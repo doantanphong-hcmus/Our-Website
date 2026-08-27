@@ -1,0 +1,15 @@
+{
+  "name": "our-website",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": "24.16.0",
+    "npm": "11.13.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
