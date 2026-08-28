@@ -1,131 +1,93 @@
-# P0.5: Google Places zero-cost guardrail
+# P0.5: Places zero-cost guardrail
 
-- Date: 2026-08-27
-- Status: Cost model verified; live call requires an owner-controlled API key
-- Goal: rich place data with a hard operating-cost ceiling of 0 VND
+- Date: 2026-08-28
+- Status: Complete
+- Goal: keep Places usable without a billing account or accidental charges
 
 ## Decision
 
-Use Google Places Nearby Search (New) as the primary source for Blind Bag and
-restaurant candidates. One Enterprise request returns up to 20 candidates with
-the required searchable fields. Do not make a Place Details call for every
-candidate.
+Do not enable Google Places or any provider that requires a billing account.
+Do not collect, display, or rank by provider price level; hiding it is an
+intentional product decision that preserves the Blind Bag surprise.
 
-Request only this field mask:
+The first production candidate is Geoapify Places on its Free plan. It does
+not require a credit card and currently includes 3,000 credits per day. A
+Places response costs one credit per 20 returned places. The account and key
+must be owner-controlled before production.
 
-```text
-places.id,places.displayName,places.primaryType,places.types,
-places.formattedAddress,places.location,places.businessStatus,places.photos,
-places.currentOpeningHours,places.rating,places.userRatingCount,places.priceLevel
-```
+Photon remains a reproducible development spike only. Its public demo has no
+production availability guarantee.
 
-`photos` returns photo resource names in the search response. Fetch the image
-only for a result actually shown to the users. Do not request reviews or any
-Enterprise + Atmosphere field.
+## Data contract
 
-Geoapify may later provide address/opening-hours fallback when Google is
-unavailable, but it must not fabricate rating, review count, photo, or price.
+Provider data is normalized without inventing missing values:
 
-## Verified free caps
+| Field | Policy |
+|---|---|
+| Provider ID, name, type, address, coordinates | Required candidate data |
+| Distance | Calculated by the server from coordinates |
+| Opening hours | Optional; `null` means unknown, not closed |
+| Rating and review count | Optional; `null` means unknown, not zero |
+| Photo | Optional; owner-uploaded visit photos are the reliable fallback |
+| Price level | Deliberately omitted |
 
-Google's global pricing documentation dated 2026-08-25 states:
+Selection uses only known data. An unknown opening time must never become
+"closed", and a missing rating must never reduce a candidate's score. Before
+departure, the result asks the users to verify current opening information via
+the external map link.
 
-| SKU category | Monthly free usage per SKU |
+## Hard limits
+
+The application reserves one shared D1 usage counter before every Places
+request. Limits are for the whole two-account space:
+
+| Limit | Value |
 |---|---:|
-| Essentials | 10,000 requests |
-| Pro | 5,000 requests |
-| Enterprise | 1,000 requests |
+| Requests per minute | 2 |
+| Requests per day | 100 |
+| Returned places per request | 20 |
+| Automatic retries | 0 |
 
-The selected `currentOpeningHours`, `rating`, `userRatingCount`, and
-`priceLevel` fields make the search a Nearby Search Enterprise request. Google
-bills a request at the highest field SKU requested, so splitting those fields
-into repeated detail calls would add calls without helping this two-user app.
-
-## Hard application limits
-
-Use a D1 counter before each external call. The production limit is lower than
-80% of each current free cap:
-
-| Method/SKU | Daily hard limit | Monthly hard limit | Current free cap |
-|---|---:|---:|---:|
-| Nearby Search Enterprise | 20 | 600 | 1,000/month |
-| Text Search Enterprise | 5 | 150 | 1,000/month |
-| Place Details Enterprise | 5 | 150 | 1,000/month |
-| Place Details Photos | 20 | 600 | 1,000/month |
-
-These are shared limits for the entire two-account space, not per user. A
-failed provider response does not retry automatically. Any future retry must
-still consume the application counter before it sends a request.
-
-Cloud Console quotas provide a second, independent brake:
-
-| API method | Maximum requests/minute |
-|---|---:|
-| Nearby Search | 2 |
-| Text Search | 2 |
-| Place Details | 5 |
-| Place Photos | 5 |
-
-Budget alerts at 50%, 80%, and 95% are informational only. They are not a
-spending cap and cannot replace the application and API quotas.
+The daily limit is intentionally far below the provider's current free-plan
+allowance. Provider errors still consume the application reservation so a
+failure loop cannot create unbounded traffic.
 
 ## Fail-closed behavior
 
-Before calling Google, the server checks the daily and monthly counter in the
-same D1 operation that reserves one request. When a limit is reached:
+When the counter is exhausted or the provider is unavailable:
 
-1. Do not call Google and do not switch to a paid provider.
-2. Return a stable `PLACE_PROVIDER_QUOTA_EXHAUSTED` error.
-3. Keep the user's session settings so they can retry later.
-4. Offer manual address input or a provider fallback only for fields it truly
-   supplies.
-5. Never silently drop allergy, safety, distance, or opening-hours rules.
+1. Do not call another paid provider.
+2. Return `PLACE_PROVIDER_QUOTA_EXHAUSTED` or `PLACE_PROVIDER_UNAVAILABLE`.
+3. Preserve the session settings.
+4. Allow manual place/address entry and previously stored places.
+5. Never weaken allergy, safety, or distance exclusions.
 
-## Key controls
+## Key and operations controls
 
-- Store `GOOGLE_MAPS_API_KEY` only as a Cloudflare Worker secret.
-- Restrict the key to Places API (New); do not use one key for browser maps.
-- Cloudflare Workers do not have one stable outbound IP, so the primary
-  protection is server-only storage, API restriction, rate limits, and hard
-  usage counters.
-- Do not log the key, request headers, or full provider payloads.
-- Do not create a billing account or key in a technician-owned account.
-
-## Reproducible spike
-
-The script makes exactly one billable Nearby Search request and has no runtime
-dependency:
-
-```sh
-node scripts/spike-google-places.mjs --self-test
-node scripts/spike-google-places.mjs
-```
-
-On PowerShell, set the environment variable for the current process instead of
-placing the key on the command line. The live run remains pending until the
-project owner supplies an API key with the quotas above already applied.
+- Store the Geoapify key only as a Cloudflare Worker secret.
+- Restrict the key to the production origin/IP controls supported by the
+  provider; never expose it in the web bundle or logs.
+- Show the required OpenStreetMap/Geoapify attribution.
+- Review free-plan allowance and terms before production and quarterly.
+- If the free plan changes or requires billing, disable remote search and use
+  stored/manual places until an approved zero-cost provider is available.
 
 ## Release checks
 
-- [x] No wildcard field mask.
-- [x] No reviews/Atmosphere fields.
-- [x] One search request per spike execution.
-- [x] Monthly application limits remain below current free caps.
-- [x] Missing key fails before any network call.
-- [ ] Owner-controlled Google Cloud project and API key exist.
-- [ ] Cloud Console per-minute quotas are applied.
-- [ ] Live 30-place field coverage is measured in the real usage area.
-- [ ] Pricing and free caps are rechecked before production.
+- [x] No Google Cloud project or billing account is required.
+- [x] Price level is absent from the provider contract and ranking.
+- [x] Missing fields remain nullable and do not become false facts.
+- [x] App limits and fail-closed behavior are defined.
+- [x] Manual/stored-place fallback is defined.
+- [ ] Owner-controlled Geoapify account and restricted key exist.
+- [ ] Live coverage is repeated in the real usage area.
+- [ ] Attribution and current free-plan terms are checked before production.
 
-P0.5 verifies the zero-cost design. The three unchecked provider-account items
-are deployment controls and must be completed before Google is enabled in
-production; they do not justify committing a secret or creating an account in
-the technician's name.
+The unchecked items are deployment prerequisites, not blockers for building
+the provider-neutral backend contract.
 
 ## References
 
-- Pricing categories and free caps: https://developers.google.com/maps/billing-and-pricing/pricing-categories
-- Current core pricing list: https://developers.google.com/maps/billing-and-pricing/pricing
-- Nearby Search fields/SKUs: https://developers.google.com/maps/documentation/places/web-service/nearby-search
-- Places usage and billing: https://developers.google.com/maps/documentation/places/web-service/usage-and-billing
-- Cost controls and hard quotas: https://developers.google.com/maps/billing-and-pricing/manage-costs
+- Geoapify Places API and credit calculation: https://apidocs.geoapify.com/docs/places/
+- Geoapify pricing and no-card Free plan: https://www.geoapify.com/pricing/
+- Photon demo-server warning: https://github.com/komoot/photon

@@ -1,15 +1,15 @@
 # P0.4: Places data spike
 
 - Date: 2026-08-27
-- Status: Complete for free-provider coverage; Google live call deferred to P0.5
+- Status: Complete for free-provider coverage
 - Sample origin: central Ho Chi Minh City (`10.7769, 106.7009`)
 - Radius: 5 km
 - Sample size: 30 unique places
 
 ## Question
 
-Can a no-cost place provider supply the fields required by Blind Bag and Food:
-type, address, distance, opening hours, rating, review count, photo, and price?
+Can a no-cost place provider supply useful fields for Blind Bag and Food:
+type, address, distance, opening hours, rating, review count, and photo?
 
 ## Method
 
@@ -38,7 +38,7 @@ the owner confirms it.
 | Rating | 0 | 0% | Fail |
 | Review count | 0 | 0% | Fail |
 | Photo | 0 | 0% | Fail |
-| Price | 0 | 0% | Fail |
+| Price | 0 | 0% | Removed from product scope after the spike |
 
 ## Sample evidence
 
@@ -81,30 +81,25 @@ reject.
 
 ## Provider conclusion
 
-OpenStreetMap through the public Photon demo is useful for a zero-key coverage
-check, but it cannot satisfy the product requirements by itself. It has no
-rating, review count, photo, price, or opening-hours data in this sample, and a
-public demo endpoint has no production availability guarantee.
+OpenStreetMap through the public Photon demo proves that useful basic data is
+available without billing. It has no rating, review count, photo, price, or
+opening-hours data in this sample, and a public demo endpoint has no production
+availability guarantee. Missing optional fields must therefore remain `null`.
 
-Google Places remains the preferred candidate because its current API schema
-contains `formattedAddress`, `location`, `types`, `photos`,
-`currentOpeningHours`, `priceLevel`, `rating`, and `userRatingCount`. Those
-fields cross Pro and Enterprise SKUs, so a live 30-place Google test must wait
-for P0.5 to approve billing, field masks, and hard quotas. No billing account or
-API key was created during this spike.
+After the spike, the owner rejected providers that require billing and removed
+price level from the product scope to preserve the surprise. P0.5 records the
+no-billing production guardrails and provider candidate.
 
 ## Decision
 
-1. Do not use a public OSM geocoder as the production Places provider.
-2. Keep OSM/Photon only as reproducible evidence of the free-data gap.
-3. Test Google Places live after P0.5 proves it cannot spend beyond the approved
-   zero-cost cap.
-4. Do not start the Blind Bag candidate pipeline until the live provider passes
-   the same 30-place field check in the real usage area.
+1. Do not use the public Photon demo as the production Places provider.
+2. Keep OSM/Photon as reproducible evidence and development data only.
+3. Do not enable Google Places or another provider requiring billing.
+4. Build the backend contract with nullable optional fields and repeat the live
+   coverage check against the approved no-card provider before production.
 
 ## References
 
 - Photon API: https://github.com/komoot/photon/blob/master/docs/api-v1.md
 - Photon demo-server terms: https://github.com/komoot/photon
-- Google Places Text Search fields: https://developers.google.com/maps/documentation/places/web-service/text-search
-- Google Place data fields and SKUs: https://developers.google.com/maps/documentation/places/web-service/data-fields
+- Geoapify Places API: https://apidocs.geoapify.com/docs/places/
