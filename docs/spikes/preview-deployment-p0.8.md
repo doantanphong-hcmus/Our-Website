@@ -24,6 +24,9 @@ Worker preview được tách khỏi spike realtime P0.7 vì Cloudflare không t
 
 ## Trạng thái
 
-GitHub đã kết nối. URL đang hoạt động: `https://our-website-preview.historyplus123.workers.dev`.
+Đã đóng ngày 2026-08-29:
 
-Chưa đóng — commit cập nhật này dùng để kích hoạt và xác minh lần build đầu tiên từ GitHub.
+- GitHub đã kết nối và deploy thành công commit `79e94ed` từ nhánh `main`.
+- Cloudflare Version: `4f132993-522e-4c59-bc65-4ec1e86fd91d` (100% traffic).
+- URL: `https://our-website-preview.historyplus123.workers.dev`.
+- `/health`: `{"ok":true,"service":"our-website-preview"}`.
