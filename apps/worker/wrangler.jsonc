@@ -1,0 +1,20 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "our-website-realtime-spike",
+  "main": "src/realtime-spike.ts",
+  "compatibility_date": "2026-08-29",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_ROOM",
+        "class_name": "RealtimeRoom"
+      }
+    ]
+  },
+  "exports": {
+    "RealtimeRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}

@@ -8,8 +8,15 @@
     "node": "24.16.0",
     "npm": "11.13.0"
   },
+  "scripts": {
+    "spike:realtime:server": "wrangler dev --config apps/worker/wrangler.jsonc --port 8787",
+    "spike:realtime:check": "node scripts/spike-realtime.mjs"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  }
 }
