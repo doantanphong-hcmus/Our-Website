@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>P1.1 Design Foundation</title>
+    <link rel="stylesheet" href="src/styles.css" />
+    <style>
+      body { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22.5rem), 1fr)); }
+      .theme { min-block-size: 100dvh; background: var(--color-canvas); color: var(--color-text); }
+      .eyebrow { color: var(--color-shared); font-size: var(--font-small); font-weight: 700; }
+      .muted { color: var(--color-text-muted); }
+      .card { padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-large); background: var(--color-surface); box-shadow: var(--shadow-card); }
+      .people { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-block: var(--space-5); }
+      .person { padding: var(--space-4); border-radius: var(--radius-medium); font-weight: 700; }
+      .one { background: var(--color-user-one-soft); color: var(--color-user-one); }
+      .two { background: var(--color-user-two-soft); color: var(--color-user-two); }
+      .shared { padding: var(--space-4); border-inline-start: .25rem solid var(--color-shared); background: var(--color-shared-soft); }
+      .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-5); }
+      button { padding-inline: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface-muted); color: var(--color-text); cursor: pointer; transition: transform var(--duration-fast) var(--ease-standard); }
+      button:hover { transform: translateY(calc(var(--motion-distance) * -0.12)); }
+      .primary { border-color: transparent; background: var(--color-shared); color: var(--color-canvas); }
+    </style>
+  </head>
+  <body>
+    <main class="theme safe-area" aria-labelledby="light-title">
+      <p class="eyebrow">Giao diện sáng</p>
+      <section class="card">
+        <h1 id="light-title">Một góc nhỏ của hai đứa</h1>
+        <p class="muted">Nhẹ nhàng, trưởng thành và đủ rõ trên màn hình điện thoại.</p>
+        <div class="people" aria-label="Màu đại diện của hai tài khoản">
+          <div class="person one">Người thứ nhất</div>
+          <div class="person two">Người thứ hai</div>
+        </div>
+        <p class="shared"><strong>Không gian chung</strong><br />Màu hòa trộn luôn đi cùng nhãn, không truyền đạt chỉ bằng màu.</p>
+        <div class="actions">
+          <button class="primary" type="button">Tiếp tục</button>
+          <button type="button">Quay lại</button>
+        </div>
+      </section>
+    </main>
+
+    <main class="theme safe-area" data-theme="dark" aria-labelledby="dark-title">
+      <p class="eyebrow">Giao diện tối</p>
+      <section class="card">
+        <h1 id="dark-title">Vẫn ấm áp khi trời tối</h1>
+        <p class="muted">Tím than thay cho màu đen tuyệt đối, giữ tương phản và cảm giác dịu mắt.</p>
+        <div class="people" aria-label="Màu đại diện của hai tài khoản">
+          <div class="person one">Người thứ nhất</div>
+          <div class="person two">Người thứ hai</div>
+        </div>
+        <p class="shared"><strong>Không gian chung</strong><br />Cùng hệ màu, nhưng mọi trạng thái vẫn có chữ hoặc biểu tượng đi kèm.</p>
+        <div class="actions">
+          <button class="primary" type="button">Tiếp tục</button>
+          <button type="button">Quay lại</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
