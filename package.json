@@ -13,6 +13,7 @@
     "web:build": "npm run build -w @our-website/web",
     "web:preview": "npm run preview -w @our-website/web -- --host 127.0.0.1",
     "web:check": "node scripts/check-app-shell.mjs",
+    "web:auth-check": "node scripts/check-auth-frontend.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config apps/worker/wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --config apps/worker/wrangler.jsonc --file apps/worker/seed.sql",
     "db:check": "node scripts/check-d1-schema.mjs",

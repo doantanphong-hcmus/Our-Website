@@ -14,6 +14,11 @@ async function main() {
 
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 800 } });
+    await page.route("**/api/auth/session", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ user: { id: "user-phong", coupleSpaceId: "couple-main", displayName: "Phong" } }),
+    }));
     await page.goto(baseUrl);
 
     const nav = page.getByRole("navigation", { name: "Điều hướng chính" });

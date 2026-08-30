@@ -78,7 +78,7 @@ export function App() {
             <AppLink path="/doi-mat-khau">Đổi mật khẩu</AppLink>
             <label><span>Chế độ tối</span><input type="checkbox" checked={dark} onChange={(event) => setDark(event.target.checked)} /></label>
             <label><span>Giảm chuyển động</span><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} /></label>
-            <button type="button" disabled title="Được kết nối khi hoàn thành xác thực ở P1.6">Đăng xuất</button>
+            <button type="button" disabled title="Được kết nối trong P1.7">Đăng xuất</button>
           </div>
         </details>
       </header>

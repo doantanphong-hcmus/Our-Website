@@ -6,6 +6,236 @@ a {
   color: inherit;
 }
 
+button {
+  border: 0;
+  border-radius: var(--radius-medium);
+  background: var(--color-shared);
+  color: var(--color-surface);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.auth-status,
+.login-page {
+  min-block-size: 100dvh;
+  max-inline-size: 30rem;
+  margin-inline: auto;
+  background:
+    radial-gradient(circle at 15% 5%, var(--color-user-one-soft), transparent 32%),
+    radial-gradient(circle at 90% 25%, var(--color-user-two-soft), transparent 28%),
+    var(--color-canvas);
+}
+
+.auth-status {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: max(var(--space-6), var(--safe-top)) max(var(--space-5), var(--safe-right)) max(var(--space-6), var(--safe-bottom)) max(var(--space-5), var(--safe-left));
+  text-align: center;
+}
+
+.auth-status h1 {
+  max-inline-size: 18rem;
+  margin-block: var(--space-5) var(--space-2);
+  font-size: 1.5rem;
+}
+
+.auth-status p {
+  max-inline-size: 20rem;
+  color: var(--color-text-muted);
+}
+
+.auth-status button {
+  padding-inline: var(--space-5);
+}
+
+.auth-status__pulse {
+  inline-size: 3rem;
+  block-size: 0.35rem;
+  margin-block-start: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-shared-soft);
+  box-shadow: inset 1.5rem 0 var(--color-shared);
+  animation: auth-pulse var(--duration-slow) var(--ease-standard) infinite alternate;
+}
+
+@keyframes auth-pulse {
+  to { transform: scaleX(0.72); }
+}
+
+.product-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-shared);
+  box-shadow: var(--shadow-card);
+  font-size: 1.2rem;
+  font-weight: 850;
+  letter-spacing: -0.08em;
+}
+
+.product-mark span {
+  margin-inline: 0.08em;
+  color: var(--color-user-one);
+  font-weight: 500;
+}
+
+.login-page {
+  display: grid;
+  align-items: end;
+  overflow-y: auto;
+  padding: max(var(--space-4), var(--safe-top)) max(var(--space-4), var(--safe-right)) max(var(--space-4), var(--safe-bottom)) max(var(--space-4), var(--safe-left));
+}
+
+.login-card {
+  inline-size: 100%;
+  max-inline-size: 27rem;
+  margin-inline: auto;
+  padding: clamp(1.25rem, 5vw, 2rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.login-heading .product-mark {
+  margin-block-end: var(--space-5);
+}
+
+.login-heading h1 {
+  margin-block-end: var(--space-2);
+}
+
+.login-heading > p:last-child {
+  margin-block-end: 0;
+  color: var(--color-text-muted);
+}
+
+.login-illustration {
+  position: relative;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: var(--space-4);
+  block-size: 6rem;
+  margin-block: var(--space-4);
+  overflow: hidden;
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+}
+
+.login-illustration > b {
+  position: absolute;
+  inset-block-end: 0.75rem;
+  inline-size: 9rem;
+  block-size: 1px;
+  background: var(--color-shared);
+  opacity: 0.35;
+}
+
+.character {
+  position: relative;
+  z-index: 1;
+  inline-size: 2.8rem;
+  block-size: 3.7rem;
+  border-radius: 1.25rem 1.25rem 0.65rem 0.65rem;
+  background: var(--color-user-one);
+}
+
+.character i {
+  position: absolute;
+  inset-block-start: -1.55rem;
+  inset-inline-start: 50%;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 0.3rem solid color-mix(in srgb, var(--color-text) 70%, transparent);
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  transform: translateX(-50%);
+}
+
+.character--two {
+  block-size: 4rem;
+  border-radius: 0.75rem 0.75rem 0.35rem 0.35rem;
+  background: var(--color-user-two);
+}
+
+.character--two i {
+  border-radius: 0.65rem;
+}
+
+.login-card form {
+  display: grid;
+}
+
+.login-card label {
+  margin-block: var(--space-3) var(--space-1);
+  font-size: var(--font-small);
+  font-weight: 750;
+}
+
+.login-card input {
+  inline-size: 100%;
+  min-block-size: 3rem;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-inline-end: 4.5rem;
+}
+
+.password-field button {
+  position: absolute;
+  inset-block: 0.2rem;
+  inset-inline-end: 0.2rem;
+  min-inline-size: 4rem;
+  min-block-size: auto;
+  background: transparent;
+  color: var(--color-shared);
+}
+
+.login-feedback {
+  min-block-size: 3.25rem;
+  padding-block-start: var(--space-2);
+  color: var(--color-danger);
+  font-size: var(--font-small);
+}
+
+.login-feedback p {
+  margin: 0;
+}
+
+.login-submit {
+  min-block-size: 3.25rem;
+}
+
+@media (max-height: 42rem) {
+  .login-illustration {
+    display: none;
+  }
+
+  .login-heading .product-mark {
+    margin-block-end: var(--space-3);
+  }
+}
+
 .app-shell {
   min-block-size: 100dvh;
   max-inline-size: 30rem;
