@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { handleAuth } from "./auth";
 
 interface RoomState {
   version: number;
@@ -8,6 +9,8 @@ interface RoomState {
 
 interface Env {
   REALTIME_ROOM: DurableObjectNamespace<RealtimeRoom>;
+  DB: D1Database;
+  AUTH_PEPPER: string;
 }
 
 const initialState: RoomState = { version: 0, value: 0, lastCommandId: null };
@@ -16,6 +19,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true });
+    if (url.pathname.startsWith("/api/auth/")) {
+      try {
+        return await handleAuth(request, env) ?? new Response("Not found", { status: 404 });
+      } catch {
+        return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });
+      }
+    }
     if (url.pathname !== "/ws") return new Response("Not found", { status: 404 });
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
