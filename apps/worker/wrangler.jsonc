@@ -3,6 +3,13 @@
   "name": "our-website-realtime-spike",
   "main": "src/realtime-spike.ts",
   "compatibility_date": "2026-08-29",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "our-website",
+      "migrations_dir": "migrations"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
