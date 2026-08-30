@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
 
 const baseUrl = process.env.WEB_URL ?? "http://127.0.0.1:4173";
-const user = { id: "user-phong", coupleSpaceId: "couple-main", displayName: "Phong" };
+const user = {
+  id: "user-phong", coupleSpaceId: "couple-main", username: "phong", displayName: "Phong",
+  nickname: "Phong", avatarKey: "initials", color: "#9F3F59", role: "boyfriend",
+  preferences: { theme: "system", reducedMotion: false },
+};
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function main() {

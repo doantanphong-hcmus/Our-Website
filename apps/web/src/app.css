@@ -365,8 +365,14 @@ button:disabled {
 }
 
 .avatar-menu__panel button {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+.avatar-menu__error {
+  margin: var(--space-1) var(--space-3);
+  color: var(--color-danger);
+  font-size: var(--font-small);
 }
 
 main {
@@ -382,6 +388,131 @@ main {
   border-radius: var(--radius-large);
   background: color-mix(in srgb, var(--color-surface) 92%, transparent);
   box-shadow: var(--shadow-card);
+}
+
+.settings-card {
+  padding: clamp(1.25rem, 6vw, 2rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.settings-card h1 {
+  margin-block-end: var(--space-2);
+}
+
+.settings-intro {
+  margin-block-end: var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.settings-card form {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.settings-card form > label:not(.setting-toggle),
+.settings-card legend {
+  margin-block-start: var(--space-2);
+  font-size: var(--font-small);
+  font-weight: 750;
+}
+
+.settings-card :where(input:not([type="radio"]):not([type="checkbox"]), select) {
+  inline-size: 100%;
+  min-block-size: 3rem;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.settings-card input[type="color"] {
+  padding: var(--space-1);
+}
+
+.settings-card fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.avatar-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.avatar-options label {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-block-size: 4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  cursor: pointer;
+}
+
+.avatar-options input {
+  position: absolute;
+  opacity: 0;
+}
+
+.avatar-options label:has(input:checked) {
+  border-color: var(--color-shared);
+  box-shadow: inset 0 0 0 2px var(--color-shared);
+}
+
+.avatar-options label:has(input:focus-visible) {
+  outline: 0.1875rem solid var(--color-focus);
+  outline-offset: 0.1875rem;
+}
+
+.avatar-preview {
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+}
+
+.avatar-preview--rose { background: var(--color-user-one); }
+.avatar-preview--sage { background: var(--color-user-two); border-radius: 0.7rem; }
+.avatar-preview--plum { background: var(--color-shared); border-radius: 35% 65% 45% 55%; }
+
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 3rem;
+  margin-block-start: var(--space-2);
+  font-weight: 700;
+}
+
+.setting-toggle input {
+  inline-size: 1.35rem;
+  min-block-size: 1.35rem;
+  accent-color: var(--color-shared);
+}
+
+.settings-feedback {
+  min-block-size: 3rem;
+  padding-block: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+}
+
+.settings-feedback[role="alert"] {
+  color: var(--color-danger);
+}
+
+.settings-card button[type="submit"] {
+  min-block-size: 3.25rem;
 }
 
 .route-card__icon {

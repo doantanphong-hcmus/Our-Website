@@ -1,28 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { App } from "./App";
-
-type User = {
-  id: string;
-  coupleSpaceId: string;
-  displayName: string;
-};
+import { userFrom, type User } from "./user";
 
 type AuthState =
   | { kind: "checking" }
   | { kind: "guest" }
   | { kind: "authenticated"; user: User }
   | { kind: "unavailable" };
-
-function userFrom(payload: unknown): User | null {
-  const user = payload && typeof payload === "object" && "user" in payload ? payload.user : null;
-  if (!user || typeof user !== "object") return null;
-  const candidate = user as Record<string, unknown>;
-  return typeof candidate.id === "string"
-    && typeof candidate.coupleSpaceId === "string"
-    && typeof candidate.displayName === "string"
-    ? candidate as User
-    : null;
-}
 
 function StatusScreen({ retry }: { retry?: () => void }) {
   return (
@@ -167,8 +151,18 @@ export function AuthApp() {
     if (auth.kind !== "authenticated") document.title = `${auth.kind === "guest" ? "Đăng nhập" : "Đang kết nối"} · Phong & Nhi`;
   }, [auth.kind]);
 
+  async function logout() {
+    const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    if (!response.ok) throw new Error("Không thể đăng xuất lúc này.");
+    setAuth({ kind: "guest" });
+  }
+
   if (auth.kind === "checking") return <StatusScreen />;
   if (auth.kind === "unavailable") return <StatusScreen retry={() => void checkSession()} />;
   if (auth.kind === "guest") return <Login onSuccess={(user) => setAuth({ kind: "authenticated", user })} />;
-  return <App />;
+  return <App
+    user={auth.user}
+    onUserChange={(user) => setAuth({ kind: "authenticated", user })}
+    onLogout={logout}
+  />;
 }

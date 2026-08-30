@@ -14,11 +14,21 @@ async function main() {
 
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 800 } });
+    let user = {
+      id: "user-phong", coupleSpaceId: "couple-main", username: "phong", displayName: "Phong",
+      nickname: "Phong", avatarKey: "initials", color: "#9F3F59", role: "boyfriend",
+      preferences: { theme: "system", reducedMotion: false },
+    };
     await page.route("**/api/auth/session", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ user: { id: "user-phong", coupleSpaceId: "couple-main", displayName: "Phong" } }),
+      body: JSON.stringify({ user }),
     }));
+    await page.route("**/api/auth/profile", async (route) => {
+      const changes = route.request().postDataJSON();
+      user = { ...user, preferences: { ...user.preferences, ...changes } };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user }) });
+    });
     await page.goto(baseUrl);
 
     const nav = page.getByRole("navigation", { name: "Điều hướng chính" });
@@ -31,8 +41,10 @@ async function main() {
 
     await page.locator("summary[aria-label='Mở menu tài khoản']").click();
     await page.getByText("Chế độ tối").click();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
     assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
-    await page.getByText("Giảm chuyển động").click();
+    await page.locator(".avatar-menu label", { hasText: "Giảm chuyển động" }).locator("input").click();
+    await page.waitForFunction(() => document.documentElement.dataset.motion === "reduced");
     assert.equal(await page.locator("html").getAttribute("data-motion"), "reduced");
 
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);

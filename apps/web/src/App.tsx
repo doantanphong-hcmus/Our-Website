@@ -1,4 +1,5 @@
-import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from "react";
+import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type MouseEvent } from "react";
+import { userFrom, type User } from "./user";
 
 type Route = {
   path: string;
@@ -39,10 +40,169 @@ function AppLink({ path, ...props }: AppLinkProps) {
   return <a {...props} href={path} onClick={(event) => navigate(event, path)} />;
 }
 
-export function App() {
+type ProfileChanges = Partial<{
+  nickname: string;
+  avatarKey: string;
+  color: string;
+  theme: string;
+  reducedMotion: boolean;
+}>;
+
+async function errorFrom(response: Response): Promise<string> {
+  const payload: unknown = await response.json().catch(() => null);
+  return payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+    ? payload.error
+    : "Không thể lưu thay đổi. Vui lòng thử lại.";
+}
+
+function ProfileSettings({ user, save }: { user: User; save: (changes: ProfileChanges) => Promise<void> }) {
+  const [nickname, setNickname] = useState(user.nickname ?? "");
+  const [avatarKey, setAvatarKey] = useState(user.avatarKey ?? "initials");
+  const [color, setColor] = useState(user.color);
+  const [theme, setTheme] = useState(user.preferences.theme);
+  const [reducedMotion, setReducedMotion] = useState(user.preferences.reducedMotion);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setNickname(user.nickname ?? "");
+    setAvatarKey(user.avatarKey ?? "initials");
+    setColor(user.color);
+    setTheme(user.preferences.theme);
+    setReducedMotion(user.preferences.reducedMotion);
+  }, [user]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setMessage("");
+    setError("");
+    try {
+      await save({
+        nickname,
+        avatarKey,
+        color,
+        theme,
+        reducedMotion,
+      });
+      setMessage("Đã lưu thông tin của ông.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể lưu thay đổi.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="settings-card" aria-labelledby="page-title">
+      <p className="eyebrow">Cá nhân</p>
+      <h1 id="page-title">Thông tin tài khoản</h1>
+      <p className="settings-intro">Tên đăng nhập <strong>{user.username}</strong> · {user.role === "boyfriend" ? "Bạn trai" : "Bạn gái"}</p>
+      <form onSubmit={submit} aria-busy={pending}>
+        <label htmlFor="nickname">Biệt danh</label>
+        <input id="nickname" name="nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={80} />
+
+        <fieldset>
+          <legend>Ảnh đại diện</legend>
+          <div className="avatar-options">
+            {["initials", "rose", "sage", "plum"].map((avatar) => (
+              <label key={avatar}>
+                <input type="radio" name="avatarKey" value={avatar} checked={avatarKey === avatar} onChange={() => setAvatarKey(avatar as NonNullable<User["avatarKey"]>)} />
+                <span className={`avatar-preview avatar-preview--${avatar}`} style={{ backgroundColor: avatar === "initials" ? user.color : undefined }}>
+                  {avatar === "initials" ? user.displayName.slice(0, 1).toUpperCase() : ""}
+                </span>
+                <span className="sr-only">{avatar === "initials" ? "Chữ cái" : `Mẫu ${avatar}`}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label htmlFor="profile-color">Màu đại diện</label>
+        <input id="profile-color" name="color" type="color" value={color} onChange={(event) => setColor(event.target.value)} />
+
+        <label htmlFor="profile-theme">Giao diện</label>
+        <select id="profile-theme" name="theme" value={theme} onChange={(event) => setTheme(event.target.value as User["preferences"]["theme"])}>
+          <option value="system">Theo thiết bị</option>
+          <option value="light">Sáng</option>
+          <option value="dark">Tối</option>
+        </select>
+
+        <label className="setting-toggle">
+          <span>Giảm chuyển động</span>
+          <input name="reducedMotion" type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} />
+        </label>
+        <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
+        <button type="submit" disabled={pending}>{pending ? "Đang lưu…" : "Lưu thay đổi"}</button>
+      </form>
+    </section>
+  );
+}
+
+function ChangePassword({ onChanged }: { onChanged: (user: User) => void }) {
+  const [show, setShow] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const currentPassword = String(form.get("currentPassword") ?? "");
+    const newPassword = String(form.get("newPassword") ?? "");
+    if (newPassword !== form.get("confirmPassword")) return setError("Hai mật khẩu mới chưa khớp.");
+    setPending(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const payload: unknown = await response.clone().json().catch(() => null);
+      const user = response.ok ? userFrom(payload) : null;
+      if (!user) throw new Error(await errorFrom(response));
+      onChanged(user);
+      formElement.reset();
+      setMessage("Đã đổi mật khẩu và đăng xuất các thiết bị cũ.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể đổi mật khẩu.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="settings-card" aria-labelledby="page-title">
+      <p className="eyebrow">Bảo mật</p>
+      <h1 id="page-title">Đổi mật khẩu</h1>
+      <p className="settings-intro">Sau khi đổi, các phiên đăng nhập cũ sẽ hết hiệu lực.</p>
+      <form onSubmit={submit} aria-busy={pending}>
+        <label htmlFor="current-password">Mật khẩu hiện tại</label>
+        <input id="current-password" name="currentPassword" type={show ? "text" : "password"} autoComplete="current-password" required />
+        <label htmlFor="new-password">Mật khẩu mới</label>
+        <input id="new-password" name="newPassword" type={show ? "text" : "password"} autoComplete="new-password" minLength={12} required />
+        <label htmlFor="confirm-password">Nhập lại mật khẩu mới</label>
+        <input id="confirm-password" name="confirmPassword" type={show ? "text" : "password"} autoComplete="new-password" minLength={12} required />
+        <label className="setting-toggle"><span>Hiện mật khẩu</span><input type="checkbox" checked={show} onChange={(event) => setShow(event.target.checked)} /></label>
+        <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
+        <button type="submit" disabled={pending}>{pending ? "Đang đổi…" : "Đổi mật khẩu"}</button>
+      </form>
+    </section>
+  );
+}
+
+export function App({ user, onUserChange, onLogout }: {
+  user: User;
+  onUserChange: (user: User) => void;
+  onLogout: () => Promise<void>;
+}) {
   const [pathname, setPathname] = useState(window.location.pathname);
-  const [dark, setDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [menuPending, setMenuPending] = useState(false);
+  const [menuError, setMenuError] = useState("");
 
   useEffect(() => {
     const syncPath = () => setPathname(window.location.pathname);
@@ -51,12 +211,31 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-  }, [dark]);
+    if (user.preferences.theme === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = user.preferences.theme;
+    document.documentElement.dataset.motion = user.preferences.reducedMotion ? "reduced" : "full";
+  }, [user.preferences]);
 
-  useEffect(() => {
-    document.documentElement.dataset.motion = reducedMotion ? "reduced" : "full";
-  }, [reducedMotion]);
+  async function saveProfile(changes: ProfileChanges) {
+    const response = await fetch("/api/auth/profile", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    const payload: unknown = await response.clone().json().catch(() => null);
+    const updated = response.ok ? userFrom(payload) : null;
+    if (!updated) throw new Error(await errorFrom(response));
+    onUserChange(updated);
+  }
+
+  async function menuAction(action: () => Promise<void>) {
+    setMenuPending(true);
+    setMenuError("");
+    try { await action(); }
+    catch (reason) { setMenuError(reason instanceof Error ? reason.message : "Không thể thực hiện."); }
+    finally { setMenuPending(false); }
+  }
 
   const route = [...bottomRoutes, ...extraRoutes].find((item) => item.path === pathname);
   const activeBottomPath = pathname.startsWith("/di-dau") ? "/di-dau" : pathname;
@@ -71,20 +250,25 @@ export function App() {
       <header className="top-bar">
         <AppLink path="/" className="brand" aria-label="Về trang chủ">P<span aria-hidden="true">&</span>N</AppLink>
         <details className="avatar-menu">
-          <summary aria-label="Mở menu tài khoản"><span aria-hidden="true">PN</span></summary>
+          <summary aria-label="Mở menu tài khoản" style={{ background: user.color }}><span aria-hidden="true">{(user.nickname ?? user.displayName).slice(0, 2).toUpperCase()}</span></summary>
           <div className="avatar-menu__panel">
-            <p className="avatar-menu__name">Phong & Nhi</p>
+            <p className="avatar-menu__name">{user.nickname ?? user.displayName}</p>
             <AppLink path="/tai-khoan">Thông tin tài khoản</AppLink>
             <AppLink path="/doi-mat-khau">Đổi mật khẩu</AppLink>
-            <label><span>Chế độ tối</span><input type="checkbox" checked={dark} onChange={(event) => setDark(event.target.checked)} /></label>
-            <label><span>Giảm chuyển động</span><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} /></label>
-            <button type="button" disabled title="Được kết nối trong P1.7">Đăng xuất</button>
+            <label><span>Chế độ tối</span><input type="checkbox" checked={user.preferences.theme === "dark"} disabled={menuPending} onChange={(event) => void menuAction(() => saveProfile({ theme: event.target.checked ? "dark" : "light" }))} /></label>
+            <label><span>Giảm chuyển động</span><input type="checkbox" checked={user.preferences.reducedMotion} disabled={menuPending} onChange={(event) => void menuAction(() => saveProfile({ reducedMotion: event.target.checked }))} /></label>
+            {menuError && <p className="avatar-menu__error" role="alert">{menuError}</p>}
+            <button type="button" disabled={menuPending} onClick={() => void menuAction(onLogout)}>Đăng xuất</button>
           </div>
         </details>
       </header>
 
       <main id="main-content" tabIndex={-1}>
-        {route ? (
+        {route?.path === "/tai-khoan" ? (
+          <ProfileSettings user={user} save={saveProfile} />
+        ) : route?.path === "/doi-mat-khau" ? (
+          <ChangePassword onChanged={onUserChange} />
+        ) : route ? (
           <section className="route-card" aria-labelledby="page-title">
             <span className="route-card__icon" aria-hidden="true">{route.icon}</span>
             <p className="eyebrow">{route.eyebrow}</p>
