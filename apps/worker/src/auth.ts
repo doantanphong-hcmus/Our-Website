@@ -22,6 +22,11 @@ interface LimitRow {
   blocked_until: number;
 }
 
+interface SessionInfo {
+  user: UserRow;
+  tokenHash: string;
+}
+
 const encoder = new TextEncoder();
 const COOKIE = "__Host-our_session";
 const ITERATIONS = 50_000;
@@ -216,20 +221,26 @@ async function login(request: Request, env: AuthEnv): Promise<Response> {
 }
 
 async function currentSession(request: Request, env: AuthEnv): Promise<Response> {
+  const session = await authenticatedUser(request, env);
+  if (!session) return json({ error: "Phiên đăng nhập đã hết hạn." }, 401, { "Set-Cookie": sessionCookie("", 0) });
+  return json({ user: publicUser(session.user) });
+}
+
+async function authenticatedUser(request: Request, env: AuthEnv): Promise<SessionInfo | null> {
   const token = cookieValue(request);
-  if (!token || token.length !== 43) return json({ error: "Chưa đăng nhập." }, 401);
+  if (!token || token.length !== 43) return null;
   const now = Math.floor(Date.now() / 1000);
   const tokenHash = await sha256(token);
   const user = await env.DB.prepare(`${userSql}
     JOIN auth_sessions s ON s.user_id = u.id
     WHERE s.token_hash = ? AND s.revoked_at IS NULL
       AND s.expires_at > ? AND s.idle_expires_at > ?`).bind(tokenHash, now, now).first<UserRow>();
-  if (!user) return json({ error: "Phiên đăng nhập đã hết hạn." }, 401, { "Set-Cookie": sessionCookie("", 0) });
+  if (!user) return null;
 
   await env.DB.prepare(`UPDATE auth_sessions SET
     last_seen_at = ?, idle_expires_at = min(expires_at, ?)
     WHERE token_hash = ? AND last_seen_at < ?`).bind(now, now + IDLE_SECONDS, tokenHash, now - 900).run();
-  return json({ user: publicUser(user) });
+  return { user, tokenHash };
 }
 
 async function logout(request: Request, env: AuthEnv): Promise<Response> {
@@ -244,10 +255,101 @@ async function logout(request: Request, env: AuthEnv): Promise<Response> {
   });
 }
 
+async function updateProfile(request: Request, env: AuthEnv): Promise<Response> {
+  const session = await authenticatedUser(request, env);
+  if (!session) return json({ error: "Phiên đăng nhập đã hết hạn." }, 401);
+
+  let input: Record<string, unknown>;
+  try {
+    const body: unknown = await request.json();
+    input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  } catch {
+    return json({ error: "Thông tin cập nhật không hợp lệ." }, 400);
+  }
+
+  const has = (key: string) => Object.hasOwn(input, key);
+  const nicknameInput = has("nickname") ? input.nickname : session.user.nickname;
+  const avatarInput = has("avatarKey") ? input.avatarKey : session.user.avatar_key ?? "initials";
+  const colorInput = has("color") ? input.color : session.user.color;
+  const themeInput = has("theme") ? input.theme : session.user.theme;
+  const motionInput = has("reducedMotion") ? input.reducedMotion : Boolean(session.user.reduced_motion);
+  const nickname = typeof nicknameInput === "string" ? nicknameInput.trim() || null : nicknameInput;
+  const avatars = ["initials", "rose", "sage", "plum"];
+
+  if ((nickname !== null && (typeof nickname !== "string" || nickname.length > 80))
+    || typeof avatarInput !== "string" || !avatars.includes(avatarInput)
+    || typeof colorInput !== "string" || !/^#[0-9a-f]{6}$/i.test(colorInput)
+    || typeof themeInput !== "string" || !["system", "light", "dark"].includes(themeInput)
+    || typeof motionInput !== "boolean") {
+    return json({ error: "Thông tin cập nhật không hợp lệ." }, 400);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET nickname = ?, avatar_key = ?, color = ?, updated_at = ? WHERE id = ?")
+      .bind(nickname, avatarInput, colorInput.toUpperCase(), now, session.user.id),
+    env.DB.prepare("UPDATE user_preferences SET theme = ?, reduced_motion = ?, updated_at = ? WHERE user_id = ?")
+      .bind(themeInput, motionInput ? 1 : 0, now, session.user.id),
+  ]);
+  const user = await env.DB.prepare(`${userSql} WHERE u.id = ?`).bind(session.user.id).first<UserRow>();
+  return json({ user: publicUser(user!) });
+}
+
+async function changePassword(request: Request, env: AuthEnv): Promise<Response> {
+  if (!env.AUTH_PEPPER || encoder.encode(env.AUTH_PEPPER).length < 32) throw new Error("AUTH_PEPPER is not configured");
+  const session = await authenticatedUser(request, env);
+  if (!session) return json({ error: "Phiên đăng nhập đã hết hạn." }, 401);
+
+  let input: { currentPassword?: unknown; newPassword?: unknown };
+  try {
+    const body: unknown = await request.json();
+    input = body && typeof body === "object" ? body : {};
+  } catch {
+    return json({ error: "Không thể đổi mật khẩu." }, 400);
+  }
+  const currentPassword = typeof input.currentPassword === "string" ? input.currentPassword : "";
+  const newPassword = typeof input.newPassword === "string" ? input.newPassword : "";
+  const newLength = encoder.encode(newPassword).length;
+  if (!currentPassword || newLength < 12 || newLength > 256) {
+    return json({ error: "Mật khẩu mới cần từ 12 đến 256 byte." }, 400);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const limitKey = await sha256(`password:${session.user.id}`);
+  const retryAfter = await blockedFor(env.DB, [limitKey], now);
+  if (retryAfter > 0) return json({ error: "Thử quá nhiều lần. Vui lòng thử lại sau." }, 429, { "Retry-After": String(retryAfter) });
+  if (!await verifyPassword(currentPassword, env.AUTH_PEPPER, session.user.password_hash)) {
+    await recordFailure(env.DB, [limitKey], now);
+    return json({ error: "Mật khẩu hiện tại không đúng." }, 400);
+  }
+  if (newPassword === currentPassword) {
+    return json({ error: "Mật khẩu mới phải khác mật khẩu hiện tại." }, 400);
+  }
+
+  const token = bytesToBase64(randomBytes(32)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  const expiresAt = now + ABSOLUTE_SECONDS;
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
+      .bind(await hashPassword(newPassword, env.AUTH_PEPPER), now, session.user.id),
+    env.DB.prepare("UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+      .bind(now, session.user.id),
+    env.DB.prepare("DELETE FROM auth_login_limits WHERE key = ?").bind(limitKey),
+    env.DB.prepare(`INSERT INTO auth_sessions
+      (id, user_id, token_hash, created_at, last_seen_at, idle_expires_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(), session.user.id, await sha256(token), now, now, now + IDLE_SECONDS, expiresAt,
+    ),
+  ]);
+  const updated = { ...session.user, password_hash: "" };
+  return json({ user: publicUser(updated) }, 200, { "Set-Cookie": sessionCookie(token) });
+}
+
 export async function handleAuth(request: Request, env: AuthEnv): Promise<Response | null> {
   const path = new URL(request.url).pathname;
   if (path === "/api/auth/login") return request.method === "POST" ? login(request, env) : json({ error: "Method not allowed" }, 405, { Allow: "POST" });
   if (path === "/api/auth/session") return request.method === "GET" ? currentSession(request, env) : json({ error: "Method not allowed" }, 405, { Allow: "GET" });
   if (path === "/api/auth/logout") return request.method === "POST" ? logout(request, env) : json({ error: "Method not allowed" }, 405, { Allow: "POST" });
+  if (path === "/api/auth/profile") return request.method === "PATCH" ? updateProfile(request, env) : json({ error: "Method not allowed" }, 405, { Allow: "PATCH" });
+  if (path === "/api/auth/change-password") return request.method === "POST" ? changePassword(request, env) : json({ error: "Method not allowed" }, 405, { Allow: "POST" });
   return null;
 }

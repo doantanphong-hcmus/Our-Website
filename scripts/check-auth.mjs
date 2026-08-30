@@ -10,6 +10,7 @@ const seed = path.join(root, "apps", "worker", "seed.sql");
 const state = path.join(root, "apps", "worker", ".wrangler", "auth-check");
 const baseUrl = "http://127.0.0.1:8795";
 const password = "correct horse battery staple";
+const newPassword = "a newer correct horse battery staple";
 const pepper = "test-only-pepper-at-least-thirty-two-bytes";
 const env = { ...process.env, CI: "1", NO_COLOR: "1", XDG_CONFIG_HOME: state, WRANGLER_LOG: "error" };
 
@@ -29,7 +30,8 @@ const peppered = createHmac("sha256", pepper).update(password).digest();
 const passwordHash = `pbkdf2-sha256+pepper$50000$${salt.toString("base64")}$${pbkdf2Sync(peppered, salt, 50_000, 32, "sha256").toString("base64")}`;
 wranglerCommand([
   "d1", "execute", ...local, "--command",
-  `UPDATE users SET password_hash = '${passwordHash}' WHERE username = 'phong'`,
+  `UPDATE users SET password_hash = '${passwordHash}', nickname = 'Phong', avatar_key = NULL, color = '#9F3F59' WHERE username = 'phong';
+   UPDATE user_preferences SET theme = 'system', reduced_motion = 0 WHERE user_id = 'user-phong'`,
 ]);
 
 const server = spawn(process.execPath, [
@@ -85,16 +87,65 @@ try {
   const current = await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: firstCookie } });
   assert.equal(current.status, 200);
   assert.equal((await current.json()).user.coupleSpaceId, "couple-main");
+  assert.equal((await fetch(`${baseUrl}/api/auth/profile`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme: "dark" }),
+  })).status, 401);
+
+  const partialProfile = await fetch(`${baseUrl}/api/auth/profile`, {
+    method: "PATCH",
+    headers: { Cookie: firstCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ theme: "light" }),
+  });
+  assert.equal(partialProfile.status, 200);
+  assert.equal((await partialProfile.json()).user.avatarKey, "initials");
+
+  const profile = await fetch(`${baseUrl}/api/auth/profile`, {
+    method: "PATCH",
+    headers: { Cookie: firstCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: "user-nhi", nickname: "Phong mới", avatarKey: "rose", color: "#884466", theme: "dark", reducedMotion: true }),
+  });
+  assert.equal(profile.status, 200);
+  const profileUser = (await profile.json()).user;
+  assert.equal(profileUser.id, "user-phong");
+  assert.deepEqual(
+    { nickname: profileUser.nickname, avatarKey: profileUser.avatarKey, color: profileUser.color, preferences: profileUser.preferences },
+    { nickname: "Phong mới", avatarKey: "rose", color: "#884466", preferences: { theme: "dark", reducedMotion: true } },
+  );
+  assert.equal((await fetch(`${baseUrl}/api/auth/profile`, {
+    method: "PATCH",
+    headers: { Cookie: firstCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ color: "red" }),
+  })).status, 400);
 
   const secondLogin = await login("phong", password);
   const secondCookie = cookieFrom(secondLogin);
   assert.equal(secondLogin.status, 200);
   assert.notEqual(secondCookie, firstCookie, "Each login must rotate the session token");
 
-  const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST", headers: { Cookie: secondCookie } });
+  assert.equal((await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: "POST",
+    headers: { Cookie: secondCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword: "wrong", newPassword }),
+  })).status, 400);
+  const changed = await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: "POST",
+    headers: { Cookie: secondCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword: password, newPassword }),
+  });
+  assert.equal(changed.status, 200);
+  const rotatedCookie = cookieFrom(changed);
+  assert.notEqual(rotatedCookie, secondCookie);
+  assert.equal((await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: firstCookie } })).status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: secondCookie } })).status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: rotatedCookie } })).status, 200);
+  assert.equal((await login("phong", password)).status, 401);
+  const relogin = await login("phong", newPassword);
+  assert.equal(relogin.status, 200);
+
+  const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST", headers: { Cookie: cookieFrom(relogin) } });
   assert.equal(logout.status, 204);
   assert.match(logout.headers.get("set-cookie") ?? "", /Max-Age=0/i);
-  assert.equal((await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: secondCookie } })).status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/auth/session`, { headers: { Cookie: cookieFrom(relogin) } })).status, 401);
 
   for (let attempt = 0; attempt < 5; attempt++) {
     assert.equal((await login("rate-test", "wrong", "203.0.113.9")).status, 401);
@@ -104,7 +155,7 @@ try {
   assert.ok(Number(limited.headers.get("retry-after")) > 0);
 
   assert.ok(hashMs < 1_000, `PBKDF2 login took ${hashMs}ms`);
-  console.log(`P1.5 auth: generic errors, peppered PBKDF2 (${hashMs}ms), rotation, cookie, logout and rate limit = OK`);
+  console.log(`P1.5/P1.7 auth: PBKDF2 (${hashMs}ms), profile, password rotation, logout and rate limit = OK`);
 } finally {
   if (process.platform === "win32") {
     spawnSync("taskkill.exe", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
