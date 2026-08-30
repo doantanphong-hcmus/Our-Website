@@ -1,0 +1,258 @@
+#root {
+  min-block-size: 100dvh;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-block-size: 100dvh;
+  max-inline-size: 30rem;
+  margin-inline: auto;
+  background:
+    radial-gradient(circle at 15% 5%, var(--color-user-one-soft), transparent 30%),
+    var(--color-canvas);
+  border-inline: 1px solid color-mix(in srgb, var(--color-border), transparent 45%);
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  background: var(--color-text);
+  color: var(--color-surface);
+  transform: translateY(-150%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.top-bar {
+  position: sticky;
+  z-index: 10;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: calc(4rem + var(--safe-top));
+  padding: max(var(--space-3), var(--safe-top)) max(var(--space-4), var(--safe-right)) var(--space-3) max(var(--space-4), var(--safe-left));
+  background: color-mix(in srgb, var(--color-canvas) 88%, transparent);
+  backdrop-filter: blur(1rem);
+}
+
+.brand {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
+  color: var(--color-shared);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: -0.08em;
+}
+
+.brand span {
+  margin-inline: 0.08em;
+  color: var(--color-user-one);
+  font-weight: 500;
+}
+
+.avatar-menu {
+  position: relative;
+}
+
+.avatar-menu summary {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-user-one), var(--color-shared));
+  color: #fff;
+  box-shadow: 0 0 0 1px var(--color-border);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.avatar-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.avatar-menu__panel {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  display: grid;
+  inline-size: min(18rem, calc(100vw - 2rem));
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.avatar-menu__name {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-small);
+  font-weight: 700;
+}
+
+.avatar-menu__panel a,
+.avatar-menu__panel label,
+.avatar-menu__panel button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
+  text-decoration: none;
+}
+
+.avatar-menu__panel :where(a, label):hover {
+  background: var(--color-surface-muted);
+}
+
+.avatar-menu__panel input {
+  inline-size: 1.25rem;
+  min-block-size: 1.25rem;
+  accent-color: var(--color-shared);
+}
+
+.avatar-menu__panel button {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+main {
+  padding: var(--space-5) max(var(--space-4), var(--safe-right)) calc(7.5rem + var(--safe-bottom)) max(var(--space-4), var(--safe-left));
+}
+
+.route-card {
+  position: relative;
+  min-block-size: 22rem;
+  padding: clamp(1.5rem, 7vw, 2.25rem);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.route-card__icon {
+  display: grid;
+  place-items: center;
+  inline-size: 4.25rem;
+  block-size: 4.25rem;
+  margin-block-end: var(--space-6);
+  border-radius: 50%;
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+  font-size: 2rem;
+}
+
+.eyebrow {
+  margin-block-end: var(--space-2);
+  color: var(--color-shared);
+  font-size: var(--font-small);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.route-card h1 {
+  margin-block-end: var(--space-3);
+}
+
+.route-card > p:last-of-type {
+  max-inline-size: 28rem;
+  color: var(--color-text-muted);
+}
+
+.place-links {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-6);
+}
+
+.place-links a,
+.primary-link {
+  display: flex;
+  align-items: center;
+  min-block-size: 3rem;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.primary-link {
+  inline-size: fit-content;
+  margin-block-start: var(--space-5);
+}
+
+.bottom-nav {
+  position: fixed;
+  z-index: 9;
+  inset-block-end: 0;
+  inset-inline-start: 50%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  inline-size: min(100%, 30rem);
+  padding: var(--space-2) max(var(--space-2), var(--safe-right)) max(var(--space-2), var(--safe-bottom)) max(var(--space-2), var(--safe-left));
+  border-block-start: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(1rem);
+  transform: translateX(-50%);
+}
+
+.bottom-nav a {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 0.1rem;
+  min-inline-size: 0;
+  min-block-size: 3.5rem;
+  padding: var(--space-1);
+  border-radius: var(--radius-medium);
+  color: var(--color-text-muted);
+  font-size: clamp(0.64rem, 2.8vw, 0.75rem);
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+
+.bottom-nav a.is-active {
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+  font-weight: 800;
+}
+
+.bottom-nav__icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+@media (min-width: 31rem) {
+  .app-shell {
+    box-shadow: 0 0 4rem rgb(67 42 36 / 8%);
+  }
+}

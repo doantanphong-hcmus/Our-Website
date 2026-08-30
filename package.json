@@ -9,6 +9,10 @@
     "npm": "11.13.0"
   },
   "scripts": {
+    "web:dev": "npm run dev -w @our-website/web",
+    "web:build": "npm run build -w @our-website/web",
+    "web:preview": "npm run preview -w @our-website/web -- --host 127.0.0.1",
+    "web:check": "node scripts/check-app-shell.mjs",
     "preview:dev": "wrangler dev --config apps/preview/wrangler.jsonc --port 8788",
     "preview:check": "node scripts/check-preview.mjs",
     "spike:realtime:server": "wrangler dev --config apps/worker/wrangler.jsonc --port 8787",
