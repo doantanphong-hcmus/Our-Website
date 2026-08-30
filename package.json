@@ -19,6 +19,8 @@
     "db:seed:local": "wrangler d1 execute DB --local --config apps/worker/wrangler.jsonc --file apps/worker/seed.sql",
     "db:check": "node scripts/check-d1-schema.mjs",
     "auth:check": "node scripts/check-auth.mjs",
+    "auth:reset": "node scripts/reset-password.mjs",
+    "auth:reset-check": "node scripts/check-reset-password.mjs",
     "preview:dev": "wrangler dev --config apps/preview/wrangler.jsonc --port 8788",
     "preview:check": "node scripts/check-preview.mjs",
     "spike:realtime:server": "wrangler dev --config apps/worker/wrangler.jsonc --port 8787",
