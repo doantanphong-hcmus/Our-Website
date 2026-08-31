@@ -2,6 +2,7 @@ import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type Mo
 import { userFrom, type User } from "./user";
 import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 import { EmptyState, ErrorState, LoadingState } from "./uiStates";
+import { BlindBagForm } from "./BlindBagForm";
 
 type Route = {
   path: string;
@@ -440,6 +441,8 @@ export function App({ user, onUserChange, onLogout }: {
           <ProfileSettings user={user} save={saveProfile} />
         ) : route?.path === "/doi-mat-khau" ? (
           <ChangePassword onChanged={onUserChange} />
+        ) : route?.path === "/di-dau/xe-tui-mu" ? (
+          <BlindBagForm />
         ) : route ? (
           <section className="route-card" aria-labelledby="page-title">
             <span className="route-card__icon" aria-hidden="true">{route.icon}</span>

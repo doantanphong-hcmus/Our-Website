@@ -14,6 +14,7 @@ interface SessionRow {
   status: Status;
   created_by_user_id: string;
   version: number;
+  payload_json: string;
   expires_at: number | null;
   completed_at: number | null;
   created_at: number;
@@ -23,24 +24,59 @@ interface SessionRow {
 const features = ["blind_bag", "food_vote", "deep_talk"];
 const commandPattern = /^[A-Za-z0-9_-]{8,100}$/;
 const selectSession = `SELECT id, feature, status, created_by_user_id, version,
-  expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
+  payload_json, expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
+
+const conditionChoices = {
+  time: ["one_hour", "two_three_hours", "half_day", "any"],
+  distance: ["under_3", "three_to_five", "five_to_ten", "custom"],
+  transport: ["walk", "motorbike", "car", "any"],
+  budget: ["free_low", "under_200k", "two_to_five_hundred_k", "any"],
+  setting: ["indoor", "outdoor", "any"],
+  experience: ["food", "relax", "art", "books", "play", "explore", "any"],
+  surprise: ["gentle", "adventure", "bold"],
+} as const;
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 function publicSession(row: SessionRow) {
+  const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
   return {
     id: row.id,
     feature: row.feature,
     status: row.status,
     createdByUserId: row.created_by_user_id,
     version: row.version,
+    ...payload,
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function blindBagPayload(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  for (const [key, choices] of Object.entries(conditionChoices)) {
+    if (typeof input[key] !== "string" || !(choices as readonly string[]).includes(input[key])) return null;
+  }
+  if (input.distance === "custom"
+    && (typeof input.customDistanceKm !== "number" || !Number.isFinite(input.customDistanceKm)
+      || input.customDistanceKm < 1 || input.customDistanceKm > 100)) return null;
+  return JSON.stringify({
+    conditions: {
+      time: input.time,
+      distance: input.distance,
+      ...(input.distance === "custom" ? { customDistanceKm: input.customDistanceKm } : {}),
+      transport: input.transport,
+      budget: input.budget,
+      setting: input.setting,
+      experience: input.experience,
+      surprise: input.surprise,
+    },
+  });
 }
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
@@ -81,11 +117,13 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
     || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
     return json({ error: "Dữ liệu tạo phiên không hợp lệ." }, 400);
   }
+  const payloadJson = feature === "blind_bag" ? blindBagPayload(input?.conditions) : "{}";
+  if (!payloadJson) return json({ error: "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
 
   await expirePending(env.DB, spaceId);
   const duplicate = await env.DB.prepare(`${selectSession} WHERE couple_space_id = ? AND idempotency_key = ?`)
     .bind(spaceId, idempotencyKey).first<SessionRow>();
-  if (duplicate) return duplicate.feature === feature && duplicate.created_by_user_id === userId
+  if (duplicate) return duplicate.feature === feature && duplicate.created_by_user_id === userId && duplicate.payload_json === payloadJson
     ? json({ session: publicSession(duplicate), duplicate: true })
     : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
   if (await env.DB.prepare("SELECT 1 FROM activity_session_events WHERE idempotency_key = ?").bind(idempotencyKey).first()) {
@@ -97,9 +135,9 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
   try {
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO activity_sessions
-        (id, couple_space_id, feature, status, created_by_user_id, version, idempotency_key, expires_at, created_at, updated_at)
-        VALUES (?, ?, ?, 'pending', ?, 1, ?, ?, ?, ?)`)
-        .bind(id, spaceId, feature, userId, idempotencyKey, now + 24 * 60 * 60, now, now),
+        (id, couple_space_id, feature, status, created_by_user_id, version, idempotency_key, payload_json, expires_at, created_at, updated_at)
+        VALUES (?, ?, ?, 'pending', ?, 1, ?, ?, ?, ?, ?)`)
+        .bind(id, spaceId, feature, userId, idempotencyKey, payloadJson, now + 24 * 60 * 60, now, now),
       env.DB.prepare(`INSERT INTO activity_session_events
         (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version)
         VALUES (?, ?, ?, ?, 'create', 'none', 'pending', 1)`)
@@ -108,7 +146,7 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
   } catch {
     const retry = await env.DB.prepare(`${selectSession} WHERE couple_space_id = ? AND idempotency_key = ?`)
       .bind(spaceId, idempotencyKey).first<SessionRow>();
-    if (retry && retry.feature === feature && retry.created_by_user_id === userId) return json({ session: publicSession(retry), duplicate: true });
+    if (retry && retry.feature === feature && retry.created_by_user_id === userId && retry.payload_json === payloadJson) return json({ session: publicSession(retry), duplicate: true });
     return json({ error: "Tính năng này đang có một phiên chưa kết thúc." }, 409);
   }
   const created = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(id).first<SessionRow>();

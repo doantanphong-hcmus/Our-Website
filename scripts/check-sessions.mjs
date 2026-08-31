@@ -14,6 +14,10 @@ const baseUrl = "http://127.0.0.1:8796";
 const password = "session check password";
 const pepper = "test-only-pepper-at-least-thirty-two-bytes";
 const env = { ...process.env, CI: "1", NO_COLOR: "1", XDG_CONFIG_HOME: state, WRANGLER_LOG: "error" };
+const blindBagConditions = {
+  time: "two_three_hours", distance: "under_3", transport: "motorbike", budget: "any",
+  setting: "any", experience: "any", surprise: "gentle",
+};
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -70,7 +74,9 @@ async function request(pathname, cookie, method = "GET", input) {
 }
 
 async function create(cookie, feature, idempotencyKey) {
-  return request("/api/sessions", cookie, "POST", { feature, idempotencyKey });
+  return request("/api/sessions", cookie, "POST", {
+    feature, idempotencyKey, ...(feature === "blind_bag" ? { conditions: blindBagConditions } : {}),
+  });
 }
 
 async function act(cookie, id, action, expectedVersion, idempotencyKey) {
@@ -87,13 +93,24 @@ try {
   assert.equal(initial.response.status, 200);
   assert.equal(initial.data.sessions.find((item) => item.feature === "food_vote").status, "expired");
 
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "missing-conditions-1",
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "bad-custom-distance", conditions: { ...blindBagConditions, distance: "custom", customDistanceKm: 0 },
+  })).response.status, 400);
+
   const created = await create(phong, "blind_bag", "create-blind-001");
   assert.equal(created.response.status, 201);
   assert.equal(created.data.session.status, "pending");
+  assert.deepEqual(created.data.session.conditions, blindBagConditions);
   const sessionId = created.data.session.id;
   const replayCreate = await create(phong, "blind_bag", "create-blind-001");
   assert.equal(replayCreate.response.status, 200);
   assert.equal(replayCreate.data.duplicate, true);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "create-blind-001", conditions: { ...blindBagConditions, surprise: "bold" },
+  })).response.status, 409);
   assert.equal((await create(phong, "deep_talk", "create-blind-001")).response.status, 409);
   assert.equal((await create(nhi, "blind_bag", "create-blind-002")).response.status, 409);
   assert.equal((await act(phong, sessionId, "join", 1, "join-blind-owner")).response.status, 409);

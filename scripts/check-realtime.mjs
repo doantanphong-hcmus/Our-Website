@@ -112,7 +112,13 @@ try {
   await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "pong"));
 
   let started = performance.now();
-  const created = await api(first.page, "/api/sessions", { feature: "blind_bag", idempotencyKey: "p110-create-001" });
+  const created = await api(first.page, "/api/sessions", {
+    feature: "blind_bag", idempotencyKey: "p110-create-001",
+    conditions: {
+      time: "two_three_hours", distance: "under_3", transport: "motorbike", budget: "any",
+      setting: "any", experience: "any", surprise: "gentle",
+    },
+  });
   assert.equal(created.status, 201);
   const sessionId = created.data.session.id;
   await Promise.all([
