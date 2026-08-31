@@ -137,6 +137,6 @@
     { "id": "bo-vien-nuong", "foodStyle": "snack", "name": "Bò viên nướng", "categories": ["grilled", "snack"], "possibleAllergens": ["soy", "wheat"], "exclusionTags": ["beef"] },
     { "id": "ho-lo-nuong", "foodStyle": "snack", "name": "Hồ lô nướng", "categories": ["fast_food", "grilled", "snack"], "possibleAllergens": ["soy", "wheat"], "exclusionTags": ["pork"] },
     { "id": "khoai-lang-ken", "foodStyle": "snack", "name": "Khoai lang kén", "categories": ["dessert", "fried", "snack", "vietnamese"], "possibleAllergens": ["wheat"], "exclusionTags": ["coconut"] },
-    { "id": "banh-tieu", "foodStyle": "snack", "name": "Bánh tiêu", "categories": ["fried", "snack", "vietnamese"], "possibleAllergens": ["sesame", "wheat"], "exclusionTags": [] }
+    { "id": "oc-xao-bo-toi", "foodStyle": "snack", "name": "Ốc xào bơ tỏi", "categories": ["fried", "snack", "vietnamese"], "possibleAllergens": ["milk", "mollusc"], "exclusionTags": ["seafood"] }
   ]
 }
