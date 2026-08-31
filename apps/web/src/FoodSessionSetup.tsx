@@ -75,6 +75,22 @@ async function responseError(response: Response, fallback: string) {
   return typeof data?.error === "string" ? data.error : fallback;
 }
 
+function FoodMatchAnimation({ dish }: { dish: FoodDish }) {
+  const snack = dish.foodStyle === "snack";
+  const icon = snack ? "🍢" : "🍲";
+  return (
+    <div className={`food-match-animation food-match-animation--${dish.foodStyle}`} role="status" aria-live="polite" aria-atomic="true">
+      <div className="food-match-stage" aria-hidden="true">
+        <span className="food-match-token food-match-token--one">{icon}</span>
+        <span className="food-match-token food-match-token--two">{icon}</span>
+        <span className="food-match-token food-match-token--result">{snack ? "🍡" : "🍽️"}</span>
+      </div>
+      <strong>Trùng ý rồi!</strong>
+      <span>Hai đứa đều muốn ăn {dish.name}.</span>
+    </div>
+  );
+}
+
 function FoodVoting({ sessionId }: { sessionId: string }) {
   const [dishes, setDishes] = useState<FoodDish[]>([]);
   const [votes, setVotes] = useState<FoodVote[]>([]);
@@ -166,7 +182,7 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
   if (loading) return <LoadingState label="Đang chuẩn bị món cho riêng ông…" />;
   if (error && !dishes.length) return <ErrorState title="Chưa tải được món" retry={() => void load()}>{error}</ErrorState>;
   if (!dishes.length) return <p role="status">Chưa có món phù hợp với các điều kiện đã chọn.</p>;
-  if (match) return <div className="food-vote-done" role="status"><strong>Trùng ý rồi!</strong><span>Hai đứa đều muốn ăn {match.name}.</span></div>;
+  if (match) return <FoodMatchAnimation dish={match} />;
   if (proxy.exhausted) return <div className="food-vote-done" role="status"><strong>Chưa còn món an toàn để chốt hộ.</strong><span>Hãy chọn thêm nhóm món hoặc tạo một danh sách mới. Điều kiện dị ứng vẫn được giữ nguyên.</span></div>;
   if (proxy.proxy) return <div className="food-vote-done" role="status">
     <strong>{proxy.ready ? `Hai đứa đã cùng chốt ${proxy.proxy.name}.` : `Chốt hộ: ${proxy.proxy.name}`}</strong>

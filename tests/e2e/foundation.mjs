@@ -68,6 +68,7 @@ try {
   let proxyConfirmCommand;
   let confirmed = false;
   let proxyMode = "none";
+  let matchMode = "none";
   const foodSessionId = "00000000-0000-4000-8000-000000000032";
   await nhiPage.route("**/api/sessions**", async (route) => {
     const request = route.request();
@@ -79,7 +80,9 @@ try {
       ],
     }) });
     if (request.method() === "GET" && pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
-    if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: null }) });
+    if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: matchMode === "full_meal"
+      ? { id: "pho-bo", name: "Phở bò", foodStyle: "full_meal", categories: ["noodle"] }
+      : null }) });
     if (request.method() === "GET" && pathname.endsWith("/food-proxy")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proxyMode === "proxy"
       ? { proxy: { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] }, exhausted: false, confirmedByMe: false, ready: false }
       : { proxy: null, exhausted: proxyMode === "empty", confirmedByMe: false, ready: false }) });
@@ -122,8 +125,24 @@ try {
   assert.match(voteCommand.body.idempotencyKey, /^[0-9a-f-]{36}$/);
   await nhiPage.getByText("Trùng ý rồi!").waitFor();
   await nhiPage.getByText("Hai đứa đều muốn ăn Bánh flan.").waitFor();
+  const snackAnimation = nhiPage.locator(".food-match-animation--snack");
+  assert.equal(await snackAnimation.count(), 1);
+  assert.equal(await snackAnimation.locator(".food-match-token").count(), 3);
+  assert.equal(await snackAnimation.locator(".food-match-token--one").evaluate((element) => getComputedStyle(element).animationDuration), "1.4s");
+  await assertA11y(nhiPage);
   assert.equal(await nhiPage.getByRole("button", { name: "Muốn ăn" }).count(), 0);
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+
+  nhi.preferences.reducedMotion = true;
+  matchMode = "full_meal";
+  await nhiPage.reload();
+  const fullMealAnimation = nhiPage.locator(".food-match-animation--full_meal");
+  await fullMealAnimation.waitFor();
+  assert.equal(await nhiPage.locator("html").getAttribute("data-motion"), "reduced");
+  assert.equal(await fullMealAnimation.locator(".food-match-token--one").evaluate((element) => getComputedStyle(element).animationDuration), "0.001s");
+  await nhiPage.getByText("Hai đứa đều muốn ăn Phở bò.").waitFor();
+  nhi.preferences.reducedMotion = false;
+  matchMode = "none";
 
   proxyMode = "proxy";
   await nhiPage.goto(`${server.url}/an-gi`);
@@ -151,7 +170,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P3.8 E2E: private vote/match/proxy, axe, mobile and offline = OK");
+  console.log("P1.14/P2.1/P3.2-P3.9 E2E: private food flow, two animation skins, reduced motion and axe = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {
