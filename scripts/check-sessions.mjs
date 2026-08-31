@@ -168,7 +168,12 @@ try {
   ]);
   assert.equal(creatorPool.response.status, 200);
   assert.equal(partnerPool.response.status, 200);
-  assert.deepEqual(creatorPool.data, partnerPool.data);
+  const creatorIds = creatorPool.data.dishes.map((dish) => dish.id);
+  const partnerIds = partnerPool.data.dishes.map((dish) => dish.id);
+  assert.deepEqual([...creatorIds].sort(), [...partnerIds].sort());
+  if (creatorIds.length > 1) assert.notDeepEqual(creatorIds, partnerIds);
+  assert.deepEqual((await request(`/api/sessions/${open.id}/food-pool`, creatorCookie)).data, creatorPool.data, "order must survive reload");
+  assert.deepEqual(Object.keys(creatorPool.data), ["dishes"], "shuffle seed and partner order must stay server-side");
   assert.ok(creatorPool.data.dishes.length > 0 && creatorPool.data.dishes.length <= 8);
   assert.ok(!creatorPool.data.dishes.some((dish) => dish.id === "xoi-man"), "recent dishes must be deprioritized while fresh choices exist");
   for (const item of creatorPool.data.dishes) {
@@ -189,7 +194,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2/P3.4 sessions: lifecycle, setup confirmation, fixed dish pool, exclusions and recent avoidance = OK");
+  console.log("P1.9/P3.2–P3.5 sessions: fixed filtered pool, stable private per-user order and concurrency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

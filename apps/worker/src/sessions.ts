@@ -137,14 +137,38 @@ function publicDishPool(ids: string[]) {
   }) };
 }
 
-async function dishPool(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
+async function userDishOrder(env: SessionEnv, spaceId: string, sessionId: string, userId: string, ids: string[]): Promise<string[]> {
+  if (ids.length < 2) return ids;
+  const users = await env.DB.prepare("SELECT id FROM users WHERE couple_space_id = ? ORDER BY id")
+    .bind(spaceId).all<{ id: string }>();
+  const userIds = (users.results ?? []).map((user) => user.id);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.AUTH_PEPPER),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const orderFor = async (targetUserId: string) => (await Promise.all(ids.map(async (id) => ({
+    id,
+    rank: new Uint8Array(await crypto.subtle.sign("HMAC", key,
+      new TextEncoder().encode(`food-order:v1:${sessionId}:${targetUserId}:${id}`))),
+  })))).sort((left, right) => {
+    for (let index = 0; index < left.rank.length; index++) {
+      if (left.rank[index] !== right.rank[index]) return left.rank[index] - right.rank[index];
+    }
+    return left.id.localeCompare(right.id);
+  }).map((item) => item.id);
+  const orders = await Promise.all(userIds.map(orderFor));
+  if (orders.length === 2 && orders[0].every((id, index) => id === orders[1][index])) {
+    [orders[1][0], orders[1][1]] = [orders[1][1], orders[1][0]];
+  }
+  return orders[userIds.indexOf(userId)] ?? orderFor(userId);
+}
+
+async function dishPool(env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
   const session = await env.DB.prepare(`SELECT feature, status, payload_json, result_json FROM activity_sessions
     WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId)
     .first<{ feature: string; status: Status; payload_json: string; result_json: string | null }>();
   if (!session) return json({ error: "Không tìm thấy phiên." }, 404);
   if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
   const existing = storedDishPool(session.result_json);
-  if (existing) return json(publicDishPool(existing));
+  if (existing) return json(publicDishPool(await userDishOrder(env, spaceId, sessionId, userId, existing)));
   if (session.result_json) return json({ error: "Dữ liệu pool món không hợp lệ." }, 500);
 
   const payload = JSON.parse(session.payload_json) as { conditions: {
@@ -170,11 +194,13 @@ async function dishPool(env: SessionEnv, spaceId: string, sessionId: string): Pr
   const saved = await env.DB.prepare(`UPDATE activity_sessions SET result_json = ?
     WHERE id = ? AND couple_space_id = ? AND status = 'active' AND result_json IS NULL`)
     .bind(JSON.stringify({ dishPool: ids }), sessionId, spaceId).run();
-  if (saved.meta.changes === 1) return json(publicDishPool(ids));
+  if (saved.meta.changes === 1) return json(publicDishPool(await userDishOrder(env, spaceId, sessionId, userId, ids)));
   const winner = await env.DB.prepare("SELECT result_json FROM activity_sessions WHERE id = ? AND couple_space_id = ?")
     .bind(sessionId, spaceId).first<{ result_json: string | null }>();
   const winnerPool = storedDishPool(winner?.result_json ?? null);
-  return winnerPool ? json(publicDishPool(winnerPool)) : json({ error: "Phiên đã thay đổi." }, 409);
+  return winnerPool
+    ? json(publicDishPool(await userDishOrder(env, spaceId, sessionId, userId, winnerPool)))
+    : json({ error: "Phiên đã thay đổi." }, 409);
 }
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
@@ -330,7 +356,7 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
     return row ? json({ session: publicSession(row) }) : json({ error: "Không tìm thấy phiên." }, 404);
   }
   if (parts.length === 4 && parts[3] === "food-pool" && request.method === "GET") {
-    return dishPool(env, spaceId, sessionId);
+    return dishPool(env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

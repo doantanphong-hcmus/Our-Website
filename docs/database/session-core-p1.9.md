@@ -20,3 +20,4 @@ npm run sessions:check
 - `GET /api/sessions/:id/food-pool` chỉ dùng cho phiên `food_vote` đã `active`.
 - Server lọc theo `foodStyle`, category, dị ứng và loại trừ; lưu cố định tối đa 8 ID trong `result_json` để cả hai người nhận cùng một pool.
 - Pool ưu tiên món chưa xuất hiện trong các phiên hoàn tất 30 ngày gần nhất; món cũ chỉ được bù vào khi lựa chọn mới không đủ.
+- P3.5 xếp cùng tập ID theo thứ tự ổn định riêng cho từng user bằng HMAC domain `food-order:v1`; seed và thứ tự của partner không được trả về client.
