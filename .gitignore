@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 .wrangler/
+.wrangler-deploy.json
 coverage/
 playwright-report/
 test-results/

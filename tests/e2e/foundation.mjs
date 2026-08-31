@@ -6,7 +6,7 @@ import { assertA11y, mockAuthenticated, network, startWeb } from "../helpers/web
 const server = await startWeb(4180);
 let browser;
 try {
-  browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? "msedge", headless: true });
+  browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? (process.platform === "win32" ? "msedge" : "chrome"), headless: true });
   const phongContext = await browser.newContext({ viewport: { width: 360, height: 800 } });
   const phongPage = await phongContext.newPage();
   await mockAuthenticated(phongPage, phong, 250);

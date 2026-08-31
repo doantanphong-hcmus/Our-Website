@@ -27,8 +27,11 @@ npm test
 ```
 
 Run one layer with `npm run test:unit`, `npm run test:integration`, or
-`npm run test:e2e`. The E2E harness uses the installed Edge browser headlessly,
+`npm run test:e2e`. The E2E harness uses installed Edge/Chrome headlessly,
 the shared Phong/Nhi fixtures, axe accessibility checks, and network controls.
+
+CI/CD setup, environment variables, release approval and rollback are documented
+in [`docs/operations/cicd-p1.15.md`](docs/operations/cicd-p1.15.md).
 
 ## License
 
