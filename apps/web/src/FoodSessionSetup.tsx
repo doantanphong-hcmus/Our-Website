@@ -77,6 +77,7 @@ async function responseError(response: Response, fallback: string) {
 function FoodVoting({ sessionId }: { sessionId: string }) {
   const [dishes, setDishes] = useState<FoodDish[]>([]);
   const [votes, setVotes] = useState<FoodVote[]>([]);
+  const [match, setMatch] = useState<FoodDish | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -85,17 +86,24 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
     setLoading(true);
     setError("");
     try {
-      const [poolResponse, votesResponse] = await Promise.all([
+      const [poolResponse, votesResponse, matchResponse] = await Promise.all([
         fetch(`/api/sessions/${sessionId}/food-pool`, { credentials: "same-origin" }),
         fetch(`/api/sessions/${sessionId}/food-votes`, { credentials: "same-origin" }),
+        fetch(`/api/sessions/${sessionId}/food-match`, { credentials: "same-origin" }),
       ]);
       if (!poolResponse.ok) throw new Error(await responseError(poolResponse, "Không tải được danh sách món."));
       if (!votesResponse.ok) throw new Error(await responseError(votesResponse, "Không tải được lựa chọn đã lưu."));
+      if (!matchResponse.ok) throw new Error(await responseError(matchResponse, "Không tải được kết quả chung."));
       const pool = await poolResponse.json() as { dishes?: unknown };
       const saved = await votesResponse.json() as { votes?: unknown };
-      if (!Array.isArray(pool.dishes) || !Array.isArray(saved.votes)) throw new Error("Dữ liệu chọn món không hợp lệ.");
+      const result = await matchResponse.json() as { match?: unknown };
+      if (!Array.isArray(pool.dishes) || !Array.isArray(saved.votes)
+        || !(result.match === null || (result.match && typeof result.match === "object" && "id" in result.match))) {
+        throw new Error("Dữ liệu chọn món không hợp lệ.");
+      }
       setDishes(pool.dishes as FoodDish[]);
       setVotes(saved.votes as FoodVote[]);
+      setMatch(result.match as FoodDish | null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được phần chọn món.");
     } finally {
@@ -119,8 +127,11 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dishId: dish.id, decision, idempotencyKey: crypto.randomUUID() }),
       });
+      if (response.status === 409) return void await load();
       if (!response.ok) throw new Error(await responseError(response, "Không lưu được lựa chọn."));
+      const result = await response.json() as { match?: FoodDish };
       setVotes((current) => [...current.filter((item) => item.dishId !== dish.id), { dishId: dish.id, decision }]);
+      if (result.match) setMatch(result.match);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không lưu được lựa chọn.");
     } finally {
@@ -131,6 +142,7 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
   if (loading) return <LoadingState label="Đang chuẩn bị món cho riêng ông…" />;
   if (error && !dishes.length) return <ErrorState title="Chưa tải được món" retry={() => void load()}>{error}</ErrorState>;
   if (!dishes.length) return <p role="status">Chưa có món phù hợp với các điều kiện đã chọn.</p>;
+  if (match) return <div className="food-vote-done" role="status"><strong>Trùng ý rồi!</strong><span>Hai đứa đều muốn ăn {match.name}.</span></div>;
   if (!dish) return <div className="food-vote-done" role="status"><strong>Đã lưu kín lựa chọn của ông.</strong><span>Kết quả chỉ mở khi cả hai hoàn tất.</span></div>;
 
   return (

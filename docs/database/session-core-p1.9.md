@@ -27,3 +27,9 @@ npm run sessions:check
 - `GET /api/sessions/:id/food-votes` chỉ trả các lựa chọn `want`, `no`, `skip` của tài khoản hiện tại; không trả vote, số lượng hay tiến độ của partner.
 - `POST /api/sessions/:id/food-votes` chỉ nhận món thuộc pool cố định, yêu cầu idempotency key và không cho sửa lựa chọn đã lưu.
 - Vote được lưu riêng theo `(session_id, user_id, dish_id)`; response không chứa session nên không phát realtime event làm lộ hoạt động riêng tư.
+
+## P3.7 — Match engine
+
+- Sau mỗi vote `want`, server tìm các món cả hai cùng muốn và chọn món đứng trước trong pool gốc; các match còn lại được lưu làm alternatives nhưng không trả về client.
+- Match đầu tiên được ghi bằng compare-and-set trên `result_json`; Durable Object tuần tự hóa các vote gần đồng thời nên chỉ có một kết quả chung.
+- `GET /api/sessions/:id/food-match` trả cùng một món cho cả hai. Khi đã match, API dừng nhận vote mới nhưng vẫn cho retry idempotent.

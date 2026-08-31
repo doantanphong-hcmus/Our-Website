@@ -9,6 +9,7 @@ interface SessionEnv {
 type Status = "pending" | "active" | "declined" | "completed" | "expired" | "cancelled";
 type Action = "join" | "decline" | "cancel" | "complete";
 type FoodDecision = "want" | "no" | "skip";
+export type FoodMatch = { dishId: string; alternatives: string[] };
 
 interface SessionRow {
   id: string;
@@ -122,6 +123,26 @@ function storedDishPool(resultJson: string | null): string[] | null {
   }
 }
 
+function storedFoodMatch(resultJson: string | null): FoodMatch | null {
+  const pool = storedDishPool(resultJson);
+  if (!pool || !resultJson) return null;
+  try {
+    const match = (JSON.parse(resultJson) as { foodMatch?: unknown }).foodMatch as Record<string, unknown> | undefined;
+    if (!match || typeof match.dishId !== "string" || !pool.includes(match.dishId)
+      || !Array.isArray(match.alternatives) || new Set(match.alternatives).size !== match.alternatives.length
+      || match.alternatives.some((id) => typeof id !== "string" || id === match.dishId || !pool.includes(id))) return null;
+    return { dishId: match.dishId, alternatives: match.alternatives as string[] };
+  } catch {
+    return null;
+  }
+}
+
+export function matchFromPool(pool: string[], mutualIds: Iterable<string>): FoodMatch | null {
+  const mutual = new Set(mutualIds);
+  const matches = pool.filter((id) => mutual.has(id));
+  return matches.length ? { dishId: matches[0], alternatives: matches.slice(1) } : null;
+}
+
 function shuffle<T>(values: T[]): T[] {
   const shuffled = [...values];
   for (let index = shuffled.length - 1; index > 0; index--) {
@@ -131,11 +152,13 @@ function shuffle<T>(values: T[]): T[] {
   return shuffled;
 }
 
+function publicDish(id: string) {
+  const dish = foodDishById.get(id)!;
+  return { id: dish.id, name: dish.name, foodStyle: dish.foodStyle, categories: dish.categories };
+}
+
 function publicDishPool(ids: string[]) {
-  return { dishes: ids.map((id) => {
-    const dish = foodDishById.get(id)!;
-    return { id: dish.id, name: dish.name, foodStyle: dish.foodStyle, categories: dish.categories };
-  }) };
+  return { dishes: ids.map(publicDish) };
 }
 
 async function userDishOrder(env: SessionEnv, spaceId: string, sessionId: string, userId: string, ids: string[]): Promise<string[]> {
@@ -212,6 +235,7 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
   if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
   const pool = storedDishPool(session.result_json);
   if (!pool) return json({ error: "Pool món chưa sẵn sàng." }, 409);
+  const existingMatch = storedFoodMatch(session.result_json);
 
   if (request.method === "GET") {
     const votes = await env.DB.prepare(`SELECT dish_id, decision FROM food_votes
@@ -236,8 +260,10 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
     .first<{ session_id: string; user_id: string; dish_id: string; decision: FoodDecision }>();
   if (existingKey) return existingKey.session_id === sessionId && existingKey.user_id === userId
     && existingKey.dish_id === dishId && existingKey.decision === foodDecision
-    ? json({ vote: { dishId, decision: foodDecision }, duplicate: true })
+    ? json({ vote: { dishId, decision: foodDecision }, duplicate: true,
+      ...(existingMatch ? { match: publicDish(existingMatch.dishId) } : {}) })
     : json({ error: "Idempotency key đã được dùng cho lựa chọn khác." }, 409);
+  if (existingMatch) return json({ error: "Hai đứa đã có món trùng ý.", match: publicDish(existingMatch.dishId) }, 409);
   const existingVote = await env.DB.prepare(`SELECT decision FROM food_votes
     WHERE session_id = ? AND user_id = ? AND dish_id = ?`).bind(sessionId, userId, dishId)
     .first<{ decision: FoodDecision }>();
@@ -256,7 +282,36 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
       ? json({ vote: { dishId, decision: foodDecision }, duplicate: true })
       : json({ error: "Không thể lưu lựa chọn món." }, 409);
   }
-  return json({ vote: { dishId, decision: foodDecision } }, 201);
+  let match: FoodMatch | null = null;
+  if (foodDecision === "want") {
+    const mutual = await env.DB.prepare(`SELECT dish_id FROM food_votes WHERE session_id = ? AND decision = 'want'
+      GROUP BY dish_id HAVING count(DISTINCT user_id) >= 2`).bind(sessionId).all<{ dish_id: string }>();
+    const candidate = matchFromPool(pool, (mutual.results ?? []).map((vote) => vote.dish_id));
+    if (candidate) {
+      const resultJson = JSON.stringify({ dishPool: pool, foodMatch: candidate });
+      const saved = await env.DB.prepare(`UPDATE activity_sessions SET result_json = ?, updated_at = unixepoch()
+        WHERE id = ? AND couple_space_id = ? AND status = 'active' AND result_json = ?`)
+        .bind(resultJson, sessionId, spaceId, session.result_json).run();
+      if (saved.meta.changes === 1) match = candidate;
+      else {
+        const winner = await env.DB.prepare("SELECT result_json FROM activity_sessions WHERE id = ? AND couple_space_id = ?")
+          .bind(sessionId, spaceId).first<{ result_json: string | null }>();
+        match = storedFoodMatch(winner?.result_json ?? null);
+      }
+    }
+  }
+  return json({ vote: { dishId, decision: foodDecision }, ...(match ? { match: publicDish(match.dishId) } : {}) }, 201);
+}
+
+async function foodMatch(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
+  const session = await env.DB.prepare(`SELECT feature, status, result_json FROM activity_sessions
+    WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId)
+    .first<{ feature: string; status: Status; result_json: string | null }>();
+  if (!session) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
+  if (!storedDishPool(session.result_json)) return json({ error: "Pool món chưa sẵn sàng." }, 409);
+  const match = storedFoodMatch(session.result_json);
+  return json({ match: match ? publicDish(match.dishId) : null });
 }
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
@@ -416,6 +471,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "food-votes") {
     return foodVotes(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "food-match" && request.method === "GET") {
+    return foodMatch(env, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

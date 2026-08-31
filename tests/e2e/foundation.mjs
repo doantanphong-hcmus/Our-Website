@@ -77,13 +77,17 @@ try {
       ],
     }) });
     if (request.method() === "GET" && pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
+    if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: null }) });
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       eventVersion: 1,
       sessions: [{ id: foodSessionId, feature: "food_vote", status: confirmed ? "active" : "pending", createdByUserId: phong.id, version: confirmed ? 2 : 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
     }) });
     if (pathname.endsWith("/food-votes")) {
       voteCommand = { pathname, body: request.postDataJSON() };
-      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ vote: voteCommand.body }) });
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        vote: voteCommand.body,
+        match: { id: "banh-flan", name: "Bánh flan", foodStyle: "snack", categories: ["dessert"] },
+      }) });
     }
     confirmCommand = { pathname, body: request.postDataJSON() };
     confirmed = true;
@@ -104,7 +108,9 @@ try {
   assert.equal(voteCommand.body.dishId, "banh-flan");
   assert.equal(voteCommand.body.decision, "want");
   assert.match(voteCommand.body.idempotencyKey, /^[0-9a-f-]{36}$/);
-  await nhiPage.getByRole("heading", { name: "Mochi" }).waitFor();
+  await nhiPage.getByText("Trùng ý rồi!").waitFor();
+  await nhiPage.getByText("Hai đứa đều muốn ăn Bánh flan.").waitFor();
+  assert.equal(await nhiPage.getByRole("button", { name: "Muốn ăn" }).count(), 0);
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
   await network.offline(nhiContext, true);
@@ -119,7 +125,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2/P3.6 E2E: setup, private vote, axe, mobile, failure and offline = OK");
+  console.log("P1.14/P2.1/P3.2-P3.7 E2E: setup, private vote/match, axe, mobile and offline = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

@@ -160,6 +160,7 @@ try {
   assert.deepEqual(open.conditions, foodConditions);
   assert.equal((await request(`/api/sessions/${open.id}/food-pool`, creatorCookie)).response.status, 409);
   assert.equal((await request(`/api/sessions/${open.id}/food-votes`, creatorCookie)).response.status, 409);
+  assert.equal((await request(`/api/sessions/${open.id}/food-match`, creatorCookie)).response.status, 409);
   const foodConfirmed = await act(partnerCookie, open.id, "join", 1, "confirm-food-001");
   assert.equal(foodConfirmed.data.session.status, "active");
   assert.deepEqual(foodConfirmed.data.session.conditions, foodConditions);
@@ -185,8 +186,10 @@ try {
     assert.ok(!dish.exclusionTags.some((tag) => foodConditions.exclusions.includes(tag)));
   }
   const votesPath = `/api/sessions/${open.id}/food-votes`;
+  const matchPath = `/api/sessions/${open.id}/food-match`;
   assert.deepEqual((await request(votesPath, creatorCookie)).data, { votes: [] });
   assert.deepEqual((await request(votesPath, partnerCookie)).data, { votes: [] });
+  assert.deepEqual((await request(matchPath, creatorCookie)).data, { match: null });
   assert.equal((await request(votesPath, creatorCookie, "POST", {
     dishId: "not-in-pool", decision: "want", idempotencyKey: "vote-invalid-dish",
   })).response.status, 400);
@@ -218,6 +221,26 @@ try {
     ...(creatorIds[1] ? [{ dishId: creatorIds[1], decision: "skip" }] : []),
   ].sort((left, right) => left.dishId.localeCompare(right.dishId)));
   assert.deepEqual(partnerVotes.data, { votes: [{ dishId: creatorIds[0], decision: "no" }] });
+  assert.ok(creatorIds.length >= 4);
+  const matchId = creatorIds[2];
+  const simultaneousMatch = await Promise.all([
+    request(votesPath, creatorCookie, "POST", { dishId: matchId, decision: "want", idempotencyKey: "vote-match-phong-01" }),
+    request(votesPath, partnerCookie, "POST", { dishId: matchId, decision: "want", idempotencyKey: "vote-match-nhi-0001" }),
+  ]);
+  assert.deepEqual(simultaneousMatch.map((item) => item.response.status), [201, 201]);
+  assert.equal(simultaneousMatch.filter((item) => item.data.match).length, 1, "near-simultaneous votes must create one match");
+  const expectedMatch = creatorPool.data.dishes.find((dish) => dish.id === matchId);
+  const [creatorMatch, partnerMatch] = await Promise.all([
+    request(matchPath, creatorCookie), request(matchPath, partnerCookie),
+  ]);
+  assert.deepEqual(creatorMatch.data, { match: expectedMatch });
+  assert.deepEqual(partnerMatch.data, creatorMatch.data, "both users must receive the same shared result");
+  assert.deepEqual(Object.keys(creatorMatch.data.match).sort(), ["categories", "foodStyle", "id", "name"], "alternatives stay server-side");
+  const stopped = await request(votesPath, creatorCookie, "POST", {
+    dishId: creatorIds[3], decision: "want", idempotencyKey: "vote-after-match-01",
+  });
+  assert.equal(stopped.response.status, 409);
+  assert.deepEqual(stopped.data.match, expectedMatch);
   assert.equal((await act(creatorCookie, open.id, "cancel", 2, "cancel-food-001")).data.session.status, "cancelled");
 
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
@@ -229,7 +252,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P3.6 sessions: fixed pool, private order/votes and concurrency = OK");
+  console.log("P1.9/P3.2-P3.7 sessions: private vote, deterministic shared match and concurrency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
