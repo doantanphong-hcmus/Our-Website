@@ -275,6 +275,25 @@ button:disabled {
   backdrop-filter: blur(1rem);
 }
 
+.offline-queue-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  font-size: var(--font-small);
+}
+
+.offline-queue-notice button {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+}
+
 .brand {
   display: inline-grid;
   place-items: center;

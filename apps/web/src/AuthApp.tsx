@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { App } from "./App";
+import { discardOfflineCommands, startOfflineQueue, stopOfflineQueue } from "./offlineQueue";
 import { userFrom, type User } from "./user";
 
 type AuthState =
@@ -150,10 +151,16 @@ export function AuthApp() {
   useEffect(() => {
     if (auth.kind !== "authenticated") document.title = `${auth.kind === "guest" ? "Đăng nhập" : "Đang kết nối"} · Phong & Nhi`;
   }, [auth.kind]);
+  useEffect(() => {
+    if (auth.kind === "authenticated") startOfflineQueue(auth.user.id);
+    else stopOfflineQueue();
+    return stopOfflineQueue;
+  }, [auth.kind, auth.kind === "authenticated" ? auth.user.id : null]);
 
   async function logout() {
     const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
     if (!response.ok) throw new Error("Không thể đăng xuất lúc này.");
+    await discardOfflineCommands().catch(() => {});
     setAuth({ kind: "guest" });
   }
 

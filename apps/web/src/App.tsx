@@ -1,5 +1,6 @@
 import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type MouseEvent } from "react";
 import { userFrom, type User } from "./user";
+import { discardOfflineCommands, type OfflineQueueEventDetail } from "./offlineQueue";
 
 type Route = {
   path: string;
@@ -38,6 +39,29 @@ type AppLinkProps = { path: string } & Omit<AnchorHTMLAttributes<HTMLAnchorEleme
 
 function AppLink({ path, ...props }: AppLinkProps) {
   return <a {...props} href={path} onClick={(event) => navigate(event, path)} />;
+}
+
+function OfflineQueueNotice() {
+  const [status, setStatus] = useState<OfflineQueueEventDetail["status"] | null>(null);
+  useEffect(() => {
+    const update = (event: Event) => setStatus((event as CustomEvent<OfflineQueueEventDetail>).detail.status);
+    window.addEventListener("our:offline-queue", update);
+    return () => window.removeEventListener("our:offline-queue", update);
+  }, []);
+  if (!status || status === "idle") return null;
+  const messages = {
+    queued: "Đã lưu thao tác. Sẽ gửi khi có mạng.",
+    retrying: "Kết nối chưa ổn định. Đang chờ để thử lại…",
+    sent: "Đã đồng bộ thao tác.",
+    conflict: "Phiên đã thay đổi trên thiết bị kia. Vui lòng kiểm tra lại trước khi thao tác tiếp.",
+    failed: "Không thể đồng bộ thao tác đã lưu.",
+  };
+  return (
+    <div className="offline-queue-notice" role={status === "conflict" || status === "failed" ? "alert" : "status"}>
+      <span>{messages[status]}</span>
+      {(status === "conflict" || status === "failed") && <button type="button" onClick={() => void discardOfflineCommands()}>Bỏ thao tác đang chờ</button>}
+    </div>
+  );
 }
 
 type ProfileChanges = Partial<{
@@ -262,6 +286,7 @@ export function App({ user, onUserChange, onLogout }: {
           </div>
         </details>
       </header>
+      <OfflineQueueNotice />
 
       <main id="main-content" tabIndex={-1}>
         {route?.path === "/tai-khoan" ? (

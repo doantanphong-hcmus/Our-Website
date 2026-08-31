@@ -15,6 +15,7 @@
     "web:check": "node scripts/check-app-shell.mjs",
     "web:auth-check": "node scripts/check-auth-frontend.mjs",
     "web:settings-check": "node scripts/check-profile-settings.mjs",
+    "web:offline-check": "node scripts/check-offline-queue.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config apps/worker/wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --config apps/worker/wrangler.jsonc --file apps/worker/seed.sql",
     "db:check": "node scripts/check-d1-schema.mjs",
