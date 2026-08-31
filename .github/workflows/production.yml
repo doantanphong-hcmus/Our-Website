@@ -30,6 +30,7 @@ jobs:
       - run: npm test
         env:
           PLAYWRIGHT_BROWSER_CHANNEL: chrome
+          REQUIRE_APPROVED_CONTENT: "1"
       - run: npm audit --audit-level=high
       - run: npm run cicd:check
 
