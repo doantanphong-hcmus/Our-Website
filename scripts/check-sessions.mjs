@@ -48,7 +48,7 @@ wranglerCommand(["d1", "execute", ...local, "--command", `
   VALUES ('00000000-0000-4000-8000-000000000001','couple-main','food_vote','pending','user-phong','expired-create-001',unixepoch()-1);
   INSERT INTO activity_sessions
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,result_json,completed_at,updated_at)
-  VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"]}',unixepoch(),unixepoch());`]);
+  VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"],"foodFinal":{"dishId":"xoi-man","foodStyle":"snack","mode":"dish","source":"match","accepted":true}}',unixepoch(),unixepoch());`]);
 
 const server = spawn(process.execPath, [
   wrangler, "dev", "--config", config, "--ip", "127.0.0.1", "--port", "8796", "--persist-to", state,
@@ -241,7 +241,19 @@ try {
   });
   assert.equal(stopped.response.status, 409);
   assert.deepEqual(stopped.data.match, expectedMatch);
-  assert.equal((await act(creatorCookie, open.id, "cancel", 2, "cancel-food-001")).data.session.status, "cancelled");
+  assert.equal((await act(creatorCookie, open.id, "complete", 2, "generic-food-complete")).response.status, 409);
+  const acceptedResult = await request(`/api/sessions/${open.id}/food-result`, creatorCookie, "POST", {
+    decision: "accept", idempotencyKey: "accept-food-result-01",
+  });
+  assert.equal(acceptedResult.response.status, 200);
+  assert.equal(acceptedResult.data.session.status, "completed");
+  assert.deepEqual(acceptedResult.data.result, expectedMatch);
+  assert.equal((await request(`/api/sessions/${open.id}/food-result`, creatorCookie, "POST", {
+    decision: "accept", idempotencyKey: "accept-food-result-01",
+  })).data.duplicate, true);
+  assert.equal((await request(`/api/sessions/${open.id}/food-result`, creatorCookie, "POST", {
+    decision: "retry", idempotencyKey: "accept-food-result-01",
+  })).response.status, 409);
 
   const smallFoodConditions = { ...foodConditions, meal: "any", category: "korean", allergens: [], exclusions: [] };
   const proxySession = (await create(phong, "food_vote", "create-food-proxy-01", smallFoodConditions)).data.session;
@@ -277,7 +289,12 @@ try {
   assert.deepEqual(phongProxy.data, { proxy: safeDish, exhausted: false, confirmedByMe: true, ready: true });
   assert.deepEqual(nhiProxy.data, phongProxy.data);
   assert.equal((await request(proxyPath, phong, "POST", { idempotencyKey: "confirm-proxy-phong" })).data.duplicate, true);
-  assert.equal((await act(phong, proxySession.id, "cancel", 2, "cancel-food-proxy")).data.session.status, "cancelled");
+  const retriedResult = await request(`/api/sessions/${proxySession.id}/food-result`, nhi, "POST", {
+    decision: "retry", idempotencyKey: "retry-food-result-01",
+  });
+  assert.equal(retriedResult.response.status, 200);
+  assert.equal(retriedResult.data.session.status, "completed");
+  assert.deepEqual(retriedResult.data.result, safeDish);
 
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
   const concurrentId = concurrentSession.data.session.id;
@@ -288,7 +305,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P3.8 sessions: private match/proxy, two confirmations and safety = OK");
+  console.log("P1.9/P3.2-P3.10 sessions: private food result, history, retry and safety = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

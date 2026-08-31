@@ -1016,8 +1016,40 @@ main {
   100% { opacity: 1; transform: scaleX(1); }
 }
 
+.food-result-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.food-result-card :where(h2, p) { margin: 0; }
+
+.food-result-style {
+  justify-self: start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+  font-size: var(--font-small);
+  font-weight: 750;
+}
+
+.food-result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.food-result-actions button { min-block-size: 3.25rem; }
+.food-result-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
+
 @media (max-width: 30rem) {
   .food-vote-actions { grid-template-columns: 1fr; }
+  .food-result-actions { grid-template-columns: 1fr; }
 }
 
 .settings-card h1 {

@@ -40,3 +40,9 @@ npm run sessions:check
 - Proxy luôn là phần tử của pool đã qua lọc tuyệt đối, nên không thể nới điều kiện dị ứng hoặc đưa món bị loại trở lại.
 - `GET/POST /api/sessions/:id/food-proxy` chỉ công khai món proxy, trạng thái xác nhận của chính user và `ready`; không trả số vote hay người đã xác nhận.
 - Nếu không còn ứng viên, API trả `exhausted: true`; UI đề nghị chọn thêm nhóm hoặc tạo danh sách mới và giữ nguyên điều kiện dị ứng.
+
+## P3.10 — Result / history
+
+- `POST /api/sessions/:id/food-result` nhận `accept` hoặc `retry`, chỉ hoàn tất phiên khi đã có match hoặc proxy được cả hai xác nhận.
+- `foodFinal` trong `result_json` lưu món, trường phái, mode `dish`, nguồn match/proxy và có chốt hay không; ngày lấy từ `completed_at` nên không cần bảng history riêng.
+- Pool mới chỉ giảm ưu tiên món đã `accept` cùng trường phái trong 30 ngày; món chỉ xem qua hoặc bấm chọn lại không bị tính là đã chốt.

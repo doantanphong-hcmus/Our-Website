@@ -91,6 +91,28 @@ function FoodMatchAnimation({ dish }: { dish: FoodDish }) {
   );
 }
 
+function FoodResultCard({ dish, source, pending, error, finish }: {
+  dish: FoodDish;
+  source: "match" | "proxy";
+  pending: boolean;
+  error: string;
+  finish: (decision: "accept" | "retry") => void;
+}) {
+  const style = label(foodCatalog.foodStyles, dish.foodStyle);
+  return (
+    <section className="food-result-card" aria-label="Kết quả chọn món">
+      {source === "match" ? <FoodMatchAnimation dish={dish} /> : <><p className="eyebrow">Hai đứa đã cùng xác nhận</p><h2>{dish.name}</h2></>}
+      <span className="food-result-style">{style}</span>
+      <p>{source === "match" ? "Đây là món cả hai cùng muốn ăn." : "Đây là phương án chốt hộ đã được cả hai đồng ý."}</p>
+      <div className="food-result-actions">
+        <button type="button" disabled={pending} onClick={() => finish("accept")}>{pending ? "Đang lưu…" : "Chốt món này"}</button>
+        <button type="button" className="secondary-button" disabled={pending} onClick={() => finish("retry")}>Chọn lại</button>
+      </div>
+      {error && <span role="alert">{error}</span>}
+    </section>
+  );
+}
+
 function FoodVoting({ sessionId }: { sessionId: string }) {
   const [dishes, setDishes] = useState<FoodDish[]>([]);
   const [votes, setVotes] = useState<FoodVote[]>([]);
@@ -179,14 +201,27 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
     }
   }
 
+  async function finish(decision: "accept" | "retry") {
+    setPending(true);
+    setError("");
+    try {
+      await queueSessionCommand(`/api/sessions/${sessionId}/food-result`, { decision });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không lưu được kết quả món ăn.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   if (loading) return <LoadingState label="Đang chuẩn bị món cho riêng ông…" />;
   if (error && !dishes.length) return <ErrorState title="Chưa tải được món" retry={() => void load()}>{error}</ErrorState>;
   if (!dishes.length) return <p role="status">Chưa có món phù hợp với các điều kiện đã chọn.</p>;
-  if (match) return <FoodMatchAnimation dish={match} />;
+  if (match) return <FoodResultCard dish={match} source="match" pending={pending} error={error} finish={(decision) => void finish(decision)} />;
   if (proxy.exhausted) return <div className="food-vote-done" role="status"><strong>Chưa còn món an toàn để chốt hộ.</strong><span>Hãy chọn thêm nhóm món hoặc tạo một danh sách mới. Điều kiện dị ứng vẫn được giữ nguyên.</span></div>;
+  if (proxy.proxy && proxy.ready) return <FoodResultCard dish={proxy.proxy} source="proxy" pending={pending} error={error} finish={(decision) => void finish(decision)} />;
   if (proxy.proxy) return <div className="food-vote-done" role="status">
-    <strong>{proxy.ready ? `Hai đứa đã cùng chốt ${proxy.proxy.name}.` : `Chốt hộ: ${proxy.proxy.name}`}</strong>
-    {proxy.ready ? <span>Đã có xác nhận từ cả hai.</span> : proxy.confirmedByMe
+    <strong>Chốt hộ: {proxy.proxy.name}</strong>
+    {proxy.confirmedByMe
       ? <span>Đã ghi nhận. Đang chờ người kia xác nhận.</span>
       : <><span>Món này được chọn từ các lựa chọn không ai từ chối.</span><button type="button" disabled={pending} onClick={() => void confirmProxy()}>Đồng ý chốt hộ</button></>}
     {error && <span role="alert">{error}</span>}

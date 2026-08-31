@@ -66,6 +66,8 @@ try {
   let confirmCommand;
   let voteCommand;
   let proxyConfirmCommand;
+  let resultCommand;
+  let resultCompleted = false;
   let confirmed = false;
   let proxyMode = "none";
   let matchMode = "none";
@@ -88,7 +90,7 @@ try {
       : { proxy: null, exhausted: proxyMode === "empty", confirmedByMe: false, ready: false }) });
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       eventVersion: 1,
-      sessions: [{ id: foodSessionId, feature: "food_vote", status: confirmed ? "active" : "pending", createdByUserId: phong.id, version: confirmed ? 2 : 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
+      sessions: resultCompleted ? [] : [{ id: foodSessionId, feature: "food_vote", status: confirmed ? "active" : "pending", createdByUserId: phong.id, version: confirmed ? 2 : 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
     }) });
     if (pathname.endsWith("/food-votes")) {
       voteCommand = { pathname, body: request.postDataJSON() };
@@ -102,6 +104,14 @@ try {
       return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
         proxy: { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] },
         exhausted: false, confirmedByMe: true, ready: false,
+      }) });
+    }
+    if (pathname.endsWith("/food-result")) {
+      resultCommand = request.postDataJSON();
+      resultCompleted = true;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        session: { id: foodSessionId, status: "completed", version: 3 },
+        result: { id: "banh-flan", name: "Bánh flan", foodStyle: "snack", categories: ["dessert"] },
       }) });
     }
     confirmCommand = { pathname, body: request.postDataJSON() };
@@ -129,11 +139,18 @@ try {
   assert.equal(await snackAnimation.count(), 1);
   assert.equal(await snackAnimation.locator(".food-match-token").count(), 3);
   assert.equal(await snackAnimation.locator(".food-match-token--one").evaluate((element) => getComputedStyle(element).animationDuration), "1.4s");
+  await nhiPage.getByLabel("Kết quả chọn món").getByText("Ăn vặt", { exact: true }).waitFor();
+  assert.equal(await nhiPage.getByRole("button", { name: "Chọn lại" }).count(), 1);
   await assertA11y(nhiPage);
+  await nhiPage.getByRole("button", { name: "Chốt món này" }).click();
+  for (let attempt = 0; attempt < 40 && !resultCommand; attempt++) await network.delay(50);
+  assert.equal(resultCommand.decision, "accept");
+  assert.match(resultCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(await nhiPage.getByRole("button", { name: "Muốn ăn" }).count(), 0);
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
   nhi.preferences.reducedMotion = true;
+  resultCompleted = false;
   matchMode = "full_meal";
   await nhiPage.reload();
   const fullMealAnimation = nhiPage.locator(".food-match-animation--full_meal");
@@ -141,6 +158,7 @@ try {
   assert.equal(await nhiPage.locator("html").getAttribute("data-motion"), "reduced");
   assert.equal(await fullMealAnimation.locator(".food-match-token--one").evaluate((element) => getComputedStyle(element).animationDuration), "0.001s");
   await nhiPage.getByText("Hai đứa đều muốn ăn Phở bò.").waitFor();
+  await nhiPage.getByLabel("Kết quả chọn món").getByText("Ăn no", { exact: true }).waitFor();
   nhi.preferences.reducedMotion = false;
   matchMode = "none";
 
@@ -170,7 +188,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P3.9 E2E: private food flow, two animation skins, reduced motion and axe = OK");
+  console.log("P1.14/P2.1/P3.2-P3.10 E2E: private food result, style labels, retry and reduced motion = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

@@ -12,6 +12,7 @@ type FoodDecision = "want" | "no" | "skip";
 export type FoodMatch = { dishId: string; alternatives: string[] };
 type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhausted: true };
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
+type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
 
 interface SessionRow {
   id: string;
@@ -20,6 +21,7 @@ interface SessionRow {
   created_by_user_id: string;
   version: number;
   payload_json: string;
+  result_json: string | null;
   expires_at: number | null;
   completed_at: number | null;
   created_at: number;
@@ -29,7 +31,7 @@ interface SessionRow {
 const features = ["blind_bag", "food_vote", "deep_talk"];
 const commandPattern = /^[A-Za-z0-9_-]{8,100}$/;
 const selectSession = `SELECT id, feature, status, created_by_user_id, version,
-  payload_json, expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
+  payload_json, result_json, expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
 
 const conditionChoices = {
   time: ["one_hour", "two_three_hours", "half_day", "any"],
@@ -153,6 +155,19 @@ function storedFoodFallback(resultJson: string | null): FoodFallback | null {
   }
 }
 
+function storedFoodFinal(resultJson: string | null): FoodFinal | null {
+  if (!resultJson) return null;
+  try {
+    const final = (JSON.parse(resultJson) as { foodFinal?: unknown }).foodFinal as Record<string, unknown> | undefined;
+    const dish = typeof final?.dishId === "string" ? foodDishById.get(final.dishId) : null;
+    if (!dish || final?.foodStyle !== dish.foodStyle || final.mode !== "dish"
+      || !["match", "proxy"].includes(String(final.source)) || typeof final.accepted !== "boolean") return null;
+    return final as FoodFinal;
+  } catch {
+    return null;
+  }
+}
+
 export function matchFromPool(pool: string[], mutualIds: Iterable<string>): FoodMatch | null {
   const mutual = new Set(mutualIds);
   const matches = pool.filter((id) => mutual.has(id));
@@ -258,7 +273,8 @@ async function dishPool(env: SessionEnv, userId: string, spaceId: string, sessio
       AND updated_at >= ? AND result_json IS NOT NULL ORDER BY updated_at DESC LIMIT 100`)
     .bind(spaceId, sessionId, Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60)
     .all<{ result_json: string }>();
-  const recent = new Set((recentRows.results ?? []).flatMap((row) => storedDishPool(row.result_json) ?? []));
+  const recent = new Set((recentRows.results ?? []).map((row) => storedFoodFinal(row.result_json))
+    .filter((final) => final?.accepted && final.foodStyle === foodStyle).map((final) => final!.dishId));
   const ids = [
     ...shuffle(candidates.filter((dish) => !recent.has(dish.id))),
     ...shuffle(candidates.filter((dish) => recent.has(dish.id))),
@@ -411,6 +427,65 @@ async function foodProxy(request: Request, env: SessionEnv, userId: string, spac
   return json(await state(), 201);
 }
 
+async function foodResult(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const input = await body(request);
+  const decision = input?.decision;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!["accept", "retry"].includes(String(decision))
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh chốt món không hợp lệ." }, 400);
+  }
+  const accepted = decision === "accept";
+  const previous = await env.DB.prepare(`SELECT session_id, action FROM activity_session_events
+    WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
+    .first<{ session_id: string; action: string }>();
+  if (previous) {
+    const replay = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+    const final = storedFoodFinal(replay?.result_json ?? null);
+    return previous.session_id === sessionId && previous.action === "complete" && final?.accepted === accepted
+      ? json({ session: publicSession(replay!), result: publicDish(final.dishId), duplicate: true })
+      : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  }
+
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "food_vote" || current.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng để chốt." }, 409);
+  const match = storedFoodMatch(current.result_json);
+  const fallback = storedFoodFallback(current.result_json);
+  let source: FoodFinal["source"] | null = match ? "match" : null;
+  let dishId = match?.dishId ?? null;
+  if (!dishId && fallback && !fallback.exhausted) {
+    const confirmations = await env.DB.prepare("SELECT count(*) AS total FROM food_proxy_confirmations WHERE session_id = ?")
+      .bind(sessionId).first<{ total: number }>();
+    if (Number(confirmations?.total ?? 0) >= 2) {
+      source = "proxy";
+      dishId = fallback.dishId;
+    }
+  }
+  if (!dishId || !source) return json({ error: "Chưa có kết quả chung để chốt." }, 409);
+  const payload = JSON.parse(current.payload_json) as { conditions?: { foodStyle?: unknown } };
+  const foodStyle = payload.conditions?.foodStyle;
+  if (typeof foodStyle !== "string" || foodDishById.get(dishId)?.foodStyle !== foodStyle) return json({ error: "Kết quả món không hợp lệ." }, 500);
+
+  const now = Math.floor(Date.now() / 1000);
+  const resultJson = JSON.stringify({ ...(JSON.parse(current.result_json!) as Record<string, unknown>),
+    foodFinal: { dishId, foodStyle, mode: "dish", source, accepted } satisfies FoodFinal });
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE activity_sessions SET status = 'completed', version = version + 1,
+      result_json = ?, expires_at = NULL, completed_at = ?, updated_at = ?
+      WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+      .bind(resultJson, now, now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version)
+      SELECT ?, ?, ?, ?, 'complete', 'active', 'completed', ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, current.version + 1),
+  ]);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json({ session: publicSession(updated!), result: publicDish(dishId) });
+}
+
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
   const [rows, latest] = await env.DB.batch([
@@ -493,7 +568,7 @@ function transition(row: SessionRow, action: Action, actorId: string): Status | 
     if (action === "decline") return "declined";
   }
   if (action === "cancel" && (row.status === "active" || (row.status === "pending" && actorId === row.created_by_user_id))) return "cancelled";
-  if (action === "complete" && row.status === "active") return "completed";
+  if (action === "complete" && row.status === "active" && row.feature !== "food_vote") return "completed";
   return null;
 }
 
@@ -574,6 +649,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "food-proxy") {
     return foodProxy(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "food-result") {
+    return foodResult(request, env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {
