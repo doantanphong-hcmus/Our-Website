@@ -2,6 +2,7 @@
   "name": "our-website",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "license": "UNLICENSED",
   "packageManager": "npm@11.13.0",
   "engines": {
@@ -18,6 +19,10 @@
     "web:offline-check": "node scripts/check-offline-queue.mjs",
     "web:home-check": "node scripts/check-home.mjs",
     "web:states-check": "node scripts/check-ui-states.mjs",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:integration": "npm run db:check && npm run auth:check && npm run sessions:check",
+    "test:e2e": "node tests/e2e/foundation.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config apps/worker/wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --config apps/worker/wrangler.jsonc --file apps/worker/seed.sql",
     "db:check": "node scripts/check-d1-schema.mjs",
@@ -35,7 +40,9 @@
     "packages/*"
   ],
   "devDependencies": {
+    "axe-core": "^4.13.0",
     "playwright-core": "^1.62.1",
+    "vitest": "^4.1.11",
     "wrangler": "^4.127.1"
   }
 }
