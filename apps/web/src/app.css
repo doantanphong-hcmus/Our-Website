@@ -398,6 +398,226 @@ main {
   padding: var(--space-5) max(var(--space-4), var(--safe-right)) calc(7.5rem + var(--safe-bottom)) max(var(--space-4), var(--safe-left));
 }
 
+.home {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.home-greeting {
+  position: relative;
+  padding-inline-end: 7rem;
+}
+
+.home-greeting h1 {
+  margin: 0;
+}
+
+.couple-avatars {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: flex;
+  align-items: center;
+}
+
+.couple-avatars span {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border: 0.18rem solid var(--color-surface);
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 850;
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.couple-avatars span:last-child {
+  margin-inline-start: -0.35rem;
+}
+
+.couple-avatars i {
+  z-index: 1;
+  margin-inline: -0.35rem;
+  color: var(--color-shared);
+  font-size: 0.75rem;
+  font-style: normal;
+}
+
+.activity-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.activity-cards a {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  align-items: center;
+  gap: 0 var(--space-3);
+  min-block-size: 5.5rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+}
+
+.activity-cards a > span {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+  font-size: 1.45rem;
+}
+
+.activity-cards small,
+.today-card small {
+  color: var(--color-text-muted);
+}
+
+.home-section h2 {
+  margin-block-end: var(--space-3);
+  font-size: 1.15rem;
+}
+
+.home-section > p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.session-card {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+}
+
+.session-card + .session-card {
+  margin-block-start: var(--space-3);
+}
+
+.session-card > div:first-child,
+.session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.session-card > div:first-child span {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-user-two-soft);
+  color: var(--color-user-two);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.session-card dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+
+.session-card dl div {
+  display: grid;
+}
+
+.session-card :where(dt, dd) {
+  margin: 0;
+  font-size: var(--font-small);
+}
+
+.session-card dt {
+  color: var(--color-text-muted);
+}
+
+.session-actions :where(a, button) {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-block-size: 2.75rem;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-medium);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.session-actions a {
+  background: var(--color-shared);
+  color: var(--color-surface);
+}
+
+.session-actions button {
+  background: var(--color-surface-muted);
+  color: var(--color-danger);
+}
+
+.home-error {
+  margin-block-start: var(--space-3) !important;
+  color: var(--color-danger) !important;
+}
+
+.home-error button {
+  min-block-size: 2.5rem;
+  padding-inline: var(--space-3);
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.today-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-large);
+  background: var(--color-user-one-soft);
+  text-decoration: none;
+}
+
+.today-card > span:first-child {
+  font-size: 1.6rem;
+}
+
+.today-card > span:nth-child(2) {
+  display: grid;
+}
+
+.today-card strong {
+  text-transform: capitalize;
+}
+
+.home-shortcuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.home-shortcuts a {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  min-block-size: 6rem;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  text-decoration: none;
+}
+
+.home-shortcuts span {
+  color: var(--color-shared);
+  font-size: 1.4rem;
+}
+
 .route-card {
   position: relative;
   min-block-size: 22rem;

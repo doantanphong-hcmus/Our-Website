@@ -1,6 +1,6 @@
 import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type MouseEvent } from "react";
 import { userFrom, type User } from "./user";
-import { discardOfflineCommands, type OfflineQueueEventDetail } from "./offlineQueue";
+import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 
 type Route = {
   path: string;
@@ -61,6 +61,141 @@ function OfflineQueueNotice() {
       <span>{messages[status]}</span>
       {(status === "conflict" || status === "failed") && <button type="button" onClick={() => void discardOfflineCommands()}>Bỏ thao tác đang chờ</button>}
     </div>
+  );
+}
+
+type ActivitySession = {
+  id: string;
+  feature: "blind_bag" | "food_vote" | "deep_talk";
+  status: "pending" | "active";
+  createdByUserId: string;
+  version: number;
+  createdAt: number;
+};
+
+const activities = {
+  blind_bag: { label: "Xé Túi Mù", description: "Để một nơi bất ngờ chọn hai đứa.", path: "/di-dau/xe-tui-mu", icon: "◇" },
+  food_vote: { label: "Hôm Nay Ăn Gì", description: "Không cần hỏi nhau thêm 30 phút nữa.", path: "/an-gi", icon: "♨" },
+  deep_talk: { label: "Deep Talk", description: "20 câu hỏi chưa ai được biết trước.", path: "/deep-talk", icon: "♡" },
+} as const;
+
+function sessionsFrom(payload: unknown): ActivitySession[] {
+  if (!payload || typeof payload !== "object" || !("sessions" in payload) || !Array.isArray(payload.sessions)) return [];
+  return payload.sessions.filter((session): session is ActivitySession => {
+    if (!session || typeof session !== "object") return false;
+    const value = session as Record<string, unknown>;
+    return typeof value.id === "string" && value.id.length === 36
+      && typeof value.feature === "string" && Object.hasOwn(activities, value.feature)
+      && ["pending", "active"].includes(String(value.status))
+      && typeof value.createdByUserId === "string" && Number.isInteger(value.version)
+      && typeof value.createdAt === "number";
+  });
+}
+
+function Home({ user }: { user: User }) {
+  const [sessions, setSessions] = useState<ActivitySession[] | null>(null);
+  const [error, setError] = useState("");
+  const [closing, setClosing] = useState<string[]>([]);
+  const now = new Date();
+  const name = user.nickname ?? user.displayName;
+  const partner = user.role === "boyfriend" ? "Nhi" : "Phong";
+  const partnerColor = user.role === "boyfriend" ? "#3F6F61" : "#9F3F59";
+  const greeting = now.getHours() < 11 ? "Chào buổi sáng" : now.getHours() < 18 ? "Chào buổi chiều" : "Chào buổi tối";
+
+  async function loadSessions() {
+    setError("");
+    try {
+      const response = await fetch("/api/sessions", { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Không tải được các phiên đang diễn ra.");
+      setSessions(sessionsFrom(await response.json()));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không tải được các phiên đang diễn ra.");
+      setSessions([]);
+    }
+  }
+
+  useEffect(() => {
+    void loadSessions();
+    const synced = (event: Event) => {
+      const detail = (event as CustomEvent<OfflineQueueEventDetail>).detail;
+      if (detail.status === "sent" || detail.status === "conflict") {
+        setClosing([]);
+        void loadSessions();
+      }
+    };
+    window.addEventListener("our:offline-queue", synced);
+    return () => window.removeEventListener("our:offline-queue", synced);
+  }, []);
+
+  async function closeSession(session: ActivitySession) {
+    setClosing((items) => [...items, session.id]);
+    try {
+      await queueSessionCommand(`/api/sessions/${session.id}/cancel`, { expectedVersion: session.version });
+    } catch (reason) {
+      setClosing((items) => items.filter((id) => id !== session.id));
+      setError(reason instanceof Error ? reason.message : "Không thể đóng phiên.");
+    }
+  }
+
+  return (
+    <section className="home" aria-labelledby="page-title">
+      <header className="home-greeting">
+        <p className="eyebrow">{greeting}</p>
+        <h1 id="page-title">{name} ơi, mình làm gì cùng nhau?</h1>
+        <div className="couple-avatars" role="img" aria-label={`${name} và ${partner}`}>
+          <span style={{ background: user.color }}>{name.slice(0, 1).toUpperCase()}</span>
+          <i aria-hidden="true">♥</i>
+          <span style={{ background: partnerColor }}>{partner.slice(0, 1)}</span>
+        </div>
+      </header>
+
+      <nav className="activity-cards" aria-label="Hoạt động chính">
+        {Object.values(activities).map((activity) => (
+          <AppLink key={activity.path} path={activity.path}>
+            <span aria-hidden="true">{activity.icon}</span>
+            <strong>{activity.label}</strong>
+            <small>{activity.description}</small>
+          </AppLink>
+        ))}
+      </nav>
+
+      <section className="home-section" aria-labelledby="active-sessions-title">
+        <h2 id="active-sessions-title">Phiên đang diễn ra</h2>
+        {sessions === null ? <p role="status">Đang tải các phiên…</p> : sessions.length ? sessions.map((session) => {
+          const activity = activities[session.feature];
+          const creator = session.createdByUserId === user.id ? name : partner;
+          const canClose = session.status === "active" || session.createdByUserId === user.id;
+          return (
+            <article className="session-card" key={session.id}>
+              <div>
+                <strong>{activity.label}</strong>
+                <span>{session.status === "pending" ? "Chờ người còn lại" : "Đang diễn ra"}</span>
+              </div>
+              <dl>
+                <div><dt>Bắt đầu bởi</dt><dd>{creator}</dd></div>
+                <div><dt>Tạo lúc</dt><dd><time dateTime={new Date(session.createdAt * 1000).toISOString()}>{new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(session.createdAt * 1000)}</time></dd></div>
+              </dl>
+              <div className="session-actions">
+                <AppLink path={activity.path}>Tiếp tục</AppLink>
+                {canClose && <button type="button" disabled={closing.includes(session.id)} onClick={() => void closeSession(session)}>{closing.includes(session.id) ? "Đang đóng…" : "Đóng phiên"}</button>}
+              </div>
+            </article>
+          );
+        }) : <p className="empty-session">Hai đứa chưa có phiên nào đang mở.</p>}
+        {error && <p className="home-error" role="alert">{error} <button type="button" onClick={() => void loadSessions()}>Thử lại</button></p>}
+      </section>
+
+      <AppLink path="/lich" className="today-card">
+        <span aria-hidden="true">□</span>
+        <span><small>Hôm nay</small><strong>{new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long" }).format(now)}</strong></span>
+        <b aria-hidden="true">→</b>
+      </AppLink>
+
+      <nav className="home-shortcuts" aria-label="Lối tắt">
+        <AppLink path="/di-dau/ban-do"><span aria-hidden="true">⌖</span><strong>Bản đồ</strong></AppLink>
+        <AppLink path="/di-dau/ho-chieu"><span aria-hidden="true">▧</span><strong>Hộ chiếu</strong></AppLink>
+      </nav>
+    </section>
   );
 }
 
@@ -289,7 +424,9 @@ export function App({ user, onUserChange, onLogout }: {
       <OfflineQueueNotice />
 
       <main id="main-content" tabIndex={-1}>
-        {route?.path === "/tai-khoan" ? (
+        {route?.path === "/" ? (
+          <Home user={user} />
+        ) : route?.path === "/tai-khoan" ? (
           <ProfileSettings user={user} save={saveProfile} />
         ) : route?.path === "/doi-mat-khau" ? (
           <ChangePassword onChanged={onUserChange} />
