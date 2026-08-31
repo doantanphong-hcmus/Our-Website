@@ -65,7 +65,9 @@ try {
 
   let confirmCommand;
   let voteCommand;
+  let proxyConfirmCommand;
   let confirmed = false;
+  let proxyMode = "none";
   const foodSessionId = "00000000-0000-4000-8000-000000000032";
   await nhiPage.route("**/api/sessions**", async (route) => {
     const request = route.request();
@@ -78,6 +80,9 @@ try {
     }) });
     if (request.method() === "GET" && pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
     if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: null }) });
+    if (request.method() === "GET" && pathname.endsWith("/food-proxy")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proxyMode === "proxy"
+      ? { proxy: { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] }, exhausted: false, confirmedByMe: false, ready: false }
+      : { proxy: null, exhausted: proxyMode === "empty", confirmedByMe: false, ready: false }) });
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       eventVersion: 1,
       sessions: [{ id: foodSessionId, feature: "food_vote", status: confirmed ? "active" : "pending", createdByUserId: phong.id, version: confirmed ? 2 : 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
@@ -87,6 +92,13 @@ try {
       return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
         vote: voteCommand.body,
         match: { id: "banh-flan", name: "Bánh flan", foodStyle: "snack", categories: ["dessert"] },
+      }) });
+    }
+    if (pathname.endsWith("/food-proxy")) {
+      proxyConfirmCommand = request.postDataJSON();
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        proxy: { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] },
+        exhausted: false, confirmedByMe: true, ready: false,
       }) });
     }
     confirmCommand = { pathname, body: request.postDataJSON() };
@@ -113,6 +125,20 @@ try {
   assert.equal(await nhiPage.getByRole("button", { name: "Muốn ăn" }).count(), 0);
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
+  proxyMode = "proxy";
+  await nhiPage.goto(`${server.url}/an-gi`);
+  await nhiPage.getByText("Chốt hộ: Mochi").waitFor();
+  await nhiPage.getByRole("button", { name: "Đồng ý chốt hộ" }).click();
+  for (let attempt = 0; attempt < 40 && !proxyConfirmCommand; attempt++) await network.delay(50);
+  assert.match(proxyConfirmCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
+  await nhiPage.getByText("Đang chờ người kia xác nhận.").waitFor();
+  await assertA11y(nhiPage);
+
+  proxyMode = "empty";
+  await nhiPage.reload();
+  await nhiPage.getByText("Chưa còn món an toàn để chốt hộ.").waitFor();
+  await nhiPage.getByText(/Điều kiện dị ứng vẫn được giữ nguyên/).waitFor();
+
   await network.offline(nhiContext, true);
   await nhiPage.getByText(/Đang ngoại tuyến/).waitFor();
   await network.offline(nhiContext, false);
@@ -125,7 +151,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P3.7 E2E: setup, private vote/match, axe, mobile and offline = OK");
+  console.log("P1.14/P2.1/P3.2-P3.8 E2E: private vote/match/proxy, axe, mobile and offline = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

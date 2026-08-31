@@ -29,6 +29,7 @@ type FoodDish = {
 
 type FoodDecision = "want" | "no" | "skip";
 type FoodVote = { dishId: string; decision: FoodDecision };
+type FoodProxy = { proxy: FoodDish | null; exhausted: boolean; confirmedByMe: boolean; ready: boolean };
 
 const mealLabels: Record<FoodConditions["meal"], string> = {
   breakfast: "Bữa sáng",
@@ -78,6 +79,7 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
   const [dishes, setDishes] = useState<FoodDish[]>([]);
   const [votes, setVotes] = useState<FoodVote[]>([]);
   const [match, setMatch] = useState<FoodDish | null>(null);
+  const [proxy, setProxy] = useState<FoodProxy>({ proxy: null, exhausted: false, confirmedByMe: false, ready: false });
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -86,17 +88,20 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
     setLoading(true);
     setError("");
     try {
-      const [poolResponse, votesResponse, matchResponse] = await Promise.all([
+      const [poolResponse, votesResponse, matchResponse, proxyResponse] = await Promise.all([
         fetch(`/api/sessions/${sessionId}/food-pool`, { credentials: "same-origin" }),
         fetch(`/api/sessions/${sessionId}/food-votes`, { credentials: "same-origin" }),
         fetch(`/api/sessions/${sessionId}/food-match`, { credentials: "same-origin" }),
+        fetch(`/api/sessions/${sessionId}/food-proxy`, { credentials: "same-origin" }),
       ]);
       if (!poolResponse.ok) throw new Error(await responseError(poolResponse, "Không tải được danh sách món."));
       if (!votesResponse.ok) throw new Error(await responseError(votesResponse, "Không tải được lựa chọn đã lưu."));
       if (!matchResponse.ok) throw new Error(await responseError(matchResponse, "Không tải được kết quả chung."));
+      if (!proxyResponse.ok && proxyResponse.status !== 409) throw new Error(await responseError(proxyResponse, "Không tải được phương án chốt hộ."));
       const pool = await poolResponse.json() as { dishes?: unknown };
       const saved = await votesResponse.json() as { votes?: unknown };
       const result = await matchResponse.json() as { match?: unknown };
+      const fallback = proxyResponse.ok ? await proxyResponse.json() as FoodProxy : null;
       if (!Array.isArray(pool.dishes) || !Array.isArray(saved.votes)
         || !(result.match === null || (result.match && typeof result.match === "object" && "id" in result.match))) {
         throw new Error("Dữ liệu chọn món không hợp lệ.");
@@ -104,6 +109,7 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
       setDishes(pool.dishes as FoodDish[]);
       setVotes(saved.votes as FoodVote[]);
       setMatch(result.match as FoodDish | null);
+      if (fallback) setProxy(fallback);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được phần chọn món.");
     } finally {
@@ -129,11 +135,29 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
       });
       if (response.status === 409) return void await load();
       if (!response.ok) throw new Error(await responseError(response, "Không lưu được lựa chọn."));
-      const result = await response.json() as { match?: FoodDish };
+      const result = await response.json() as { match?: FoodDish; proxy?: FoodDish | null; exhausted?: boolean };
       setVotes((current) => [...current.filter((item) => item.dishId !== dish.id), { dishId: dish.id, decision }]);
       if (result.match) setMatch(result.match);
+      if ("proxy" in result || result.exhausted) setProxy({ proxy: result.proxy ?? null, exhausted: result.exhausted === true, confirmedByMe: false, ready: false });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không lưu được lựa chọn.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function confirmProxy() {
+    setPending(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/food-proxy`, {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "Không xác nhận được món chốt hộ."));
+      setProxy(await response.json() as FoodProxy);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không xác nhận được món chốt hộ.");
     } finally {
       setPending(false);
     }
@@ -143,6 +167,14 @@ function FoodVoting({ sessionId }: { sessionId: string }) {
   if (error && !dishes.length) return <ErrorState title="Chưa tải được món" retry={() => void load()}>{error}</ErrorState>;
   if (!dishes.length) return <p role="status">Chưa có món phù hợp với các điều kiện đã chọn.</p>;
   if (match) return <div className="food-vote-done" role="status"><strong>Trùng ý rồi!</strong><span>Hai đứa đều muốn ăn {match.name}.</span></div>;
+  if (proxy.exhausted) return <div className="food-vote-done" role="status"><strong>Chưa còn món an toàn để chốt hộ.</strong><span>Hãy chọn thêm nhóm món hoặc tạo một danh sách mới. Điều kiện dị ứng vẫn được giữ nguyên.</span></div>;
+  if (proxy.proxy) return <div className="food-vote-done" role="status">
+    <strong>{proxy.ready ? `Hai đứa đã cùng chốt ${proxy.proxy.name}.` : `Chốt hộ: ${proxy.proxy.name}`}</strong>
+    {proxy.ready ? <span>Đã có xác nhận từ cả hai.</span> : proxy.confirmedByMe
+      ? <span>Đã ghi nhận. Đang chờ người kia xác nhận.</span>
+      : <><span>Món này được chọn từ các lựa chọn không ai từ chối.</span><button type="button" disabled={pending} onClick={() => void confirmProxy()}>Đồng ý chốt hộ</button></>}
+    {error && <span role="alert">{error}</span>}
+  </div>;
   if (!dish) return <div className="food-vote-done" role="status"><strong>Đã lưu kín lựa chọn của ông.</strong><span>Kết quả chỉ mở khi cả hai hoàn tất.</span></div>;
 
   return (

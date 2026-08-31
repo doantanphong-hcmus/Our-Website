@@ -10,6 +10,8 @@ type Status = "pending" | "active" | "declined" | "completed" | "expired" | "can
 type Action = "join" | "decline" | "cancel" | "complete";
 type FoodDecision = "want" | "no" | "skip";
 export type FoodMatch = { dishId: string; alternatives: string[] };
+type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhausted: true };
+export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 
 interface SessionRow {
   id: string;
@@ -137,10 +139,30 @@ function storedFoodMatch(resultJson: string | null): FoodMatch | null {
   }
 }
 
+function storedFoodFallback(resultJson: string | null): FoodFallback | null {
+  const pool = storedDishPool(resultJson);
+  if (!pool || !resultJson) return null;
+  try {
+    const value = JSON.parse(resultJson) as { foodProxy?: unknown; foodExhausted?: unknown };
+    if (value.foodExhausted === true) return { dishId: null, exhausted: true };
+    const proxy = value.foodProxy as { dishId?: unknown } | undefined;
+    return proxy && typeof proxy.dishId === "string" && pool.includes(proxy.dishId)
+      ? { dishId: proxy.dishId, exhausted: false } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function matchFromPool(pool: string[], mutualIds: Iterable<string>): FoodMatch | null {
   const mutual = new Set(mutualIds);
   const matches = pool.filter((id) => mutual.has(id));
   return matches.length ? { dishId: matches[0], alternatives: matches.slice(1) } : null;
+}
+
+export function proxyCandidates(pool: string[], votes: FoodVoteChoice[]): string[] {
+  const wanted = new Set(votes.filter((vote) => vote.decision === "want").map((vote) => vote.dishId));
+  const rejected = new Set(votes.filter((vote) => vote.decision === "no").map((vote) => vote.dishId));
+  return pool.filter((id) => wanted.has(id) && !rejected.has(id));
 }
 
 function shuffle<T>(values: T[]): T[] {
@@ -159,6 +181,33 @@ function publicDish(id: string) {
 
 function publicDishPool(ids: string[]) {
   return { dishes: ids.map(publicDish) };
+}
+
+function publicFallback(fallback: FoodFallback) {
+  return { proxy: fallback.dishId ? publicDish(fallback.dishId) : null, exhausted: fallback.exhausted };
+}
+
+async function resolveFoodFallback(env: SessionEnv, spaceId: string, sessionId: string, pool: string[], resultJson: string): Promise<FoodFallback | null> {
+  const votes = await env.DB.prepare(`SELECT user_id, dish_id, decision FROM food_votes WHERE session_id = ?`)
+    .bind(sessionId).all<{ user_id: string; dish_id: string; decision: FoodDecision }>();
+  const rows = votes.results ?? [];
+  const counts = new Map<string, number>();
+  for (const vote of rows) counts.set(vote.user_id, (counts.get(vote.user_id) ?? 0) + 1);
+  if (counts.size !== 2 || [...counts.values()].some((count) => count !== pool.length)) return null;
+
+  const candidates = proxyCandidates(pool, rows.map((vote) => ({ dishId: vote.dish_id, decision: vote.decision })));
+  const fallback: FoodFallback = candidates.length
+    ? { dishId: candidates[crypto.getRandomValues(new Uint32Array(1))[0] % candidates.length], exhausted: false }
+    : { dishId: null, exhausted: true };
+  const nextResult = JSON.stringify({ dishPool: pool,
+    ...(fallback.dishId ? { foodProxy: { dishId: fallback.dishId } } : { foodExhausted: true }) });
+  const saved = await env.DB.prepare(`UPDATE activity_sessions SET result_json = ?, updated_at = unixepoch()
+    WHERE id = ? AND couple_space_id = ? AND status = 'active' AND result_json = ?`)
+    .bind(nextResult, sessionId, spaceId, resultJson).run();
+  if (saved.meta.changes === 1) return fallback;
+  const winner = await env.DB.prepare("SELECT result_json FROM activity_sessions WHERE id = ? AND couple_space_id = ?")
+    .bind(sessionId, spaceId).first<{ result_json: string | null }>();
+  return storedFoodFallback(winner?.result_json ?? null);
 }
 
 async function userDishOrder(env: SessionEnv, spaceId: string, sessionId: string, userId: string, ids: string[]): Promise<string[]> {
@@ -236,6 +285,7 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
   const pool = storedDishPool(session.result_json);
   if (!pool) return json({ error: "Pool món chưa sẵn sàng." }, 409);
   const existingMatch = storedFoodMatch(session.result_json);
+  const existingFallback = storedFoodFallback(session.result_json);
 
   if (request.method === "GET") {
     const votes = await env.DB.prepare(`SELECT dish_id, decision FROM food_votes
@@ -261,9 +311,10 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
   if (existingKey) return existingKey.session_id === sessionId && existingKey.user_id === userId
     && existingKey.dish_id === dishId && existingKey.decision === foodDecision
     ? json({ vote: { dishId, decision: foodDecision }, duplicate: true,
-      ...(existingMatch ? { match: publicDish(existingMatch.dishId) } : {}) })
+      ...(existingMatch ? { match: publicDish(existingMatch.dishId) } : existingFallback ? publicFallback(existingFallback) : {}) })
     : json({ error: "Idempotency key đã được dùng cho lựa chọn khác." }, 409);
   if (existingMatch) return json({ error: "Hai đứa đã có món trùng ý.", match: publicDish(existingMatch.dishId) }, 409);
+  if (existingFallback) return json({ error: "Hai đứa đã bình chọn xong.", ...publicFallback(existingFallback) }, 409);
   const existingVote = await env.DB.prepare(`SELECT decision FROM food_votes
     WHERE session_id = ? AND user_id = ? AND dish_id = ?`).bind(sessionId, userId, dishId)
     .first<{ decision: FoodDecision }>();
@@ -283,6 +334,7 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
       : json({ error: "Không thể lưu lựa chọn món." }, 409);
   }
   let match: FoodMatch | null = null;
+  let fallback: FoodFallback | null = null;
   if (foodDecision === "want") {
     const mutual = await env.DB.prepare(`SELECT dish_id FROM food_votes WHERE session_id = ? AND decision = 'want'
       GROUP BY dish_id HAVING count(DISTINCT user_id) >= 2`).bind(sessionId).all<{ dish_id: string }>();
@@ -300,7 +352,9 @@ async function foodVotes(request: Request, env: SessionEnv, userId: string, spac
       }
     }
   }
-  return json({ vote: { dishId, decision: foodDecision }, ...(match ? { match: publicDish(match.dishId) } : {}) }, 201);
+  if (!match) fallback = await resolveFoodFallback(env, spaceId, sessionId, pool, session.result_json);
+  return json({ vote: { dishId, decision: foodDecision },
+    ...(match ? { match: publicDish(match.dishId) } : fallback ? publicFallback(fallback) : {}) }, 201);
 }
 
 async function foodMatch(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
@@ -312,6 +366,49 @@ async function foodMatch(env: SessionEnv, spaceId: string, sessionId: string): P
   if (!storedDishPool(session.result_json)) return json({ error: "Pool món chưa sẵn sàng." }, 409);
   const match = storedFoodMatch(session.result_json);
   return json({ match: match ? publicDish(match.dishId) : null });
+}
+
+async function foodProxy(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  const session = await env.DB.prepare(`SELECT feature, status, result_json FROM activity_sessions
+    WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId)
+    .first<{ feature: string; status: Status; result_json: string | null }>();
+  if (!session) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
+  if (storedFoodMatch(session.result_json)) return json({ error: "Hai đứa đã có món trùng ý." }, 409);
+  const fallback = storedFoodFallback(session.result_json);
+
+  const state = async (duplicate = false) => {
+    if (!fallback) return { proxy: null, exhausted: false, confirmedByMe: false, ready: false };
+    if (fallback.exhausted) return { ...publicFallback(fallback), confirmedByMe: false, ready: false };
+    const confirmations = await env.DB.prepare("SELECT user_id FROM food_proxy_confirmations WHERE session_id = ?")
+      .bind(sessionId).all<{ user_id: string }>();
+    const userIds = (confirmations.results ?? []).map((item) => item.user_id);
+    return { ...publicFallback(fallback), confirmedByMe: userIds.includes(userId), ready: userIds.length >= 2,
+      ...(duplicate ? { duplicate: true } : {}) };
+  };
+
+  if (request.method === "GET") return json(await state());
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (!fallback || fallback.exhausted) return json({ error: "Chưa có món để chốt hộ." }, 409);
+  const input = await body(request);
+  const idempotencyKey = input?.idempotencyKey;
+  if (typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) return json({ error: "Lệnh xác nhận không hợp lệ." }, 400);
+  const previousKey = await env.DB.prepare("SELECT session_id, user_id FROM food_proxy_confirmations WHERE idempotency_key = ?")
+    .bind(idempotencyKey).first<{ session_id: string; user_id: string }>();
+  if (previousKey) return previousKey.session_id === sessionId && previousKey.user_id === userId
+    ? json(await state(true)) : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  const previousUser = await env.DB.prepare("SELECT 1 FROM food_proxy_confirmations WHERE session_id = ? AND user_id = ?")
+    .bind(sessionId, userId).first();
+  if (previousUser) return json(await state(true));
+  try {
+    await env.DB.prepare("INSERT INTO food_proxy_confirmations (session_id, user_id, idempotency_key) VALUES (?, ?, ?)")
+      .bind(sessionId, userId, idempotencyKey).run();
+  } catch {
+    const retry = await env.DB.prepare("SELECT 1 FROM food_proxy_confirmations WHERE session_id = ? AND user_id = ?")
+      .bind(sessionId, userId).first();
+    return retry ? json(await state(true)) : json({ error: "Không thể lưu xác nhận chốt hộ." }, 409);
+  }
+  return json(await state(), 201);
 }
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
@@ -474,6 +571,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "food-match" && request.method === "GET") {
     return foodMatch(env, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "food-proxy") {
+    return foodProxy(request, env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

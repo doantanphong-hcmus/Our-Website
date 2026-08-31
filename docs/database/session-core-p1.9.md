@@ -33,3 +33,10 @@ npm run sessions:check
 - Sau mỗi vote `want`, server tìm các món cả hai cùng muốn và chọn món đứng trước trong pool gốc; các match còn lại được lưu làm alternatives nhưng không trả về client.
 - Match đầu tiên được ghi bằng compare-and-set trên `result_json`; Durable Object tuần tự hóa các vote gần đồng thời nên chỉ có một kết quả chung.
 - `GET /api/sessions/:id/food-match` trả cùng một món cho cả hai. Khi đã match, API dừng nhận vote mới nhưng vẫn cho retry idempotent.
+
+## P3.8 — No-match / Chốt hộ
+
+- Chỉ khi cả hai đã vote toàn bộ pool và không có match, server lấy union `want`, loại mọi món có ít nhất một vote `no`, rồi chọn ngẫu nhiên một món còn lại.
+- Proxy luôn là phần tử của pool đã qua lọc tuyệt đối, nên không thể nới điều kiện dị ứng hoặc đưa món bị loại trở lại.
+- `GET/POST /api/sessions/:id/food-proxy` chỉ công khai món proxy, trạng thái xác nhận của chính user và `ready`; không trả số vote hay người đã xác nhận.
+- Nếu không còn ứng viên, API trả `exhausted: true`; UI đề nghị chọn thêm nhóm hoặc tạo danh sách mới và giữ nguyên điều kiện dị ứng.

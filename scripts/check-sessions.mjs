@@ -82,10 +82,10 @@ async function request(pathname, cookie, method = "GET", input) {
   return { response, data };
 }
 
-async function create(cookie, feature, idempotencyKey) {
+async function create(cookie, feature, idempotencyKey, conditions = foodConditions) {
   return request("/api/sessions", cookie, "POST", {
     feature, idempotencyKey,
-    ...(feature === "blind_bag" ? { conditions: blindBagConditions } : feature === "food_vote" ? { conditions: foodConditions } : {}),
+    ...(feature === "blind_bag" ? { conditions: blindBagConditions } : feature === "food_vote" ? { conditions } : {}),
   });
 }
 
@@ -243,6 +243,42 @@ try {
   assert.deepEqual(stopped.data.match, expectedMatch);
   assert.equal((await act(creatorCookie, open.id, "cancel", 2, "cancel-food-001")).data.session.status, "cancelled");
 
+  const smallFoodConditions = { ...foodConditions, meal: "any", category: "korean", allergens: [], exclusions: [] };
+  const proxySession = (await create(phong, "food_vote", "create-food-proxy-01", smallFoodConditions)).data.session;
+  assert.equal((await act(nhi, proxySession.id, "join", 1, "join-food-proxy-01")).data.session.status, "active");
+  const proxyPool = await request(`/api/sessions/${proxySession.id}/food-pool`, phong);
+  const proxyIds = proxyPool.data.dishes.map((dish) => dish.id);
+  const proxyVotesPath = `/api/sessions/${proxySession.id}/food-votes`;
+  const proxyPath = `/api/sessions/${proxySession.id}/food-proxy`;
+  for (let index = 0; index < proxyIds.length; index++) {
+    const response = await request(proxyVotesPath, phong, "POST", {
+      dishId: proxyIds[index], decision: index < 2 ? "want" : "skip", idempotencyKey: `proxy-phong-${index}`,
+    });
+    assert.equal(response.response.status, 201);
+  }
+  assert.deepEqual((await request(proxyPath, phong)).data, { proxy: null, exhausted: false, confirmedByMe: false, ready: false });
+  let proxyResult;
+  for (let index = 0; index < proxyIds.length; index++) {
+    proxyResult = await request(proxyVotesPath, nhi, "POST", {
+      dishId: proxyIds[index], decision: index === 1 ? "no" : "skip", idempotencyKey: `proxy-nhi-${index}-01`,
+    });
+    assert.equal(proxyResult.response.status, 201);
+  }
+  const safeDish = proxyPool.data.dishes[0];
+  assert.deepEqual(proxyResult.data.proxy, safeDish, "proxy must come from union wants minus every no");
+  assert.equal(proxyResult.data.exhausted, false);
+  const confirmations = await Promise.all([
+    request(proxyPath, phong, "POST", { idempotencyKey: "confirm-proxy-phong" }),
+    request(proxyPath, nhi, "POST", { idempotencyKey: "confirm-proxy-nhi-01" }),
+  ]);
+  assert.deepEqual(confirmations.map((item) => item.response.status), [201, 201]);
+  assert.equal(confirmations.filter((item) => item.data.ready).length, 1);
+  const [phongProxy, nhiProxy] = await Promise.all([request(proxyPath, phong), request(proxyPath, nhi)]);
+  assert.deepEqual(phongProxy.data, { proxy: safeDish, exhausted: false, confirmedByMe: true, ready: true });
+  assert.deepEqual(nhiProxy.data, phongProxy.data);
+  assert.equal((await request(proxyPath, phong, "POST", { idempotencyKey: "confirm-proxy-phong" })).data.duplicate, true);
+  assert.equal((await act(phong, proxySession.id, "cancel", 2, "cancel-food-proxy")).data.session.status, "cancelled");
+
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
   const concurrentId = concurrentSession.data.session.id;
   assert.equal((await act(nhi, concurrentId, "join", 1, "join-deep-000001")).data.session.status, "active");
@@ -252,7 +288,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P3.7 sessions: private vote, deterministic shared match and concurrency = OK");
+  console.log("P1.9/P3.2-P3.8 sessions: private match/proxy, two confirmations and safety = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
