@@ -43,6 +43,19 @@ function publicSession(row: SessionRow) {
   };
 }
 
+export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
+  await expirePending(env.DB, spaceId);
+  const [rows, latest] = await env.DB.batch([
+    env.DB.prepare(`${selectSession} WHERE couple_space_id = ? ORDER BY updated_at DESC LIMIT 20`).bind(spaceId),
+    env.DB.prepare(`SELECT coalesce(max(rowid), 0) AS version FROM activity_session_events
+      WHERE couple_space_id = ?`).bind(spaceId),
+  ]);
+  return {
+    eventVersion: Number((latest.results[0] as { version?: number } | undefined)?.version ?? 0),
+    sessions: (rows.results as unknown as SessionRow[]).map(publicSession),
+  };
+}
+
 async function expirePending(db: D1Database, spaceId: string): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   await db.prepare(`UPDATE activity_sessions SET status = 'expired', version = version + 1,
@@ -166,10 +179,7 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   if (parts.length === 2) {
     if (request.method === "POST") return createSession(request, env, userId, spaceId);
     if (request.method === "GET") {
-      await expirePending(env.DB, spaceId);
-      const rows = await env.DB.prepare(`${selectSession} WHERE couple_space_id = ? ORDER BY updated_at DESC LIMIT 20`)
-        .bind(spaceId).all<SessionRow>();
-      return json({ sessions: rows.results.map(publicSession) });
+      return json(await sessionSnapshot(env, spaceId));
     }
     return json({ error: "Method not allowed" }, 405);
   }

@@ -24,9 +24,8 @@
     "sessions:check": "node scripts/check-sessions.mjs",
     "preview:dev": "wrangler dev --config apps/preview/wrangler.jsonc --port 8788",
     "preview:check": "node scripts/check-preview.mjs",
-    "spike:realtime:server": "wrangler dev --config apps/worker/wrangler.jsonc --port 8787",
-    "spike:realtime:check": "node scripts/spike-realtime.mjs",
-    "spike:realtime:browser": "node scripts/spike-realtime-browser.mjs"
+    "realtime:server": "wrangler dev --config apps/worker/wrangler.jsonc --port 8787",
+    "realtime:check": "node scripts/check-realtime.mjs"
   },
   "workspaces": [
     "apps/*",

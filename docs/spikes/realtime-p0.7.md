@@ -16,26 +16,11 @@ It deliberately does not implement authentication, D1 business state, a domain
 session machine, an offline browser queue, heartbeat/backoff, or production
 deployment. Those belong to P1.9-P1.11; P0.7 only proves the platform behavior.
 
-## Run
+## Historical check
 
-Start the local Cloudflare runtime:
-
-```sh
-npm run spike:realtime:server
-```
-
-In another terminal, run the fast protocol check and the two-context browser
-acceptance:
-
-```sh
-npm run spike:realtime:check
-npm run spike:realtime:browser
-```
-
-The browser check launches two isolated contexts in the system Microsoft Edge
-through `playwright-core`; it does not download a bundled browser. Set
-`PLAYWRIGHT_BROWSER_CHANNEL` to another installed Playwright channel when
-needed. The full cross-browser/network matrix still belongs to P1.14.
+The spike commands were retired by P1.10. Run `npm run realtime:check` for the
+authenticated production protocol that replaced them. The full cross-browser
+and network matrix still belongs to P1.14.
 
 ## Acceptance record
 
@@ -51,10 +36,9 @@ needed. The full cross-browser/network matrix still belongs to P1.14.
 | Browser concurrent increments | Final value/version = 3/3 in < 2,000 ms | Passed in 1,268 ms |
 | Browser context reconnect | Snapshot value/version = 4/4 in < 2,000 ms | Passed in 153 ms |
 
-P0.7 fully passes its local feasibility gate, including the two real browser
-contexts named in the plan. The result proves ordering/recovery behavior but is
-not an Internet latency measurement. P1.10 and P1.14 must repeat this against
-preview with the full browser and network matrix.
+P0.7 fully passed its local feasibility gate. Its unauthenticated counter code
+and commands were removed when P1.10 replaced them with the authenticated D1
+session protocol; the acceptance record remains as historical evidence.
 
 ## References
 
