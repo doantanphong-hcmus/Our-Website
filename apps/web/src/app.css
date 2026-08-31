@@ -799,6 +799,112 @@ main {
   min-block-size: 3.25rem;
 }
 
+.food-style-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+}
+
+.food-style-options legend {
+  margin-block-end: var(--space-2);
+  font-size: var(--font-small);
+  font-weight: 750;
+}
+
+.food-style-options label {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  min-block-size: 8rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  cursor: pointer;
+}
+
+.food-style-options label:has(input:checked) {
+  border-color: var(--color-shared);
+  background: var(--color-shared-soft);
+  box-shadow: inset 0 0 0 1px var(--color-shared);
+}
+
+.food-style-options label:has(input:focus-visible) {
+  outline: 0.1875rem solid var(--color-focus);
+  outline-offset: 0.1875rem;
+}
+
+.food-style-options input[type="radio"] {
+  position: absolute;
+  inline-size: 1px;
+  min-block-size: 1px;
+  padding: 0;
+  opacity: 0;
+}
+
+.food-style-options span { font-size: 1.75rem; }
+.food-style-options small { color: var(--color-text-muted); font-weight: 500; }
+
+.food-filters {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+}
+
+.food-filters summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.food-filters > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+}
+
+.food-filters label {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.food-filters input[type="checkbox"] {
+  inline-size: 1.25rem;
+  min-block-size: 1.25rem;
+  padding: 0;
+  accent-color: var(--color-shared);
+}
+
+.food-summary {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-5);
+}
+
+.food-summary div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) 1.2fr;
+  gap: var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.food-summary :where(dt, dd) { margin: 0; }
+.food-summary dt { color: var(--color-text-muted); }
+.food-summary dd { font-weight: 700; }
+
+.food-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.food-actions button { min-block-size: 3.25rem; }
+.food-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
+
 .settings-card h1 {
   margin-block-end: var(--space-2);
 }

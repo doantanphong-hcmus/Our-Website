@@ -37,11 +37,49 @@ try {
   assert.match(createCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
+  createCommand = null;
+  await phongPage.getByRole("link", { name: "Ăn gì", exact: true }).click();
+  await phongPage.getByRole("heading", { name: "Hôm nay mình muốn ăn kiểu nào?" }).waitFor();
+  assert.equal(await phongPage.getByText("Chọn quán", { exact: true }).count(), 0);
+  await phongPage.getByRole("radio", { name: /Ăn vặt/ }).check();
+  await phongPage.getByLabel("Bữa ăn").selectOption("late");
+  await phongPage.getByLabel("Danh mục").selectOption("dessert");
+  await phongPage.getByText("Dị ứng cần tránh", { exact: true }).click();
+  await phongPage.getByLabel("Sữa").check();
+  await phongPage.getByText("Món không muốn ăn", { exact: true }).click();
+  await phongPage.getByLabel("Hải sản").check();
+  await assertA11y(phongPage);
+  await phongPage.getByRole("button", { name: "Gửi người kia xác nhận" }).click();
+  for (let attempt = 0; attempt < 40 && !createCommand; attempt++) await network.delay(50);
+  assert.equal(createCommand.feature, "food_vote");
+  assert.deepEqual(createCommand.conditions, {
+    foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"],
+  });
+  assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+
   const nhiContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const nhiPage = await nhiContext.newPage();
   await mockAuthenticated(nhiPage, nhi);
   await nhiPage.goto(server.url);
   await nhiPage.getByRole("heading", { name: /Nhi ơi/ }).waitFor();
+
+  let confirmCommand;
+  const foodSessionId = "00000000-0000-4000-8000-000000000032";
+  await nhiPage.route("**/api/sessions**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      eventVersion: 1,
+      sessions: [{ id: foodSessionId, feature: "food_vote", status: "pending", createdByUserId: phong.id, version: 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
+    }) });
+    confirmCommand = { pathname: new URL(route.request().url()).pathname, body: route.request().postDataJSON() };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: { id: foodSessionId, status: "active", version: 2 } }) });
+  });
+  await nhiPage.getByRole("link", { name: "Ăn gì", exact: true }).click();
+  await nhiPage.getByRole("heading", { name: "Xem lại trước khi xác nhận" }).waitFor();
+  assert.match(await nhiPage.locator(".food-summary").textContent(), /Ăn vặt.*Ăn khuya.*Tráng miệng.*Sữa.*Hải sản/s);
+  await nhiPage.getByRole("button", { name: "Xác nhận thiết lập" }).click();
+  for (let attempt = 0; attempt < 40 && !confirmCommand; attempt++) await network.delay(50);
+  assert.equal(confirmCommand.pathname, `/api/sessions/${foodSessionId}/join`);
+  assert.equal(confirmCommand.body.expectedVersion, 1);
 
   await network.offline(nhiContext, true);
   await nhiPage.getByText(/Đang ngoại tuyến/).waitFor();
@@ -55,7 +93,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1 E2E: two users, blind-bag conditions, axe, mobile, latency, failure and offline = OK");
+  console.log("P1.14/P2.1/P3.2 E2E: two users, activity setup, axe, mobile, latency, failure and offline = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

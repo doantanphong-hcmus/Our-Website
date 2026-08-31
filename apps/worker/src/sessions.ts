@@ -1,4 +1,5 @@
 import { authenticatedUser } from "./auth";
+import foodCatalog from "../../../content/food.v1.json";
 
 interface SessionEnv {
   DB: D1Database;
@@ -35,6 +36,12 @@ const conditionChoices = {
   experience: ["food", "relax", "art", "books", "play", "explore", "any"],
   surprise: ["gentle", "adventure", "bold"],
 } as const;
+const foodMeals = ["breakfast", "lunch", "dinner", "late", "any"];
+const foodStyles = new Set<string>(foodCatalog.foodStyles.map((item) => item.id));
+const foodCategories = new Set<string>(["any", ...foodCatalog.categories.map((item) => item.id)]);
+const foodAllergens = new Set<string>(foodCatalog.allergens.map((item) => item.id));
+const foodExclusions = new Set<string>(foodCatalog.exclusions.map((item) => item.id));
+const foodStyleCategories = new Set(foodCatalog.dishes.flatMap((dish) => dish.categories.map((category) => `${dish.foodStyle}:${category}`)));
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -79,6 +86,28 @@ function blindBagPayload(value: unknown): string | null {
   });
 }
 
+function foodPayload(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  if (typeof input.foodStyle !== "string" || !foodStyles.has(input.foodStyle)
+    || typeof input.meal !== "string" || !foodMeals.includes(input.meal)
+    || typeof input.category !== "string" || !foodCategories.has(input.category)
+    || (input.category !== "any" && !foodStyleCategories.has(`${input.foodStyle}:${input.category}`))) return null;
+  const allergens = input.allergens;
+  const exclusions = input.exclusions;
+  if (!Array.isArray(allergens) || !Array.isArray(exclusions)
+    || new Set(allergens).size !== allergens.length || new Set(exclusions).size !== exclusions.length
+    || allergens.some((item) => typeof item !== "string" || !foodAllergens.has(item))
+    || exclusions.some((item) => typeof item !== "string" || !foodExclusions.has(item))) return null;
+  return JSON.stringify({ conditions: {
+    foodStyle: input.foodStyle,
+    meal: input.meal,
+    category: input.category,
+    allergens,
+    exclusions,
+  } });
+}
+
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
   const [rows, latest] = await env.DB.batch([
@@ -117,8 +146,10 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
     || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
     return json({ error: "Dữ liệu tạo phiên không hợp lệ." }, 400);
   }
-  const payloadJson = feature === "blind_bag" ? blindBagPayload(input?.conditions) : "{}";
-  if (!payloadJson) return json({ error: "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
+  const payloadJson = feature === "blind_bag"
+    ? blindBagPayload(input?.conditions)
+    : feature === "food_vote" ? foodPayload(input?.conditions) : "{}";
+  if (!payloadJson) return json({ error: feature === "food_vote" ? "Thiết lập món ăn không hợp lệ." : "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
 
   await expirePending(env.DB, spaceId);
   const duplicate = await env.DB.prepare(`${selectSession} WHERE couple_space_id = ? AND idempotency_key = ?`)

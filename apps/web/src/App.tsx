@@ -3,6 +3,7 @@ import { userFrom, type User } from "./user";
 import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 import { EmptyState, ErrorState, LoadingState } from "./uiStates";
 import { BlindBagForm } from "./BlindBagForm";
+import { FoodSessionSetup } from "./FoodSessionSetup";
 
 type Route = {
   path: string;
@@ -443,6 +444,8 @@ export function App({ user, onUserChange, onLogout }: {
           <ChangePassword onChanged={onUserChange} />
         ) : route?.path === "/di-dau/xe-tui-mu" ? (
           <BlindBagForm />
+        ) : route?.path === "/an-gi" ? (
+          <FoodSessionSetup user={user} />
         ) : route ? (
           <section className="route-card" aria-labelledby="page-title">
             <span className="route-card__icon" aria-hidden="true">{route.icon}</span>

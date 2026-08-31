@@ -18,6 +18,10 @@ const blindBagConditions = {
   time: "two_three_hours", distance: "under_3", transport: "motorbike", budget: "any",
   setting: "any", experience: "any", surprise: "gentle",
 };
+const foodConditions = {
+  foodStyle: "snack", meal: "late", category: "snack",
+  allergens: ["milk"], exclusions: ["seafood"],
+};
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -75,7 +79,8 @@ async function request(pathname, cookie, method = "GET", input) {
 
 async function create(cookie, feature, idempotencyKey) {
   return request("/api/sessions", cookie, "POST", {
-    feature, idempotencyKey, ...(feature === "blind_bag" ? { conditions: blindBagConditions } : {}),
+    feature, idempotencyKey,
+    ...(feature === "blind_bag" ? { conditions: blindBagConditions } : feature === "food_vote" ? { conditions: foodConditions } : {}),
   });
 }
 
@@ -98,6 +103,15 @@ try {
   })).response.status, 400);
   assert.equal((await request("/api/sessions", phong, "POST", {
     feature: "blind_bag", idempotencyKey: "bad-custom-distance", conditions: { ...blindBagConditions, distance: "custom", customDistanceKm: 0 },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "food_vote", idempotencyKey: "bad-food-style-01", conditions: { ...foodConditions, foodStyle: "restaurant" },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "food_vote", idempotencyKey: "bad-food-tags-001", conditions: { ...foodConditions, allergens: ["unknown"] },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "food_vote", idempotencyKey: "bad-food-category", conditions: { ...foodConditions, category: "hotpot" },
   })).response.status, 400);
 
   const created = await create(phong, "blind_bag", "create-blind-001");
@@ -137,7 +151,12 @@ try {
   assert.deepEqual(simultaneous.map((item) => item.response.status).sort(), [201, 409]);
   const open = simultaneous.find((item) => item.response.status === 201).data.session;
   const creatorCookie = open.createdByUserId === "user-phong" ? phong : nhi;
-  assert.equal((await act(creatorCookie, open.id, "cancel", 1, "cancel-food-001")).data.session.status, "cancelled");
+  const partnerCookie = open.createdByUserId === "user-phong" ? nhi : phong;
+  assert.deepEqual(open.conditions, foodConditions);
+  const foodConfirmed = await act(partnerCookie, open.id, "join", 1, "confirm-food-001");
+  assert.equal(foodConfirmed.data.session.status, "active");
+  assert.deepEqual(foodConfirmed.data.session.conditions, foodConditions);
+  assert.equal((await act(creatorCookie, open.id, "cancel", 2, "cancel-food-001")).data.session.status, "cancelled");
 
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
   const concurrentId = concurrentSession.data.session.id;
@@ -148,7 +167,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9 session core: scope, lifecycle, expiry, idempotency, version conflict and one-open invariant = OK");
+  console.log("P1.9/P3.2 sessions: lifecycle, food setup validation, partner confirmation and concurrency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
