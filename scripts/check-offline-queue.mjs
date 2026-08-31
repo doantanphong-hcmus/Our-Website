@@ -46,6 +46,9 @@ try {
     status: 200, contentType: "application/json", body: JSON.stringify({ user }),
   }));
   await page.route("**/api/sessions**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({
+      status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 0, sessions: [] }),
+    });
     requests.push(route.request().postDataJSON());
     if (requests.length === 1) return route.abort("failed");
     if (requests.length === 3) return route.fulfill({
@@ -65,10 +68,11 @@ try {
 
   await page.evaluate(async () => {
     const queue = await import("/src/offlineQueue.ts");
-    await queue.queueSessionCommand("/api/sessions", { feature: "blind_bag" });
+    await queue.queueSessionCommand("/api/sessions/00000000-0000-4000-8000-000000000032/food-result", { decision: "retry" });
   });
   await page.getByText("Kết nối chưa ổn định. Đang chờ để thử lại…").waitFor();
   await waitFor(() => requests.length === 1, "First request was not attempted");
+  assert.equal(requests[0].decision, "retry");
   const idempotencyKey = requests[0].idempotencyKey;
 
   await page.reload();
@@ -105,7 +109,7 @@ try {
   await page.evaluate(async () => (await import("/src/offlineQueue.ts")).startOfflineQueue("user-phong"));
   await waitFor(() => requests.length === 4, "Owner did not resume their queued command");
 
-  console.log("P1.11 offline queue: persistence, stable idempotency, backoff, conflict stop and user isolation = OK");
+  console.log("P1.11/P3.11 offline queue: food retry persistence, stable idempotency, backoff and isolation = OK");
   await context.close();
 } finally {
   await browser?.close().catch(() => {});

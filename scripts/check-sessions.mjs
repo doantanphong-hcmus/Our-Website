@@ -305,7 +305,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P3.10 sessions: private food result, history, retry and safety = OK");
+  console.log("P1.9/P3.2-P3.11 sessions: secrecy, simultaneous match and safety = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

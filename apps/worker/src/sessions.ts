@@ -180,6 +180,13 @@ export function proxyCandidates(pool: string[], votes: FoodVoteChoice[]): string
   return pool.filter((id) => wanted.has(id) && !rejected.has(id));
 }
 
+export function foodCandidates(conditions: { foodStyle: string; category: string; allergens: string[]; exclusions: string[] }) {
+  return foodCatalog.dishes.filter((dish) => dish.foodStyle === conditions.foodStyle
+    && (conditions.category === "any" || dish.categories.includes(conditions.category))
+    && !dish.possibleAllergens.some((item) => conditions.allergens.includes(item))
+    && !dish.exclusionTags.some((item) => conditions.exclusions.includes(item)));
+}
+
 function shuffle<T>(values: T[]): T[] {
   const shuffled = [...values];
   for (let index = shuffled.length - 1; index > 0; index--) {
@@ -263,10 +270,7 @@ async function dishPool(env: SessionEnv, userId: string, spaceId: string, sessio
     foodStyle: string; category: string; allergens: string[]; exclusions: string[];
   } };
   const { foodStyle, category, allergens, exclusions } = payload.conditions;
-  const candidates = foodCatalog.dishes.filter((dish) => dish.foodStyle === foodStyle
-    && (category === "any" || dish.categories.includes(category))
-    && !dish.possibleAllergens.some((item) => allergens.includes(item))
-    && !dish.exclusionTags.some((item) => exclusions.includes(item)));
+  const candidates = foodCandidates({ foodStyle, category, allergens, exclusions });
 
   const recentRows = await env.DB.prepare(`SELECT result_json FROM activity_sessions
     WHERE couple_space_id = ? AND id <> ? AND feature = 'food_vote' AND status = 'completed'

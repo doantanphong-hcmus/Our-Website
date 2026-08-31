@@ -22,7 +22,7 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:unit": "vitest run && npm run food:check",
     "test:integration": "npm run db:check && npm run auth:check && npm run sessions:check",
-    "test:e2e": "node tests/e2e/foundation.mjs",
+    "test:e2e": "node tests/e2e/foundation.mjs && node scripts/check-offline-queue.mjs",
     "cicd:check": "node scripts/check-cicd.mjs",
     "food:check": "node scripts/check-food-content.mjs",
     "deploy:config": "node scripts/render-deploy-config.mjs",

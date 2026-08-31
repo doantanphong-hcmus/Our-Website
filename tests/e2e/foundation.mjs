@@ -70,7 +70,6 @@ try {
   let resultCompleted = false;
   let confirmed = false;
   let proxyMode = "none";
-  let matchMode = "none";
   const foodSessionId = "00000000-0000-4000-8000-000000000032";
   await nhiPage.route("**/api/sessions**", async (route) => {
     const request = route.request();
@@ -82,9 +81,7 @@ try {
       ],
     }) });
     if (request.method() === "GET" && pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
-    if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: matchMode === "full_meal"
-      ? { id: "pho-bo", name: "Phở bò", foodStyle: "full_meal", categories: ["noodle"] }
-      : null }) });
+    if (request.method() === "GET" && pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: null }) });
     if (request.method() === "GET" && pathname.endsWith("/food-proxy")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(proxyMode === "proxy"
       ? { proxy: { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] }, exhausted: false, confirmedByMe: false, ready: false }
       : { proxy: null, exhausted: proxyMode === "empty", confirmedByMe: false, ready: false }) });
@@ -149,19 +146,39 @@ try {
   assert.equal(await nhiPage.getByRole("button", { name: "Muốn ăn" }).count(), 0);
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
-  nhi.preferences.reducedMotion = true;
-  resultCompleted = false;
-  matchMode = "full_meal";
-  await nhiPage.reload();
-  const fullMealAnimation = nhiPage.locator(".food-match-animation--full_meal");
+  let fullMealResult;
+  phong.preferences.reducedMotion = true;
+  await phongPage.route("**/api/sessions**", async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    const dish = { id: "pho-bo", name: "Phở bò", foodStyle: "full_meal", categories: ["noodle"] };
+    if (request.method() === "POST" && pathname.endsWith("/food-result")) {
+      fullMealResult = request.postDataJSON();
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: { id: foodSessionId, status: "completed" }, result: dish }) });
+    }
+    if (pathname.endsWith("/food-pool")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ dishes: [dish] }) });
+    if (pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
+    if (pathname.endsWith("/food-match")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ match: dish }) });
+    if (pathname.endsWith("/food-proxy")) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: "Đã có kết quả" }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 2,
+      sessions: [{ id: foodSessionId, feature: "food_vote", status: "active", createdByUserId: phong.id, version: 2,
+        conditions: { foodStyle: "full_meal", meal: "dinner", category: "noodle", allergens: [], exclusions: [] } }] }) });
+  });
+  await phongPage.goto(`${server.url}/an-gi`);
+  const fullMealAnimation = phongPage.locator(".food-match-animation--full_meal");
   await fullMealAnimation.waitFor();
-  assert.equal(await nhiPage.locator("html").getAttribute("data-motion"), "reduced");
+  assert.equal(await phongPage.locator("html").getAttribute("data-motion"), "reduced");
   assert.equal(await fullMealAnimation.locator(".food-match-token--one").evaluate((element) => getComputedStyle(element).animationDuration), "0.001s");
-  await nhiPage.getByText("Hai đứa đều muốn ăn Phở bò.").waitFor();
-  await nhiPage.getByLabel("Kết quả chọn món").getByText("Ăn no", { exact: true }).waitFor();
-  nhi.preferences.reducedMotion = false;
-  matchMode = "none";
+  await phongPage.getByText("Hai đứa đều muốn ăn Phở bò.").waitFor();
+  await phongPage.getByLabel("Kết quả chọn món").getByText("Ăn no", { exact: true }).waitFor();
+  await assertA11y(phongPage);
+  await phongPage.getByRole("button", { name: "Chốt món này" }).click();
+  for (let attempt = 0; attempt < 40 && !fullMealResult; attempt++) await network.delay(50);
+  assert.equal(fullMealResult.decision, "accept");
+  assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+  phong.preferences.reducedMotion = false;
 
+  resultCompleted = false;
   proxyMode = "proxy";
   await nhiPage.goto(`${server.url}/an-gi`);
   await nhiPage.getByText("Chốt hộ: Mochi").waitFor();
@@ -188,7 +205,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P3.10 E2E: private food result, style labels, retry and reduced motion = OK");
+  console.log("P1.14/P2.1/P3.2-P3.11 E2E: both food styles complete on two viewports = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {
