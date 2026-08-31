@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { App } from "./App";
 import { discardOfflineCommands, startOfflineQueue, stopOfflineQueue } from "./offlineQueue";
 import { userFrom, type User } from "./user";
+import { ErrorState, LoadingState } from "./uiStates";
 
 type AuthState =
   | { kind: "checking" }
@@ -9,22 +10,16 @@ type AuthState =
   | { kind: "authenticated"; user: User }
   | { kind: "unavailable" };
 
-function StatusScreen({ retry }: { retry?: () => void }) {
+function StatusScreen({ retry, back }: { retry?: () => void; back?: () => void }) {
   return (
     <main className="auth-status" aria-live="polite">
       <div className="product-mark" aria-hidden="true">P<span>&</span>N</div>
       {retry ? (
-        <>
-          <h1>Chưa thể kết nối</h1>
-          <p>Không kiểm tra được phiên đăng nhập. Kết nối của ông vẫn được giữ nguyên.</p>
-          <button type="button" onClick={retry}>Thử lại</button>
-        </>
+        <ErrorState title="Chưa thể kết nối" retry={retry} back={back}>
+          Không kiểm tra được phiên đăng nhập. Kết nối của ông vẫn được giữ nguyên.
+        </ErrorState>
       ) : (
-        <>
-          <div className="auth-status__pulse" aria-hidden="true" />
-          <h1>Đang mở góc nhỏ của hai đứa…</h1>
-          <p>Chờ một chút nhé.</p>
-        </>
+        <LoadingState label="Đang mở góc nhỏ của hai đứa…" />
       )}
     </main>
   );
@@ -165,7 +160,7 @@ export function AuthApp() {
   }
 
   if (auth.kind === "checking") return <StatusScreen />;
-  if (auth.kind === "unavailable") return <StatusScreen retry={() => void checkSession()} />;
+  if (auth.kind === "unavailable") return <StatusScreen retry={() => void checkSession()} back={() => setAuth({ kind: "guest" })} />;
   if (auth.kind === "guest") return <Login onSuccess={(user) => setAuth({ kind: "authenticated", user })} />;
   return <App
     user={auth.user}

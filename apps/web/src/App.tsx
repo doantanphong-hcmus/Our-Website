@@ -1,6 +1,7 @@
 import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type MouseEvent } from "react";
 import { userFrom, type User } from "./user";
 import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
+import { EmptyState, ErrorState, LoadingState } from "./uiStates";
 
 type Route = {
   path: string;
@@ -104,13 +105,13 @@ function Home({ user }: { user: User }) {
 
   async function loadSessions() {
     setError("");
+    setSessions(null);
     try {
       const response = await fetch("/api/sessions", { credentials: "same-origin" });
       if (!response.ok) throw new Error("Không tải được các phiên đang diễn ra.");
       setSessions(sessionsFrom(await response.json()));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được các phiên đang diễn ra.");
-      setSessions([]);
     }
   }
 
@@ -161,7 +162,11 @@ function Home({ user }: { user: User }) {
 
       <section className="home-section" aria-labelledby="active-sessions-title">
         <h2 id="active-sessions-title">Phiên đang diễn ra</h2>
-        {sessions === null ? <p role="status">Đang tải các phiên…</p> : sessions.length ? sessions.map((session) => {
+        {error && sessions === null ? (
+          <ErrorState title="Chưa xem được các phiên" retry={() => void loadSessions()}>{error}</ErrorState>
+        ) : sessions === null ? (
+          <LoadingState label="Đang tải các phiên…" />
+        ) : sessions.length ? sessions.map((session) => {
           const activity = activities[session.feature];
           const creator = session.createdByUserId === user.id ? name : partner;
           const canClose = session.status === "active" || session.createdByUserId === user.id;
@@ -181,8 +186,13 @@ function Home({ user }: { user: User }) {
               </div>
             </article>
           );
-        }) : <p className="empty-session">Hai đứa chưa có phiên nào đang mở.</p>}
-        {error && <p className="home-error" role="alert">{error} <button type="button" onClick={() => void loadSessions()}>Thử lại</button></p>}
+        }) : (
+          <EmptyState
+            title="Chưa có phiên nào đang mở"
+            action={<AppLink path="/di-dau/xe-tui-mu" className="primary-link">Bắt đầu Xé Túi Mù</AppLink>}
+          >Chọn một hoạt động để hai đứa bắt đầu cùng nhau.</EmptyState>
+        )}
+        {error && sessions !== null && <ErrorState title="Chưa thể đóng phiên" retry={() => void loadSessions()}>{error}</ErrorState>}
       </section>
 
       <AppLink path="/lich" className="today-card">

@@ -44,13 +44,15 @@ try {
   });
 
   await page.goto(baseUrl);
-  assert.equal(await page.getByRole("navigation", { name: "Hoạt động chính" }).getByRole("link").count(), 3);
+  const activities = page.getByRole("navigation", { name: "Hoạt động chính" });
+  await activities.waitFor();
+  assert.equal(await activities.getByRole("link").count(), 3);
   await page.getByRole("heading", { name: "Phiên đang diễn ra" }).waitFor();
   assert.match(await page.locator(".session-card").textContent(), /Xé Túi Mù.*Chờ người còn lại.*Phong/s);
   assert.equal(await page.getByRole("navigation", { name: "Lối tắt" }).getByRole("link").count(), 2);
   assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
   await page.getByRole("button", { name: "Đóng phiên" }).click();
-  await page.getByText("Hai đứa chưa có phiên nào đang mở.").waitFor();
+  await page.getByRole("heading", { name: "Chưa có phiên nào đang mở" }).waitFor();
   assert.equal(commands.length, 1);
   assert.equal(commands[0].expectedVersion, 1);
   assert.match(commands[0].idempotencyKey, /^[0-9a-f-]{36}$/);
