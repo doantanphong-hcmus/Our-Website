@@ -905,6 +905,45 @@ main {
 .food-actions button { min-block-size: 3.25rem; }
 .food-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
 
+.food-voting {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+
+.food-vote-card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  text-align: center;
+}
+
+.food-vote-card h2 { margin-block: 0 var(--space-2); }
+.food-vote-card p { margin: 0; color: var(--color-text-muted); }
+
+.food-vote-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.food-vote-actions button { min-block-size: 3.25rem; }
+.food-vote-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
+
+.food-vote-done {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+}
+
+.food-vote-done span { color: var(--color-text-muted); }
+
+@media (max-width: 30rem) {
+  .food-vote-actions { grid-template-columns: 1fr; }
+}
+
 .settings-card h1 {
   margin-block-end: var(--space-2);
 }

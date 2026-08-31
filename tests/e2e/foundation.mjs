@@ -64,13 +64,29 @@ try {
   await nhiPage.getByRole("heading", { name: /Nhi ơi/ }).waitFor();
 
   let confirmCommand;
+  let voteCommand;
+  let confirmed = false;
   const foodSessionId = "00000000-0000-4000-8000-000000000032";
   await nhiPage.route("**/api/sessions**", async (route) => {
-    if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      eventVersion: 1,
-      sessions: [{ id: foodSessionId, feature: "food_vote", status: "pending", createdByUserId: phong.id, version: 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (request.method() === "GET" && pathname.endsWith("/food-pool")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      dishes: [
+        { id: "banh-flan", name: "Bánh flan", foodStyle: "snack", categories: ["dessert"] },
+        { id: "mochi", name: "Mochi", foodStyle: "snack", categories: ["dessert"] },
+      ],
     }) });
-    confirmCommand = { pathname: new URL(route.request().url()).pathname, body: route.request().postDataJSON() };
+    if (request.method() === "GET" && pathname.endsWith("/food-votes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ votes: [] }) });
+    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      eventVersion: 1,
+      sessions: [{ id: foodSessionId, feature: "food_vote", status: confirmed ? "active" : "pending", createdByUserId: phong.id, version: confirmed ? 2 : 1, conditions: { foodStyle: "snack", meal: "late", category: "dessert", allergens: ["milk"], exclusions: ["seafood"] } }],
+    }) });
+    if (pathname.endsWith("/food-votes")) {
+      voteCommand = { pathname, body: request.postDataJSON() };
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ vote: voteCommand.body }) });
+    }
+    confirmCommand = { pathname, body: request.postDataJSON() };
+    confirmed = true;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: { id: foodSessionId, status: "active", version: 2 } }) });
   });
   await nhiPage.getByRole("link", { name: "Ăn gì", exact: true }).click();
@@ -80,6 +96,16 @@ try {
   for (let attempt = 0; attempt < 40 && !confirmCommand; attempt++) await network.delay(50);
   assert.equal(confirmCommand.pathname, `/api/sessions/${foodSessionId}/join`);
   assert.equal(confirmCommand.body.expectedVersion, 1);
+  await nhiPage.getByRole("heading", { name: "Bánh flan" }).waitFor();
+  await assertA11y(nhiPage);
+  await nhiPage.getByRole("button", { name: "Muốn ăn" }).click();
+  for (let attempt = 0; attempt < 40 && !voteCommand; attempt++) await network.delay(50);
+  assert.equal(voteCommand.pathname, `/api/sessions/${foodSessionId}/food-votes`);
+  assert.equal(voteCommand.body.dishId, "banh-flan");
+  assert.equal(voteCommand.body.decision, "want");
+  assert.match(voteCommand.body.idempotencyKey, /^[0-9a-f-]{36}$/);
+  await nhiPage.getByRole("heading", { name: "Mochi" }).waitFor();
+  assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
   await network.offline(nhiContext, true);
   await nhiPage.getByText(/Đang ngoại tuyến/).waitFor();
@@ -93,7 +119,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2 E2E: two users, activity setup, axe, mobile, latency, failure and offline = OK");
+  console.log("P1.14/P2.1/P3.2/P3.6 E2E: setup, private vote, axe, mobile, failure and offline = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

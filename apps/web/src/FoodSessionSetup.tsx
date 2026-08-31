@@ -20,6 +20,16 @@ type FoodSession = {
   conditions: FoodConditions;
 };
 
+type FoodDish = {
+  id: string;
+  name: string;
+  foodStyle: "full_meal" | "snack";
+  categories: string[];
+};
+
+type FoodDecision = "want" | "no" | "skip";
+type FoodVote = { dishId: string; decision: FoodDecision };
+
 const mealLabels: Record<FoodConditions["meal"], string> = {
   breakfast: "Bữa sáng",
   lunch: "Bữa trưa",
@@ -56,6 +66,87 @@ function SessionSummary({ session }: { session: FoodSession }) {
       <div><dt>Dị ứng cần tránh</dt><dd>{conditions.allergens.length ? conditions.allergens.map((id) => label(foodCatalog.allergens, id)).join(", ") : "Không có"}</dd></div>
       <div><dt>Không muốn ăn</dt><dd>{conditions.exclusions.length ? conditions.exclusions.map((id) => label(foodCatalog.exclusions, id)).join(", ") : "Không có"}</dd></div>
     </dl>
+  );
+}
+
+async function responseError(response: Response, fallback: string) {
+  const data = await response.json().catch(() => null) as { error?: unknown } | null;
+  return typeof data?.error === "string" ? data.error : fallback;
+}
+
+function FoodVoting({ sessionId }: { sessionId: string }) {
+  const [dishes, setDishes] = useState<FoodDish[]>([]);
+  const [votes, setVotes] = useState<FoodVote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const [poolResponse, votesResponse] = await Promise.all([
+        fetch(`/api/sessions/${sessionId}/food-pool`, { credentials: "same-origin" }),
+        fetch(`/api/sessions/${sessionId}/food-votes`, { credentials: "same-origin" }),
+      ]);
+      if (!poolResponse.ok) throw new Error(await responseError(poolResponse, "Không tải được danh sách món."));
+      if (!votesResponse.ok) throw new Error(await responseError(votesResponse, "Không tải được lựa chọn đã lưu."));
+      const pool = await poolResponse.json() as { dishes?: unknown };
+      const saved = await votesResponse.json() as { votes?: unknown };
+      if (!Array.isArray(pool.dishes) || !Array.isArray(saved.votes)) throw new Error("Dữ liệu chọn món không hợp lệ.");
+      setDishes(pool.dishes as FoodDish[]);
+      setVotes(saved.votes as FoodVote[]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không tải được phần chọn món.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, [sessionId]);
+
+  const votedIds = new Set(votes.map((vote) => vote.dishId));
+  const dish = dishes.find((item) => !votedIds.has(item.id));
+
+  async function vote(decision: FoodDecision) {
+    if (!dish) return;
+    setPending(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/food-votes`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dishId: dish.id, decision, idempotencyKey: crypto.randomUUID() }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "Không lưu được lựa chọn."));
+      setVotes((current) => [...current.filter((item) => item.dishId !== dish.id), { dishId: dish.id, decision }]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không lưu được lựa chọn.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Đang chuẩn bị món cho riêng ông…" />;
+  if (error && !dishes.length) return <ErrorState title="Chưa tải được món" retry={() => void load()}>{error}</ErrorState>;
+  if (!dishes.length) return <p role="status">Chưa có món phù hợp với các điều kiện đã chọn.</p>;
+  if (!dish) return <div className="food-vote-done" role="status"><strong>Đã lưu kín lựa chọn của ông.</strong><span>Kết quả chỉ mở khi cả hai hoàn tất.</span></div>;
+
+  return (
+    <section className="food-voting" aria-labelledby="food-vote-title" aria-busy={pending}>
+      <p className="eyebrow">Món {votes.length + 1}/{dishes.length}</p>
+      <div className="food-vote-card">
+        <h2 id="food-vote-title">{dish.name}</h2>
+        <p>Lựa chọn này là riêng tư. Người kia sẽ không thấy câu trả lời của ông.</p>
+      </div>
+      <div className="food-vote-actions">
+        <button type="button" disabled={pending} onClick={() => void vote("want")}>Muốn ăn</button>
+        <button type="button" className="secondary-button" disabled={pending} onClick={() => void vote("no")}>Không</button>
+        <button type="button" className="secondary-button" disabled={pending} onClick={() => void vote("skip")}>Bỏ qua</button>
+      </div>
+      <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error}</div>
+    </section>
   );
 }
 
@@ -148,6 +239,7 @@ export function FoodSessionSetup({ user }: { user: User }) {
         <h1 id="page-title">{session.status === "active" ? "Hai đứa đã thống nhất" : ownsSession ? "Đang chờ người kia" : "Xem lại trước khi xác nhận"}</h1>
         <p>{session.status === "active" ? "Thiết lập đã được cả hai xác nhận và sẵn sàng cho bước chọn món." : ownsSession ? "Người kia sẽ thấy toàn bộ lựa chọn dưới đây trước khi đồng ý." : "Chỉ xác nhận khi mọi điều kiện đều ổn với ông."}</p>
         <SessionSummary session={session} />
+        {session.status === "active" && <FoodVoting sessionId={session.id} />}
         {session.status === "pending" && <div className="food-actions">
           {ownsSession ? (
             <button type="button" disabled={pending} onClick={() => void act("cancel")}>Hủy để chọn lại</button>

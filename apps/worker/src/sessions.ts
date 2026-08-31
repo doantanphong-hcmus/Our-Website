@@ -8,6 +8,7 @@ interface SessionEnv {
 
 type Status = "pending" | "active" | "declined" | "completed" | "expired" | "cancelled";
 type Action = "join" | "decline" | "cancel" | "complete";
+type FoodDecision = "want" | "no" | "skip";
 
 interface SessionRow {
   id: string;
@@ -203,6 +204,61 @@ async function dishPool(env: SessionEnv, userId: string, spaceId: string, sessio
     : json({ error: "Phiên đã thay đổi." }, 409);
 }
 
+async function foodVotes(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  const session = await env.DB.prepare(`SELECT feature, status, result_json FROM activity_sessions
+    WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId)
+    .first<{ feature: string; status: Status; result_json: string | null }>();
+  if (!session) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
+  const pool = storedDishPool(session.result_json);
+  if (!pool) return json({ error: "Pool món chưa sẵn sàng." }, 409);
+
+  if (request.method === "GET") {
+    const votes = await env.DB.prepare(`SELECT dish_id, decision FROM food_votes
+      WHERE session_id = ? AND user_id = ? ORDER BY created_at, dish_id`).bind(sessionId, userId)
+      .all<{ dish_id: string; decision: FoodDecision }>();
+    return json({ votes: (votes.results ?? []).map((vote) => ({ dishId: vote.dish_id, decision: vote.decision })) });
+  }
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const input = await body(request);
+  const dishId = input?.dishId;
+  const decision = input?.decision;
+  const idempotencyKey = input?.idempotencyKey;
+  if (typeof dishId !== "string" || !pool.includes(dishId)
+    || !["want", "no", "skip"].includes(String(decision))
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lựa chọn món không hợp lệ." }, 400);
+  }
+  const foodDecision = decision as FoodDecision;
+  const existingKey = await env.DB.prepare(`SELECT session_id, user_id, dish_id, decision FROM food_votes
+    WHERE idempotency_key = ?`).bind(idempotencyKey)
+    .first<{ session_id: string; user_id: string; dish_id: string; decision: FoodDecision }>();
+  if (existingKey) return existingKey.session_id === sessionId && existingKey.user_id === userId
+    && existingKey.dish_id === dishId && existingKey.decision === foodDecision
+    ? json({ vote: { dishId, decision: foodDecision }, duplicate: true })
+    : json({ error: "Idempotency key đã được dùng cho lựa chọn khác." }, 409);
+  const existingVote = await env.DB.prepare(`SELECT decision FROM food_votes
+    WHERE session_id = ? AND user_id = ? AND dish_id = ?`).bind(sessionId, userId, dishId)
+    .first<{ decision: FoodDecision }>();
+  if (existingVote) return existingVote.decision === foodDecision
+    ? json({ vote: { dishId, decision: foodDecision }, duplicate: true })
+    : json({ error: "Món này đã được chọn trước đó." }, 409);
+
+  try {
+    await env.DB.prepare(`INSERT INTO food_votes (session_id, user_id, dish_id, decision, idempotency_key)
+      VALUES (?, ?, ?, ?, ?)`).bind(sessionId, userId, dishId, foodDecision, idempotencyKey).run();
+  } catch {
+    const retry = await env.DB.prepare(`SELECT decision FROM food_votes
+      WHERE session_id = ? AND user_id = ? AND dish_id = ?`).bind(sessionId, userId, dishId)
+      .first<{ decision: FoodDecision }>();
+    return retry?.decision === foodDecision
+      ? json({ vote: { dishId, decision: foodDecision }, duplicate: true })
+      : json({ error: "Không thể lưu lựa chọn món." }, 409);
+  }
+  return json({ vote: { dishId, decision: foodDecision } }, 201);
+}
+
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
   const [rows, latest] = await env.DB.batch([
@@ -357,6 +413,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "food-pool" && request.method === "GET") {
     return dishPool(env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "food-votes") {
+    return foodVotes(request, env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

@@ -21,3 +21,9 @@ npm run sessions:check
 - Server lọc theo `foodStyle`, category, dị ứng và loại trừ; lưu cố định tối đa 8 ID trong `result_json` để cả hai người nhận cùng một pool.
 - Pool ưu tiên món chưa xuất hiện trong các phiên hoàn tất 30 ngày gần nhất; món cũ chỉ được bù vào khi lựa chọn mới không đủ.
 - P3.5 xếp cùng tập ID theo thứ tự ổn định riêng cho từng user bằng HMAC domain `food-order:v1`; seed và thứ tự của partner không được trả về client.
+
+## P3.6 — Private voting
+
+- `GET /api/sessions/:id/food-votes` chỉ trả các lựa chọn `want`, `no`, `skip` của tài khoản hiện tại; không trả vote, số lượng hay tiến độ của partner.
+- `POST /api/sessions/:id/food-votes` chỉ nhận món thuộc pool cố định, yêu cầu idempotency key và không cho sửa lựa chọn đã lưu.
+- Vote được lưu riêng theo `(session_id, user_id, dish_id)`; response không chứa session nên không phát realtime event làm lộ hoạt động riêng tư.
