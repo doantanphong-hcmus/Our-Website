@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { handleAuth } from "./auth";
+import { handleSessions } from "./sessions";
 
 interface RoomState {
   version: number;
@@ -22,6 +23,13 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) {
       try {
         return await handleAuth(request, env) ?? new Response("Not found", { status: 404 });
+      } catch {
+        return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });
+      }
+    }
+    if (url.pathname === "/api/sessions" || url.pathname.startsWith("/api/sessions/")) {
+      try {
+        return await handleSessions(request, env);
       } catch {
         return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });
       }

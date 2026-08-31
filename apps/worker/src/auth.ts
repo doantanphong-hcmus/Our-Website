@@ -3,7 +3,7 @@ interface AuthEnv {
   AUTH_PEPPER: string;
 }
 
-interface UserRow {
+export interface UserRow {
   id: string;
   couple_space_id: string;
   username: string;
@@ -22,7 +22,7 @@ interface LimitRow {
   blocked_until: number;
 }
 
-interface SessionInfo {
+export interface SessionInfo {
   user: UserRow;
   tokenHash: string;
 }
@@ -226,7 +226,7 @@ async function currentSession(request: Request, env: AuthEnv): Promise<Response>
   return json({ user: publicUser(session.user) });
 }
 
-async function authenticatedUser(request: Request, env: AuthEnv): Promise<SessionInfo | null> {
+export async function authenticatedUser(request: Request, env: AuthEnv): Promise<SessionInfo | null> {
   const token = cookieValue(request);
   if (!token || token.length !== 43) return null;
   const now = Math.floor(Date.now() / 1000);
