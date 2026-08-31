@@ -42,6 +42,7 @@ const foodCategories = new Set<string>(["any", ...foodCatalog.categories.map((it
 const foodAllergens = new Set<string>(foodCatalog.allergens.map((item) => item.id));
 const foodExclusions = new Set<string>(foodCatalog.exclusions.map((item) => item.id));
 const foodStyleCategories = new Set(foodCatalog.dishes.flatMap((dish) => dish.categories.map((category) => `${dish.foodStyle}:${category}`)));
+const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -106,6 +107,74 @@ function foodPayload(value: unknown): string | null {
     allergens,
     exclusions,
   } });
+}
+
+function storedDishPool(resultJson: string | null): string[] | null {
+  if (!resultJson) return null;
+  try {
+    const value = JSON.parse(resultJson) as { dishPool?: unknown };
+    const pool = value.dishPool;
+    return Array.isArray(pool) && pool.length <= 8 && new Set(pool).size === pool.length
+      && pool.every((id) => typeof id === "string" && foodDishById.has(id)) ? pool as string[] : null;
+  } catch {
+    return null;
+  }
+}
+
+function shuffle<T>(values: T[]): T[] {
+  const shuffled = [...values];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const random = crypto.getRandomValues(new Uint32Array(1))[0] % (index + 1);
+    [shuffled[index], shuffled[random]] = [shuffled[random], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function publicDishPool(ids: string[]) {
+  return { dishes: ids.map((id) => {
+    const dish = foodDishById.get(id)!;
+    return { id: dish.id, name: dish.name, foodStyle: dish.foodStyle, categories: dish.categories };
+  }) };
+}
+
+async function dishPool(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
+  const session = await env.DB.prepare(`SELECT feature, status, payload_json, result_json FROM activity_sessions
+    WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId)
+    .first<{ feature: string; status: Status; payload_json: string; result_json: string | null }>();
+  if (!session) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (session.feature !== "food_vote" || session.status !== "active") return json({ error: "Phiên chọn món chưa sẵn sàng." }, 409);
+  const existing = storedDishPool(session.result_json);
+  if (existing) return json(publicDishPool(existing));
+  if (session.result_json) return json({ error: "Dữ liệu pool món không hợp lệ." }, 500);
+
+  const payload = JSON.parse(session.payload_json) as { conditions: {
+    foodStyle: string; category: string; allergens: string[]; exclusions: string[];
+  } };
+  const { foodStyle, category, allergens, exclusions } = payload.conditions;
+  const candidates = foodCatalog.dishes.filter((dish) => dish.foodStyle === foodStyle
+    && (category === "any" || dish.categories.includes(category))
+    && !dish.possibleAllergens.some((item) => allergens.includes(item))
+    && !dish.exclusionTags.some((item) => exclusions.includes(item)));
+
+  const recentRows = await env.DB.prepare(`SELECT result_json FROM activity_sessions
+    WHERE couple_space_id = ? AND id <> ? AND feature = 'food_vote' AND status = 'completed'
+      AND updated_at >= ? AND result_json IS NOT NULL ORDER BY updated_at DESC LIMIT 100`)
+    .bind(spaceId, sessionId, Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60)
+    .all<{ result_json: string }>();
+  const recent = new Set((recentRows.results ?? []).flatMap((row) => storedDishPool(row.result_json) ?? []));
+  const ids = [
+    ...shuffle(candidates.filter((dish) => !recent.has(dish.id))),
+    ...shuffle(candidates.filter((dish) => recent.has(dish.id))),
+  ].slice(0, 8).map((dish) => dish.id);
+
+  const saved = await env.DB.prepare(`UPDATE activity_sessions SET result_json = ?
+    WHERE id = ? AND couple_space_id = ? AND status = 'active' AND result_json IS NULL`)
+    .bind(JSON.stringify({ dishPool: ids }), sessionId, spaceId).run();
+  if (saved.meta.changes === 1) return json(publicDishPool(ids));
+  const winner = await env.DB.prepare("SELECT result_json FROM activity_sessions WHERE id = ? AND couple_space_id = ?")
+    .bind(sessionId, spaceId).first<{ result_json: string | null }>();
+  const winnerPool = storedDishPool(winner?.result_json ?? null);
+  return winnerPool ? json(publicDishPool(winnerPool)) : json({ error: "Phiên đã thay đổi." }, 409);
 }
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
@@ -259,6 +328,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
     await expirePending(env.DB, spaceId);
     const row = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
     return row ? json({ session: publicSession(row) }) : json({ error: "Không tìm thấy phiên." }, 404);
+  }
+  if (parts.length === 4 && parts[3] === "food-pool" && request.method === "GET") {
+    return dishPool(env, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

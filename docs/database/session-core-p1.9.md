@@ -14,3 +14,9 @@ P1.9 không phát WebSocket và không giữ command khi offline; đó là P1.10
 ```bash
 npm run sessions:check
 ```
+
+## P3.4 — Dish pool
+
+- `GET /api/sessions/:id/food-pool` chỉ dùng cho phiên `food_vote` đã `active`.
+- Server lọc theo `foodStyle`, category, dị ứng và loại trừ; lưu cố định tối đa 8 ID trong `result_json` để cả hai người nhận cùng một pool.
+- Pool ưu tiên món chưa xuất hiện trong các phiên hoàn tất 30 ngày gần nhất; món cũ chỉ được bù vào khi lựa chọn mới không đủ.

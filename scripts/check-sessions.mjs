@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,8 @@ const foodConditions = {
   foodStyle: "snack", meal: "late", category: "snack",
   allergens: ["milk"], exclusions: ["seafood"],
 };
+const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v1.json"), "utf8"));
+const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -43,7 +45,10 @@ wranglerCommand(["d1", "execute", ...local, "--command", `
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-nhi';
   INSERT INTO activity_sessions
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,expires_at)
-  VALUES ('00000000-0000-4000-8000-000000000001','couple-main','food_vote','pending','user-phong','expired-create-001',unixepoch()-1);`]);
+  VALUES ('00000000-0000-4000-8000-000000000001','couple-main','food_vote','pending','user-phong','expired-create-001',unixepoch()-1);
+  INSERT INTO activity_sessions
+    (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,result_json,completed_at,updated_at)
+  VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"]}',unixepoch(),unixepoch());`]);
 
 const server = spawn(process.execPath, [
   wrangler, "dev", "--config", config, "--ip", "127.0.0.1", "--port", "8796", "--persist-to", state,
@@ -153,9 +158,26 @@ try {
   const creatorCookie = open.createdByUserId === "user-phong" ? phong : nhi;
   const partnerCookie = open.createdByUserId === "user-phong" ? nhi : phong;
   assert.deepEqual(open.conditions, foodConditions);
+  assert.equal((await request(`/api/sessions/${open.id}/food-pool`, creatorCookie)).response.status, 409);
   const foodConfirmed = await act(partnerCookie, open.id, "join", 1, "confirm-food-001");
   assert.equal(foodConfirmed.data.session.status, "active");
   assert.deepEqual(foodConfirmed.data.session.conditions, foodConditions);
+  const [creatorPool, partnerPool] = await Promise.all([
+    request(`/api/sessions/${open.id}/food-pool`, creatorCookie),
+    request(`/api/sessions/${open.id}/food-pool`, partnerCookie),
+  ]);
+  assert.equal(creatorPool.response.status, 200);
+  assert.equal(partnerPool.response.status, 200);
+  assert.deepEqual(creatorPool.data, partnerPool.data);
+  assert.ok(creatorPool.data.dishes.length > 0 && creatorPool.data.dishes.length <= 8);
+  assert.ok(!creatorPool.data.dishes.some((dish) => dish.id === "xoi-man"), "recent dishes must be deprioritized while fresh choices exist");
+  for (const item of creatorPool.data.dishes) {
+    const dish = foodDishById.get(item.id);
+    assert.equal(dish.foodStyle, foodConditions.foodStyle);
+    assert.ok(dish.categories.includes(foodConditions.category));
+    assert.ok(!dish.possibleAllergens.some((tag) => foodConditions.allergens.includes(tag)));
+    assert.ok(!dish.exclusionTags.some((tag) => foodConditions.exclusions.includes(tag)));
+  }
   assert.equal((await act(creatorCookie, open.id, "cancel", 2, "cancel-food-001")).data.session.status, "cancelled");
 
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
@@ -167,7 +189,7 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2 sessions: lifecycle, food setup validation, partner confirmation and concurrency = OK");
+  console.log("P1.9/P3.2/P3.4 sessions: lifecycle, setup confirmation, fixed dish pool, exclusions and recent avoidance = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
