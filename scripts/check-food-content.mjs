@@ -56,6 +56,8 @@ function validate(value) {
   }
   for (const [category, count] of Object.entries(coverage)) assert.ok(count >= 4, `${category} needs at least 4 dishes`);
   for (const [style, count] of Object.entries(styleCoverage)) assert.ok(count >= 8, `${style} needs at least 8 dishes`);
+  assert.ok(styleCoverage.snack >= 35, "snack needs at least 35 dishes");
+  assert.ok(value.dishes.some((dish) => dish.id === "lap-xuong-nuong-da" && dish.foodStyle === "snack"), "Lạp xưởng nướng đá is required");
   return value;
 }
 

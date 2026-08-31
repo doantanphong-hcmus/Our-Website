@@ -130,6 +130,13 @@
     { "id": "su-kem", "foodStyle": "snack", "name": "Su kem", "categories": ["dessert"], "possibleAllergens": ["egg", "milk", "wheat"], "exclusionTags": [] },
     { "id": "tiramisu", "foodStyle": "snack", "name": "Tiramisu", "categories": ["dessert"], "possibleAllergens": ["egg", "milk", "wheat"], "exclusionTags": [] },
     { "id": "tau-hu-nuoc-duong", "foodStyle": "snack", "name": "Tàu hũ nước đường", "categories": ["dessert", "vietnamese"], "possibleAllergens": ["soy"], "exclusionTags": ["coconut"] },
-    { "id": "chuoi-chien", "foodStyle": "snack", "name": "Chuối chiên", "categories": ["dessert", "fried", "snack", "vietnamese"], "possibleAllergens": ["wheat"], "exclusionTags": [] }
+    { "id": "chuoi-chien", "foodStyle": "snack", "name": "Chuối chiên", "categories": ["dessert", "fried", "snack", "vietnamese"], "possibleAllergens": ["wheat"], "exclusionTags": [] },
+    { "id": "lap-xuong-nuong-da", "foodStyle": "snack", "name": "Lạp xưởng nướng đá", "categories": ["grilled", "snack", "vietnamese"], "possibleAllergens": ["soy", "wheat"], "exclusionTags": ["pork"] },
+    { "id": "trung-cut-nuong-chen", "foodStyle": "snack", "name": "Trứng cút nướng chén", "categories": ["grilled", "snack", "vietnamese"], "possibleAllergens": ["crustacean", "egg", "fish", "milk", "soy"], "exclusionTags": ["seafood"] },
+    { "id": "banh-khot", "foodStyle": "snack", "name": "Bánh khọt", "categories": ["fried", "snack", "vietnamese"], "possibleAllergens": ["crustacean", "fish"], "exclusionTags": ["coconut", "pork", "seafood"] },
+    { "id": "bo-vien-nuong", "foodStyle": "snack", "name": "Bò viên nướng", "categories": ["grilled", "snack"], "possibleAllergens": ["soy", "wheat"], "exclusionTags": ["beef"] },
+    { "id": "ho-lo-nuong", "foodStyle": "snack", "name": "Hồ lô nướng", "categories": ["fast_food", "grilled", "snack"], "possibleAllergens": ["soy", "wheat"], "exclusionTags": ["pork"] },
+    { "id": "khoai-lang-ken", "foodStyle": "snack", "name": "Khoai lang kén", "categories": ["dessert", "fried", "snack", "vietnamese"], "possibleAllergens": ["wheat"], "exclusionTags": ["coconut"] },
+    { "id": "banh-tieu", "foodStyle": "snack", "name": "Bánh tiêu", "categories": ["fried", "snack", "vietnamese"], "possibleAllergens": ["sesame", "wheat"], "exclusionTags": [] }
   ]
 }
