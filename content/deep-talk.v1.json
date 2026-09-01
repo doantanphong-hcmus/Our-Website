@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "language": "vi",
+  "deck": {
+    "cardCount": 20,
+    "cardsPerGroup": 4,
+    "minimumDistinctForms": 5,
+    "maxConsecutiveSameForm": 3,
+    "positiveEndingCards": 2
+  },
+  "questionLength": {
+    "unit": "characters",
+    "min": 15,
+    "max": 180
+  },
+  "safetyDefaults": {
+    "sensitiveTopicsRequireMutualConsent": true,
+    "userAnswersAllowedInPrompt": false,
+    "unopenedCardsAllowedInClientPayload": false
+  },
+  "severities": [
+    { "id": "light", "rank": 1, "label": "Nhẹ", "description": "Dễ trả lời, không gây áp lực cảm xúc." },
+    { "id": "medium", "rank": 2, "label": "Suy ngẫm", "description": "Cần thành thật và suy nghĩ nhưng không ép đào sâu." },
+    { "id": "heavy", "rank": 3, "label": "Sâu", "description": "Có thể tạo cảm xúc mạnh; không được đặt hai lá nặng cạnh nhau." }
+  ],
+  "groups": [
+    { "id": "mo_long", "label": "Mở lòng", "allowedSeverities": ["light"], "allowsSensitiveTopics": false },
+    { "id": "ky_uc", "label": "Ký ức", "allowedSeverities": ["light", "medium"], "allowsSensitiveTopics": true },
+    { "id": "thau_hieu", "label": "Thấu hiểu", "allowedSeverities": ["light", "medium"], "allowsSensitiveTopics": true },
+    { "id": "chan_that", "label": "Chân thật", "allowedSeverities": ["medium", "heavy"], "allowsSensitiveTopics": true },
+    { "id": "tuong_lai", "label": "Tương lai", "allowedSeverities": ["light", "medium"], "allowsSensitiveTopics": true }
+  ],
+  "forms": [
+    { "id": "ke_chuyen", "label": "Kể lại một câu chuyện" },
+    { "id": "lua_chon", "label": "Chọn giữa hai khả năng" },
+    { "id": "tuong_tuong", "label": "Tưởng tượng một tình huống" },
+    { "id": "nhin_nguoi_kia", "label": "Nhìn nhận về người kia" },
+    { "id": "nhin_ban_than", "label": "Nhìn nhận về bản thân" },
+    { "id": "hoan_thanh_cau", "label": "Hoàn thành một câu" },
+    { "id": "biet_on", "label": "Nói một điều biết ơn" },
+    { "id": "mong_muon", "label": "Đưa ra một mong muốn" },
+    { "id": "cam_giac", "label": "Mô tả một cảm giác" },
+    { "id": "hanh_dong", "label": "Chọn hành động cho tương lai" }
+  ],
+  "safeTopics": [
+    { "id": "cam_nhan", "label": "Cảm nhận về nhau" },
+    { "id": "thoi_quen", "label": "Thói quen" },
+    { "id": "ky_niem", "label": "Kỷ niệm" },
+    { "id": "the_hien_tinh_cam", "label": "Cách thể hiện tình cảm" },
+    { "id": "nhu_cau", "label": "Nhu cầu" },
+    { "id": "giai_quyet_khac_biet", "label": "Cách giải quyết khác biệt" },
+    { "id": "mong_muon", "label": "Mong muốn" },
+    { "id": "tuong_lai", "label": "Tương lai" },
+    { "id": "biet_on", "label": "Sự biết ơn" },
+    { "id": "chua_tung_hoi", "label": "Những điều chưa từng hỏi" }
+  ],
+  "sensitiveTopics": [
+    { "id": "nguoi_yeu_cu", "label": "Người yêu cũ" },
+    { "id": "gia_dinh", "label": "Gia đình" },
+    { "id": "tien_bac", "label": "Tiền bạc" },
+    { "id": "hon_nhan", "label": "Hôn nhân" },
+    { "id": "con_cai", "label": "Con cái" },
+    { "id": "than_mat", "label": "Sự thân mật" },
+    { "id": "ton_thuong_qua_khu", "label": "Tổn thương trong quá khứ" },
+    { "id": "mau_thuan_hien_tai", "label": "Mâu thuẫn hiện tại" }
+  ],
+  "forbiddenPatterns": [
+    { "id": "psychological_diagnosis", "action": "block", "patterns": ["chẩn đoán", "trầm cảm", "rối loạn tâm lý"] },
+    { "id": "prove_love", "action": "block", "patterns": ["chứng minh.*(?:yêu|tình cảm)"] },
+    { "id": "dangerous_secret", "action": "block", "patterns": ["bí mật nguy hiểm"] },
+    { "id": "forced_trauma", "action": "block", "patterns": ["(?:kể lại|mô tả chi tiết).*(?:sang chấn|tổn thương)"] },
+    { "id": "jealousy_provocation", "action": "block", "patterns": ["(?:làm|khiến).*(?:ghen|ghen tuông)"] },
+    { "id": "judgment", "action": "block", "patterns": ["ai (?:đúng|sai) hơn", "người kia.*(?:tệ|ích kỷ)"] },
+    { "id": "coercion", "action": "block", "patterns": ["(?:bắt buộc|phải) trả lời", "không được bỏ qua"] },
+    { "id": "therapy", "action": "block", "patterns": ["trị liệu", "nhà trị liệu", "bác sĩ tâm lý"] },
+    { "id": "llm_brand", "action": "block", "patterns": ["ChatGPT|OpenAI|Claude|Gemini|Llama|Cloudflare"] },
+    { "id": "advertising", "action": "block", "patterns": ["quảng cáo|mã giảm giá|tài trợ bởi"] },
+    { "id": "gender_assumption", "action": "block", "patterns": ["anh ấy|cô ấy"] }
+  ],
+  "cardSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["group", "form", "sensitivityTopics", "severity", "positive", "question"],
+    "properties": {
+      "group": { "type": "string", "enum": ["mo_long", "ky_uc", "thau_hieu", "chan_that", "tuong_lai"] },
+      "form": { "type": "string", "enum": ["ke_chuyen", "lua_chon", "tuong_tuong", "nhin_nguoi_kia", "nhin_ban_than", "hoan_thanh_cau", "biet_on", "mong_muon", "cam_giac", "hanh_dong"] },
+      "sensitivityTopics": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["nguoi_yeu_cu", "gia_dinh", "tien_bac", "hon_nhan", "con_cai", "than_mat", "ton_thuong_qua_khu", "mau_thuan_hien_tai"] } },
+      "severity": { "type": "string", "enum": ["light", "medium", "heavy"] },
+      "positive": { "type": "boolean" },
+      "question": { "type": "string", "minLength": 15, "maxLength": 180 }
+    }
+  }
+}
