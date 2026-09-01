@@ -30,6 +30,8 @@ const deepTalkConditions = {
 };
 const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v1.json"), "utf8"));
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
+const deepTalkDeckJson = JSON.stringify(JSON.parse(await readFile(path.join(root, "tests", "fixtures", "deep-talk-safe-deck.json"), "utf8")).cards)
+  .replaceAll("'", "''");
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -55,6 +57,19 @@ wranglerCommand(["d1", "execute", ...local, "--command", `
   INSERT INTO activity_sessions
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,result_json,completed_at,updated_at)
   VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"],"foodFinal":{"dishId":"xoi-man","foodStyle":"snack","mode":"dish","source":"match","accepted":true}}',unixepoch(),unixepoch());`]);
+
+for (let index = 1; index <= 3; index++) {
+  const sessionId = `00000000-0000-4000-8000-00000000010${index}`;
+  wranglerCommand(["d1", "execute", ...local, "--command", `
+    INSERT INTO activity_sessions
+      (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,payload_json,result_json,completed_at,updated_at)
+    VALUES ('${sessionId}','couple-main','deep_talk','completed','user-phong','history-session-${index}',
+      '{"conditions":{"level":"understand","duration":"30","sensitiveTopics":{}}}','{}',unixepoch()-${index},unixepoch()-${index});
+    INSERT INTO deep_talk_decks
+      (id,session_id,couple_space_id,created_by_user_id,idempotency_key,seed,generation_day,cards_json,created_at)
+    VALUES ('history-deck-${index}','${sessionId}','couple-main','user-phong','history-deck-key-${index}',${index},date('now','+7 hours'),'${deepTalkDeckJson}',unixepoch()-${index});
+    INSERT INTO question_fingerprints (deck_id,position,fingerprint) VALUES ('history-deck-${index}',0,'history-fingerprint-${index}');`]);
+}
 
 const server = spawn(process.execPath, [
   wrangler, "dev", "--config", config, "--ip", "127.0.0.1", "--port", "8796", "--persist-to", state,
@@ -104,6 +119,14 @@ try {
   assert.equal((await fetch(`${baseUrl}/api/sessions`)).status, 401);
   const phong = await login("phong");
   const nhi = await login("nhi");
+
+  const replayedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong, "POST", {
+    expectedVersion: 1, idempotencyKey: "history-deck-key-1",
+  });
+  assert.equal(replayedDeck.response.status, 200);
+  assert.equal(replayedDeck.data.duplicate, true);
+  assert.equal(replayedDeck.data.deck.cardCount, 20);
+  assert.doesNotMatch(JSON.stringify(replayedDeck.data), /seed|cards|question/i);
 
   const initial = await request("/api/sessions", phong);
   assert.equal(initial.response.status, 200);
@@ -335,7 +358,18 @@ try {
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P4.2 sessions: food safety and versioned Deep Talk consent = OK");
+  const quotaSession = await create(phong, "deep_talk", "create-deep-quota1");
+  const quotaId = quotaSession.data.session.id;
+  const quotaReview = await request(`/api/sessions/${quotaId}/deep-talk-consent`, nhi, "POST", {
+    action: "review", expectedVersion: 1, sensitiveTopics: deepTalkConditions.sensitiveTopics, idempotencyKey: "review-deep-quota1",
+  });
+  assert.equal(quotaReview.data.session.status, "active");
+  const quotaResult = await request(`/api/sessions/${quotaId}/deep-talk-deck`, phong, "POST", {
+    expectedVersion: 2, idempotencyKey: "generate-deep-quota1",
+  });
+  assert.equal(quotaResult.response.status, 429);
+
+  console.log("P1.9/P3.2-P4.7 sessions: food safety, Deep Talk consent, deck idempotency and quota = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

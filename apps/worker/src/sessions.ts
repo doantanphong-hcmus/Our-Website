@@ -1,10 +1,15 @@
 import { authenticatedUser } from "./auth";
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import foodCatalog from "../../../content/food.v1.json";
+import { buildDeepTalkDeck } from "./deep-talk-generation";
+import type { DeepTalkAiBinding } from "./deep-talk-ai";
+import { fingerprintDeepTalkQuestion } from "./deep-talk-similarity";
+import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
 
 interface SessionEnv {
   DB: D1Database;
   AUTH_PEPPER: string;
+  AI?: DeepTalkAiBinding;
 }
 
 type Status = "pending" | "active" | "declined" | "completed" | "expired" | "cancelled";
@@ -32,10 +37,21 @@ interface SessionRow {
   updated_at: number;
 }
 
+interface DeepTalkDeckRow {
+  id: string;
+  session_id: string;
+  created_by_user_id: string;
+  idempotency_key: string;
+  seed: number;
+  cards_json: string;
+  created_at: number;
+}
+
 const features = ["blind_bag", "food_vote", "deep_talk"];
 const commandPattern = /^[A-Za-z0-9_-]{8,100}$/;
 const selectSession = `SELECT id, feature, status, created_by_user_id, version,
   payload_json, result_json, expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
+const selectDeepTalkDeck = `SELECT id, session_id, created_by_user_id, idempotency_key, seed, cards_json, created_at FROM deep_talk_decks`;
 
 const conditionChoices = {
   time: ["one_hour", "two_three_hours", "half_day", "any"],
@@ -616,6 +632,105 @@ async function deepTalkConsent(request: Request, env: SessionEnv, userId: string
   return json(state(updated!), 201);
 }
 
+function publicDeepTalkDeck(row: DeepTalkDeckRow) {
+  return { id: row.id, sessionId: row.session_id, cardCount: 20, createdAt: row.created_at };
+}
+
+function deepTalkGenerationDay(now: number): string {
+  return new Date((now + 7 * 60 * 60) * 1000).toISOString().slice(0, 10);
+}
+
+function storedDeepTalkDeck(row: { cards_json: string }): DeepTalkDeck | null {
+  try {
+    const cards = JSON.parse(row.cards_json) as unknown;
+    return Array.isArray(cards) && cards.length === 20 ? { cards: cards as DeepTalkCard[] } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const input = await body(request);
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!Number.isInteger(expectedVersion) || Number(expectedVersion) < 1
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh tạo bộ Deep Talk không hợp lệ." }, 400);
+  }
+
+  const byKey = await env.DB.prepare(`${selectDeepTalkDeck} WHERE idempotency_key = ?`).bind(idempotencyKey).first<DeepTalkDeckRow>();
+  if (byKey) return byKey.session_id === sessionId && byKey.created_by_user_id === userId
+    ? json({ deck: publicDeepTalkDeck(byKey), duplicate: true })
+    : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  const usedKey = await env.DB.batch([
+    env.DB.prepare("SELECT 1 FROM activity_session_events WHERE idempotency_key = ?").bind(idempotencyKey),
+    env.DB.prepare("SELECT 1 FROM deep_talk_consent_events WHERE idempotency_key = ?").bind(idempotencyKey),
+  ]);
+  if (usedKey.some((result) => result.results.length)) return json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  const existing = await env.DB.prepare(`${selectDeepTalkDeck} WHERE session_id = ?`).bind(sessionId).first<DeepTalkDeckRow>();
+  if (existing) return json({ deck: publicDeepTalkDeck(existing), duplicate: true });
+
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "deep_talk" || current.status !== "active" || storedDeepTalkConsent(current.result_json)?.stage !== "ready") {
+    return json({ error: "Deep Talk chưa được cả hai xác nhận." }, 409);
+  }
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
+
+  const now = Math.floor(Date.now() / 1000);
+  const generationDay = deepTalkGenerationDay(now);
+  const quota = await env.DB.prepare(`SELECT count(*) AS total FROM deep_talk_decks
+    WHERE couple_space_id = ? AND generation_day = ?`).bind(spaceId, generationDay).first<{ total: number }>();
+  if (Number(quota?.total ?? 0) >= 3) return json({ error: "Hôm nay hai bạn đã tạo đủ 3 bộ Deep Talk." }, 429);
+  if (!env.AI?.run) return json({ error: "Workers AI chưa được cấu hình." }, 503);
+
+  const conditions = deepTalkConditions((JSON.parse(current.payload_json) as { conditions?: unknown }).conditions);
+  if (!conditions) return json({ error: "Thiết lập Deep Talk không hợp lệ." }, 500);
+  const recentRows = await env.DB.prepare(`${selectDeepTalkDeck} WHERE couple_space_id = ? AND session_id <> ?
+    ORDER BY created_at DESC LIMIT 5`).bind(spaceId, sessionId).all<DeepTalkDeckRow>();
+  const recentDecks = (recentRows.results ?? []).map(storedDeepTalkDeck).filter((deck): deck is DeepTalkDeck => Boolean(deck));
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  let generated: DeepTalkDeck;
+  try {
+    generated = await buildDeepTalkDeck(env.AI, {
+      level: conditions.level as "gentle" | "understand" | "deep" | "mixed",
+      allowedSensitiveTopics: deepTalkTopicIds.filter((id) => conditions.sensitiveTopics[id] === "allow"),
+      seed,
+    }, null, recentDecks);
+  } catch {
+    return json({ error: "Không thể tạo đủ 20 lá an toàn lúc này." }, 502);
+  }
+
+  const deckId = crypto.randomUUID();
+  const resultJson = JSON.stringify({ ...(JSON.parse(current.result_json!) as Record<string, unknown>), deepTalkDeckId: deckId });
+  const statements = [
+    env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
+      WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+      .bind(resultJson, now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO deep_talk_decks
+      (id, session_id, couple_space_id, created_by_user_id, idempotency_key, seed, generation_day, cards_json, created_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(deckId, sessionId, spaceId, userId, idempotencyKey, seed, generationDay, JSON.stringify(generated.cards), now),
+    ...generated.cards.map((card, position) => env.DB.prepare(`INSERT INTO question_fingerprints (deck_id, position, fingerprint)
+      VALUES (?, ?, ?)`).bind(deckId, position, fingerprintDeepTalkQuestion(card.question))),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version)
+      VALUES (?, ?, ?, ?, 'generate_deck', 'active', 'active', ?)`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, current.version + 1),
+  ];
+  try {
+    const results = await env.DB.batch(statements);
+    if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  } catch {
+    const replay = await env.DB.prepare(`${selectDeepTalkDeck} WHERE session_id = ?`).bind(sessionId).first<DeepTalkDeckRow>();
+    return replay ? json({ deck: publicDeepTalkDeck(replay), duplicate: true }) : json({ error: "Không thể lưu bộ Deep Talk." }, 409);
+  }
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  const saved = await env.DB.prepare(`${selectDeepTalkDeck} WHERE id = ?`).bind(deckId).first<DeepTalkDeckRow>();
+  return json({ session: publicSession(updated!), deck: publicDeepTalkDeck(saved!) }, 201);
+}
+
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
   const [rows, latest] = await env.DB.batch([
@@ -786,6 +901,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "deep-talk-consent") {
     return deepTalkConsent(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "deep-talk-deck") {
+    return deepTalkDeck(request, env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

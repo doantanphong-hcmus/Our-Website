@@ -1,11 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
 import { authenticatedUser, handleAuth } from "./auth";
 import { handleSessions, sessionSnapshot } from "./sessions";
+import type { DeepTalkAiBinding } from "./deep-talk-ai";
 
 interface Env {
   REALTIME_ROOM: DurableObjectNamespace<RealtimeRoom>;
   DB: D1Database;
   AUTH_PEPPER: string;
+  AI?: DeepTalkAiBinding;
 }
 
 function unauthorized(): Response {
