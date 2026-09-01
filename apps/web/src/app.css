@@ -905,6 +905,25 @@ main {
 .food-actions button { min-block-size: 3.25rem; }
 .food-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
 
+.deep-talk-topics {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+
+.deep-talk-topics fieldset {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+}
+
+.deep-talk-topics legend { padding-inline: var(--space-1); font-weight: 750; }
+.deep-talk-topics label { display: flex; align-items: center; gap: var(--space-1); font-weight: 500; }
+.deep-talk-topics input[type="radio"] { inline-size: 1.15rem; min-block-size: 1.15rem; padding: 0; accent-color: var(--color-shared); }
+
 .food-voting {
   display: grid;
   gap: var(--space-3);
@@ -1050,6 +1069,7 @@ main {
 @media (max-width: 30rem) {
   .food-vote-actions { grid-template-columns: 1fr; }
   .food-result-actions { grid-template-columns: 1fr; }
+  .deep-talk-topics fieldset { grid-template-columns: 1fr; }
 }
 
 .settings-card h1 {

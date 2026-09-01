@@ -4,6 +4,7 @@ import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDeta
 import { EmptyState, ErrorState, LoadingState } from "./uiStates";
 import { BlindBagForm } from "./BlindBagForm";
 import { FoodSessionSetup } from "./FoodSessionSetup";
+import { DeepTalkSetup } from "./DeepTalkSetup";
 
 type Route = {
   path: string;
@@ -446,6 +447,8 @@ export function App({ user, onUserChange, onLogout }: {
           <BlindBagForm />
         ) : route?.path === "/an-gi" ? (
           <FoodSessionSetup user={user} />
+        ) : route?.path === "/deep-talk" ? (
+          <DeepTalkSetup user={user} />
         ) : route ? (
           <section className="route-card" aria-labelledby="page-title">
             <span className="route-card__icon" aria-hidden="true">{route.icon}</span>

@@ -198,6 +198,79 @@ try {
   await network.offline(nhiContext, false);
   await nhiPage.getByText(/Đang ngoại tuyến/).waitFor({ state: "hidden" });
 
+  let deepSession = null;
+  let deepStage = "partner_review";
+  let deepRevision = 1;
+  const deepConfirmed = new Set();
+  const deepCommands = [];
+  const deepRoute = (userId) => async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    const body = request.method() === "POST" ? request.postDataJSON() : null;
+    const consent = () => ({
+      stage: deepSession?.status === "active" ? "ready" : deepStage,
+      revision: deepRevision,
+      confirmedByMe: deepConfirmed.has(userId),
+      conditions: deepSession.conditions,
+    });
+    if (request.method() === "GET" && pathname.endsWith("/deep-talk-consent")) {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: deepSession, consent: consent() }) });
+    }
+    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      eventVersion: deepSession?.version ?? 0, sessions: deepSession ? [deepSession] : [],
+    }) });
+    deepCommands.push({ pathname, body });
+    if (pathname === "/api/sessions") {
+      deepSession = { id: foodSessionId, feature: "deep_talk", status: "pending", createdByUserId: phong.id,
+        version: 1, conditions: body.conditions };
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: deepSession }) });
+    }
+    if (body.action === "review") {
+      deepSession = { ...deepSession, version: 2, conditions: { ...deepSession.conditions, sensitiveTopics: body.sensitiveTopics } };
+      deepStage = "final_confirmation";
+      deepRevision = 2;
+    } else {
+      deepConfirmed.add(userId);
+      deepSession = { ...deepSession, version: deepSession.version + 1,
+        status: deepConfirmed.size === 2 ? "active" : "pending" };
+      if (deepSession.status === "active") deepStage = "ready";
+    }
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: deepSession, consent: consent() }) });
+  };
+  await phongPage.route("**/api/sessions**", deepRoute(phong.id));
+  await nhiPage.route("**/api/sessions**", deepRoute(nhi.id));
+
+  await phongPage.goto(`${server.url}/deep-talk`);
+  await phongPage.getByLabel("Mức độ").selectOption("deep");
+  await phongPage.getByLabel("Thời lượng gợi ý").selectOption("60");
+  const creatorFamily = phongPage.getByRole("group", { name: "Gia đình" });
+  assert.equal(await creatorFamily.getByRole("radio").count(), 3);
+  await creatorFamily.getByLabel("Đồng ý", { exact: true }).check();
+  await phongPage.getByRole("button", { name: "Gửi người kia xem lại" }).click();
+  for (let attempt = 0; attempt < 40 && !deepSession; attempt++) await network.delay(50);
+  assert.equal(deepCommands[0].body.conditions.level, "deep");
+  assert.equal(deepCommands[0].body.conditions.duration, "60");
+  assert.match(deepCommands[0].body.idempotencyKey, /^[0-9a-f-]{36}$/);
+
+  await nhiPage.goto(`${server.url}/deep-talk`);
+  await nhiPage.getByRole("heading", { name: "Xem lại thiết lập" }).waitFor();
+  await nhiPage.getByRole("group", { name: "Gia đình" }).getByLabel("Không đồng ý", { exact: true }).check();
+  await nhiPage.getByRole("button", { name: "Xác nhận lựa chọn" }).click();
+  for (let attempt = 0; attempt < 40 && deepStage !== "final_confirmation"; attempt++) await network.delay(50);
+  assert.equal(deepCommands.at(-1).body.action, "review");
+
+  await phongPage.reload();
+  await phongPage.getByRole("heading", { name: "Xác nhận bản cuối" }).waitFor();
+  await phongPage.getByText("Không đồng ý", { exact: true }).waitFor();
+  await phongPage.getByRole("button", { name: "Tôi xác nhận bản cuối" }).click();
+  for (let attempt = 0; attempt < 40 && !deepConfirmed.has(phong.id); attempt++) await network.delay(50);
+  await nhiPage.reload();
+  await nhiPage.getByRole("button", { name: "Tôi xác nhận bản cuối" }).click();
+  for (let attempt = 0; attempt < 40 && deepSession.status !== "active"; attempt++) await network.delay(50);
+  await nhiPage.getByRole("heading", { name: "Hai đứa đã thống nhất" }).waitFor();
+  assert.equal(deepCommands.filter(({ body }) => body.action === "confirm").length, 2);
+  await assertA11y(nhiPage);
+
   await phongPage.goto(server.url);
   const restore = await network.fail(phongPage, "**/api/sessions");
   await phongPage.reload();
@@ -205,7 +278,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P3.11 E2E: both food styles complete on two viewports = OK");
+  console.log("P1.14/P2.1/P3.2-P4.2 E2E: food flows and two-device Deep Talk consent = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {
