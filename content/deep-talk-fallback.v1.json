@@ -1,6 +1,9 @@
 {
   "cards": [
-    { "group": "mo_long", "form": "nhin_nguoi_kia", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Điều nhỏ bé nào ở người kia khiến bạn mỉm cười gần đây?" },
+    {
+      "group": "mo_long", "form": "nhin_nguoi_kia", "sensitivityTopics": [], "severity": "light", "positive": true,
+      "question": "Điều nhỏ bé nào ở người kia khiến bạn mỉm cười gần đây?"
+    },
     { "group": "mo_long", "form": "ke_chuyen", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Hãy kể lại một khoảnh khắc bình thường nhưng làm bạn thấy ấm áp." },
     { "group": "mo_long", "form": "tuong_tuong", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Nếu tối nay có một giờ rảnh, hai bạn muốn cùng làm điều gì?" },
     { "group": "mo_long", "form": "hoan_thanh_cau", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Hoàn thành câu: Khi ở bên bạn, mình cảm thấy..." },

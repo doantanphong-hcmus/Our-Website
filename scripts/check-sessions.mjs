@@ -30,7 +30,7 @@ const deepTalkConditions = {
 };
 const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v1.json"), "utf8"));
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
-const deepTalkDeckJson = JSON.stringify(JSON.parse(await readFile(path.join(root, "tests", "fixtures", "deep-talk-safe-deck.json"), "utf8")).cards)
+const deepTalkDeckJson = JSON.stringify(JSON.parse(await readFile(path.join(root, "content", "deep-talk-fallback.v1.json"), "utf8")).cards)
   .replaceAll("'", "''");
 
 function wranglerCommand(args) {

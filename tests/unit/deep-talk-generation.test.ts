@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DeepTalkGenerationError, buildDeepTalkDeck } from "../../apps/worker/src/deep-talk-generation";
 import type { DeepTalkCard } from "../../apps/worker/src/deep-talk-validator";
-import safeDeck from "../fixtures/deep-talk-safe-deck.json";
+import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 const replacement: DeepTalkCard = {
   ...safeDeck.cards[0],

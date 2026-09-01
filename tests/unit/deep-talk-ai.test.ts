@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { DeepTalkAiError, deepTalkModel, generateDeepTalkDeck } from "../../apps/worker/src/deep-talk-ai";
-import safeDeck from "../fixtures/deep-talk-safe-deck.json";
+import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 describe("Deep Talk AI adapter", () => {
   it("requests structured output without forwarding private fields", async () => {

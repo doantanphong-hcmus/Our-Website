@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DeepTalkShuffleError, shuffleDeepTalkDeck } from "../../apps/worker/src/deep-talk-shuffle";
 import type { DeepTalkDeck } from "../../apps/worker/src/deep-talk-validator";
-import safeDeck from "../fixtures/deep-talk-safe-deck.json";
+import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 const questions = (deck: DeepTalkDeck) => deck.cards.map(({ question }) => question);
 

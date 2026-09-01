@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DeepTalkValidationError, validateDeepTalkDeck } from "../../apps/worker/src/deep-talk-validator";
-import safeDeck from "../fixtures/deep-talk-safe-deck.json";
+import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 const changed = (change: (deck: any) => void) => {
   const deck = structuredClone(safeDeck);
@@ -9,7 +9,8 @@ const changed = (change: (deck: any) => void) => {
 };
 
 describe("Deep Talk deck validator", () => {
-  it("accepts the reviewed 20-card Vietnamese deck", () => {
+  it("accepts the versioned 20-card fallback with no sensitive topics", () => {
+    expect(safeDeck.cards.every(({ sensitivityTopics }) => sensitivityTopics.length === 0)).toBe(true);
     expect(validateDeepTalkDeck(safeDeck)).toEqual(safeDeck);
   });
 

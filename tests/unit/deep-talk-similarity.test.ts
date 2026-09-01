@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fingerprintDeepTalkQuestion, removeRepeatedDeepTalkCards } from "../../apps/worker/src/deep-talk-similarity";
 import type { DeepTalkCard, DeepTalkDeck } from "../../apps/worker/src/deep-talk-validator";
-import safeDeck from "../fixtures/deep-talk-safe-deck.json";
+import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 const card = (question: string, overrides: Partial<DeepTalkCard> = {}): DeepTalkCard => ({
   ...safeDeck.cards[0], question, ...overrides,
