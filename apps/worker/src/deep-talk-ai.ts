@@ -1,4 +1,5 @@
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
+import { validateDeepTalkDeck, type DeepTalkDeck } from "./deep-talk-validator";
 
 export const deepTalkModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -66,7 +67,7 @@ function withTimeout<T>(operation: Promise<T>, milliseconds: number): Promise<T>
   return Promise.race([operation, timeout]).finally(() => clearTimeout(timer));
 }
 
-export async function generateDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput, timeoutMs = 30_000): Promise<unknown> {
+export async function generateDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput, timeoutMs = 30_000): Promise<DeepTalkDeck> {
   if (!Object.hasOwn(levels, input.level) || !Number.isInteger(input.seed) || input.seed < 0 || input.seed > 0xffffffff
     || new Set(input.allowedSensitiveTopics).size !== input.allowedSensitiveTopics.length
     || input.allowedSensitiveTopics.some((id) => !sensitiveLabels.has(id))
@@ -88,7 +89,7 @@ export async function generateDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTal
     const remaining = deadline - Date.now();
     if (remaining < 1) break;
     try {
-      return parse(await withTimeout(ai.run(deepTalkModel, request), remaining));
+      return validateDeepTalkDeck(parse(await withTimeout(ai.run(deepTalkModel, request), remaining)), input.allowedSensitiveTopics);
     } catch (error) {
       lastError = error;
     }

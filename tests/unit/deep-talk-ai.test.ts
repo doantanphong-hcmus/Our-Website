@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { DeepTalkAiError, deepTalkModel, generateDeepTalkDeck } from "../../apps/worker/src/deep-talk-ai";
+import safeDeck from "../fixtures/deep-talk-safe-deck.json";
 
 describe("Deep Talk AI adapter", () => {
   it("requests structured output without forwarding private fields", async () => {
-    const ai = { run: vi.fn().mockResolvedValue({ response: "```json\n{\"cards\":[]}\n```" }) };
+    const ai = { run: vi.fn().mockResolvedValue({ response: `\`\`\`json\n${JSON.stringify(safeDeck)}\n\`\`\`` }) };
     const result = await generateDeepTalkDeck(ai, {
       level: "deep", allowedSensitiveTopics: ["gia_dinh"], seed: 42,
       username: "phong", answers: ["private answer"],
     } as never);
-    expect(result).toEqual({ cards: [] });
+    expect(result).toEqual(safeDeck);
     expect(ai.run).toHaveBeenCalledTimes(1);
     const [model, request] = ai.run.mock.calls[0];
     expect(model).toBe(deepTalkModel);
@@ -25,8 +26,8 @@ describe("Deep Talk AI adapter", () => {
   it("retries one provider failure with the same seed", async () => {
     const ai = { run: vi.fn()
       .mockRejectedValueOnce(new Error("temporary quota edge"))
-      .mockResolvedValueOnce({ response: { cards: [] } }) };
-    await expect(generateDeepTalkDeck(ai, { level: "gentle", allowedSensitiveTopics: [], seed: 7 })).resolves.toEqual({ cards: [] });
+      .mockResolvedValueOnce({ response: safeDeck }) };
+    await expect(generateDeepTalkDeck(ai, { level: "gentle", allowedSensitiveTopics: [], seed: 7 })).resolves.toEqual(safeDeck);
     expect(ai.run).toHaveBeenCalledTimes(2);
     expect(ai.run.mock.calls.map(([, request]) => request.seed)).toEqual([7, 7]);
   });

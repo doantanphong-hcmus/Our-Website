@@ -1,0 +1,24 @@
+{
+  "cards": [
+    { "group": "mo_long", "form": "nhin_nguoi_kia", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Điều nhỏ bé nào ở người kia khiến bạn mỉm cười gần đây?" },
+    { "group": "mo_long", "form": "ke_chuyen", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Hãy kể lại một khoảnh khắc bình thường nhưng làm bạn thấy ấm áp." },
+    { "group": "mo_long", "form": "tuong_tuong", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Nếu tối nay có một giờ rảnh, hai bạn muốn cùng làm điều gì?" },
+    { "group": "mo_long", "form": "hoan_thanh_cau", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Hoàn thành câu: Khi ở bên bạn, mình cảm thấy..." },
+    { "group": "ky_uc", "form": "ke_chuyen", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Kỷ niệm đầu tiên nào của hai bạn vẫn còn rõ nét nhất?" },
+    { "group": "ky_uc", "form": "nhin_nguoi_kia", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Một lần người kia làm bạn bất ngờ theo cách dễ thương là khi nào?" },
+    { "group": "ky_uc", "form": "cam_giac", "sensitivityTopics": [], "severity": "medium", "positive": true, "question": "Thói quen chung nào từng xuất hiện tình cờ rồi trở nên thân thuộc với hai bạn?" },
+    { "group": "ky_uc", "form": "lua_chon", "sensitivityTopics": [], "severity": "medium", "positive": true, "question": "Nếu được sống lại một ngày vui cùng nhau, bạn sẽ chọn ngày nào?" },
+    { "group": "thau_hieu", "form": "lua_chon", "sensitivityTopics": [], "severity": "medium", "positive": false, "question": "Khi mệt mỏi, bạn mong người kia lắng nghe hay giúp tìm giải pháp hơn?" },
+    { "group": "thau_hieu", "form": "nhin_nguoi_kia", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Điều gì người kia làm khiến bạn cảm thấy mình được quan tâm?" },
+    { "group": "thau_hieu", "form": "nhin_ban_than", "sensitivityTopics": [], "severity": "medium", "positive": false, "question": "Bạn thường cần điều gì để cảm thấy an toàn khi chia sẻ suy nghĩ?" },
+    { "group": "thau_hieu", "form": "mong_muon", "sensitivityTopics": [], "severity": "medium", "positive": true, "question": "Có cách thể hiện tình cảm nào bạn muốn hai người hiểu nhau hơn?" },
+    { "group": "chan_that", "form": "nhin_ban_than", "sensitivityTopics": [], "severity": "medium", "positive": false, "question": "Một điều bạn từng ngại nói vì sợ bị hiểu nhầm là gì?" },
+    { "group": "chan_that", "form": "nhin_ban_than", "sensitivityTopics": [], "severity": "heavy", "positive": false, "question": "Khi hai người không đồng ý, phản ứng nào của chính bạn muốn thay đổi?" },
+    { "group": "chan_that", "form": "mong_muon", "sensitivityTopics": [], "severity": "medium", "positive": false, "question": "Mong muốn nào trong mối quan hệ bạn chưa diễn đạt thật rõ ràng?" },
+    { "group": "chan_that", "form": "hoan_thanh_cau", "sensitivityTopics": [], "severity": "heavy", "positive": false, "question": "Hoàn thành câu: Mình dễ khép lòng lại khi..." },
+    { "group": "tuong_lai", "form": "mong_muon", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Một trải nghiệm mới nào hai bạn muốn cùng thử trong năm tới?" },
+    { "group": "tuong_lai", "form": "tuong_tuong", "sensitivityTopics": [], "severity": "medium", "positive": true, "question": "Nếu tạo một nghi thức nhỏ mỗi tuần, hai bạn muốn đó là gì?" },
+    { "group": "tuong_lai", "form": "biet_on", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Hãy nói một điều bạn biết ơn người kia trong hành trình vừa qua." },
+    { "group": "tuong_lai", "form": "hanh_dong", "sensitivityTopics": [], "severity": "light", "positive": true, "question": "Một hành động nhỏ nào hai bạn có thể cùng thực hiện ngay ngày mai?" }
+  ]
+}
