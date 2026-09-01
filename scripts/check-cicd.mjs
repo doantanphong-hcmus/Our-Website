@@ -22,6 +22,7 @@ try {
   assert.equal(config.d1_databases[0].database_id, env.D1_DATABASE_ID);
   assert.equal(config.assets.not_found_handling, "single-page-application");
   assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/ws", "/health"]);
+  assert.deepEqual(config.ai, { binding: "AI" });
   assert.deepEqual(config.secrets.required, ["AUTH_PEPPER"]);
   assert.equal(JSON.stringify(config).includes(env.AUTH_PEPPER), false, "Secret values must not enter deploy config");
 

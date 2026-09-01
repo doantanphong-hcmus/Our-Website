@@ -21,6 +21,7 @@ const config = {
   main: "apps/worker/src/realtime-spike.ts",
   workers_dev: true,
   preview_urls: false,
+  ai: { binding: "AI" },
   secrets: { required: ["AUTH_PEPPER"] },
   d1_databases: source.d1_databases.map((database) => ({
     ...database,
