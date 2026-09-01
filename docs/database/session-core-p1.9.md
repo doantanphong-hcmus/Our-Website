@@ -46,3 +46,11 @@ npm run sessions:check
 - `POST /api/sessions/:id/food-result` nhận `accept` hoặc `retry`, chỉ hoàn tất phiên khi đã có match hoặc proxy được cả hai xác nhận.
 - `foodFinal` trong `result_json` lưu món, trường phái, mode `dish`, nguồn match/proxy và có chốt hay không; ngày lấy từ `completed_at` nên không cần bảng history riêng.
 - Pool mới chỉ giảm ưu tiên món đã `accept` cùng trường phái trong 30 ngày; món chỉ xem qua hoặc bấm chọn lại không bị tính là đã chốt.
+
+## P4.2 — Deep Talk consent
+
+- Creator tạo `deep_talk` với mức độ, thời lượng và đủ tám chủ đề ở một trong ba trạng thái `unset`, `allow`, `deny`.
+- `GET/POST /api/sessions/:id/deep-talk-consent` phục vụ review và final confirmation; `/join` chung không thể kích hoạt Deep Talk.
+- Partner giữ nguyên cấu hình thì phiên chuyển thẳng sang `active`. Nếu đổi bất kỳ chủ đề nào, session tạo revision 2 và chờ cả hai xác nhận đúng bản cuối.
+- Mỗi lệnh review/confirm có idempotency key và expected version; thao tác cũ hoặc đồng thời không thể ghi đè revision mới.
+- Chỉ chủ đề ở trạng thái `allow` sau consent mới được phép đưa vào prompt ở P4.3; `deny` và `unset` đều bị loại.

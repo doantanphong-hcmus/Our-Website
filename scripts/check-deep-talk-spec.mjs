@@ -22,6 +22,7 @@ const groupIds = ids(spec.groups);
 const formIds = ids(spec.forms);
 const severityIds = ids(spec.severities);
 const sensitiveIds = ids(spec.sensitiveTopics);
+assert.deepEqual(ids(spec.consentStates), ["unset", "allow", "deny"]);
 for (const [label, values] of Object.entries({ groups: groupIds, forms: formIds, severities: severityIds,
   safeTopics: ids(spec.safeTopics), sensitiveTopics: sensitiveIds, forbiddenPatterns: ids(spec.forbiddenPatterns) })) unique(values, label);
 assert.deepEqual(groupIds, ["mo_long", "ky_uc", "thau_hieu", "chan_that", "tuong_lai"]);

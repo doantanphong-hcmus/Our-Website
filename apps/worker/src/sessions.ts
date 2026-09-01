@@ -1,4 +1,5 @@
 import { authenticatedUser } from "./auth";
+import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import foodCatalog from "../../../content/food.v1.json";
 
 interface SessionEnv {
@@ -13,6 +14,9 @@ export type FoodMatch = { dishId: string; alternatives: string[] };
 type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhausted: true };
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
+type TopicState = "unset" | "allow" | "deny";
+type DeepTalkConditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
+type DeepTalkConsent = { stage: "final_confirmation" | "ready"; revision: number; confirmedUserIds: string[]; changed: boolean };
 
 interface SessionRow {
   id: string;
@@ -49,6 +53,10 @@ const foodAllergens = new Set<string>(foodCatalog.allergens.map((item) => item.i
 const foodExclusions = new Set<string>(foodCatalog.exclusions.map((item) => item.id));
 const foodStyleCategories = new Set(foodCatalog.dishes.flatMap((dish) => dish.categories.map((category) => `${dish.foodStyle}:${category}`)));
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
+const deepTalkLevels = ["gentle", "understand", "deep", "mixed"];
+const deepTalkDurations = ["15", "30", "60", "unlimited"];
+const deepTalkTopicIds = deepTalkSpec.sensitiveTopics.map((topic) => topic.id);
+const topicStates = new Set<TopicState>(deepTalkSpec.consentStates.map((state) => state.id as TopicState));
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -115,6 +123,25 @@ function foodPayload(value: unknown): string | null {
   } });
 }
 
+function deepTalkConditions(value: unknown): DeepTalkConditions | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  const topics = input.sensitiveTopics;
+  if (typeof input.level !== "string" || !deepTalkLevels.includes(input.level)
+    || typeof input.duration !== "string" || !deepTalkDurations.includes(input.duration)
+    || !topics || typeof topics !== "object" || Array.isArray(topics)) return null;
+  const values = topics as Record<string, unknown>;
+  if (Object.keys(values).sort().join("|") !== [...deepTalkTopicIds].sort().join("|")
+    || deepTalkTopicIds.some((id) => !topicStates.has(values[id] as TopicState))) return null;
+  return { level: input.level, duration: input.duration,
+    sensitiveTopics: Object.fromEntries(deepTalkTopicIds.map((id) => [id, values[id] as TopicState])) };
+}
+
+function deepTalkPayload(value: unknown): string | null {
+  const conditions = deepTalkConditions(value);
+  return conditions ? JSON.stringify({ conditions }) : null;
+}
+
 function storedDishPool(resultJson: string | null): string[] | null {
   if (!resultJson) return null;
   try {
@@ -163,6 +190,20 @@ function storedFoodFinal(resultJson: string | null): FoodFinal | null {
     if (!dish || final?.foodStyle !== dish.foodStyle || final.mode !== "dish"
       || !["match", "proxy"].includes(String(final.source)) || typeof final.accepted !== "boolean") return null;
     return final as FoodFinal;
+  } catch {
+    return null;
+  }
+}
+
+function storedDeepTalkConsent(resultJson: string | null): DeepTalkConsent | null {
+  if (!resultJson) return null;
+  try {
+    const consent = (JSON.parse(resultJson) as { deepTalkConsent?: unknown }).deepTalkConsent as Record<string, unknown> | undefined;
+    if (!consent || !["final_confirmation", "ready"].includes(String(consent.stage))
+      || !Number.isInteger(consent.revision) || Number(consent.revision) < 1
+      || !Array.isArray(consent.confirmedUserIds) || new Set(consent.confirmedUserIds).size !== consent.confirmedUserIds.length
+      || consent.confirmedUserIds.some((id) => typeof id !== "string") || typeof consent.changed !== "boolean") return null;
+    return consent as DeepTalkConsent;
   } catch {
     return null;
   }
@@ -490,6 +531,91 @@ async function foodResult(request: Request, env: SessionEnv, userId: string, spa
   return json({ session: publicSession(updated!), result: publicDish(dishId) });
 }
 
+async function deepTalkConsent(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "deep_talk" || !["pending", "active"].includes(current.status)) {
+    return json({ error: "Phiên Deep Talk chưa sẵn sàng." }, 409);
+  }
+  const conditions = (JSON.parse(current.payload_json) as { conditions?: unknown }).conditions;
+  const parsedConditions = deepTalkConditions(conditions);
+  if (!parsedConditions) return json({ error: "Thiết lập Deep Talk không hợp lệ." }, 500);
+  const stored = storedDeepTalkConsent(current.result_json);
+  const state = (row = current, duplicate = false) => {
+    const rowConditions = deepTalkConditions((JSON.parse(row.payload_json) as { conditions?: unknown }).conditions)!;
+    const consent = storedDeepTalkConsent(row.result_json);
+    return { session: publicSession(row), consent: {
+      stage: row.status === "active" ? "ready" : consent?.stage ?? "partner_review",
+      revision: consent?.revision ?? 1,
+      confirmedByMe: consent?.confirmedUserIds.includes(userId) ?? row.created_by_user_id === userId,
+      conditions: rowConditions,
+    }, ...(duplicate ? { duplicate: true } : {}) };
+  };
+  if (request.method === "GET") return json(state());
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (current.status === "active") return json({ error: "Thiết lập Deep Talk đã được xác nhận." }, 409);
+
+  const input = await body(request);
+  const action = input?.action;
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!["review", "confirm"].includes(String(action)) || !Number.isInteger(expectedVersion)
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh xác nhận Deep Talk không hợp lệ." }, 400);
+  }
+  let nextConditions = parsedConditions;
+  if (action === "review") {
+    const reviewed = deepTalkConditions({ ...parsedConditions, sensitiveTopics: input?.sensitiveTopics });
+    if (!reviewed) return json({ error: "Lựa chọn chủ đề nhạy cảm không hợp lệ." }, 400);
+    nextConditions = reviewed;
+  }
+  const inputJson = JSON.stringify(action === "review"
+    ? { action, sensitiveTopics: nextConditions.sensitiveTopics } : { action });
+  const previous = await env.DB.prepare(`SELECT session_id, user_id, action, input_json FROM deep_talk_consent_events
+    WHERE idempotency_key = ?`).bind(idempotencyKey)
+    .first<{ session_id: string; user_id: string; action: string; input_json: string }>();
+  if (previous) {
+    const replay = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+    return previous.session_id === sessionId && previous.user_id === userId
+      && previous.action === action && previous.input_json === inputJson && replay
+      ? json(state(replay, true)) : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  }
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", ...state() }, 409);
+
+  let nextConsent: DeepTalkConsent;
+  let nextStatus: Status = "pending";
+  if (action === "review") {
+    if (userId === current.created_by_user_id || stored) return json({ error: "Lượt xem lại của người kia đã kết thúc." }, 409);
+    const changed = JSON.stringify(nextConditions.sensitiveTopics) !== JSON.stringify(parsedConditions.sensitiveTopics);
+    nextConsent = changed
+      ? { stage: "final_confirmation", revision: 2, confirmedUserIds: [], changed: true }
+      : { stage: "ready", revision: 1, confirmedUserIds: [current.created_by_user_id, userId], changed: false };
+    if (!changed) nextStatus = "active";
+  } else {
+    if (!stored || stored.stage !== "final_confirmation" || stored.confirmedUserIds.includes(userId)) {
+      return json({ error: "Không có bản cuối cần xác nhận." }, 409);
+    }
+    const confirmedUserIds = [...stored.confirmedUserIds, userId];
+    nextStatus = confirmedUserIds.length >= 2 ? "active" : "pending";
+    nextConsent = { ...stored, stage: nextStatus === "active" ? "ready" : "final_confirmation", confirmedUserIds };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}), deepTalkConsent: nextConsent };
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE activity_sessions SET status = ?, version = version + 1, payload_json = ?, result_json = ?,
+      expires_at = ?, updated_at = ? WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'pending'`)
+      .bind(nextStatus, JSON.stringify({ conditions: nextConditions }), JSON.stringify(result),
+        nextStatus === "active" ? null : current.expires_at, now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO deep_talk_consent_events (idempotency_key, session_id, user_id, action, input_json, revision)
+      SELECT ?, ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, userId, action, inputJson, nextConsent.revision),
+  ]);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json(state(updated!), 201);
+}
+
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
   const [rows, latest] = await env.DB.batch([
@@ -530,8 +656,9 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
   }
   const payloadJson = feature === "blind_bag"
     ? blindBagPayload(input?.conditions)
-    : feature === "food_vote" ? foodPayload(input?.conditions) : "{}";
-  if (!payloadJson) return json({ error: feature === "food_vote" ? "Thiết lập món ăn không hợp lệ." : "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
+    : feature === "food_vote" ? foodPayload(input?.conditions) : deepTalkPayload(input?.conditions);
+  if (!payloadJson) return json({ error: feature === "food_vote" ? "Thiết lập món ăn không hợp lệ."
+    : feature === "deep_talk" ? "Thiết lập Deep Talk không hợp lệ." : "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
 
   await expirePending(env.DB, spaceId);
   const duplicate = await env.DB.prepare(`${selectSession} WHERE couple_space_id = ? AND idempotency_key = ?`)
@@ -568,7 +695,7 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
 
 function transition(row: SessionRow, action: Action, actorId: string): Status | null {
   if (row.status === "pending" && actorId !== row.created_by_user_id) {
-    if (action === "join") return "active";
+    if (action === "join" && row.feature !== "deep_talk") return "active";
     if (action === "decline") return "declined";
   }
   if (action === "cancel" && (row.status === "active" || (row.status === "pending" && actorId === row.created_by_user_id))) return "cancelled";
@@ -656,6 +783,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "food-result") {
     return foodResult(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "deep-talk-consent") {
+    return deepTalkConsent(request, env, userId, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {

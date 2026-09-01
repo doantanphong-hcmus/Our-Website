@@ -22,6 +22,12 @@ const foodConditions = {
   foodStyle: "snack", meal: "late", category: "snack",
   allergens: ["milk"], exclusions: ["seafood"],
 };
+const deepTalkConditions = {
+  level: "understand", duration: "30",
+  sensitiveTopics: Object.fromEntries([
+    "nguoi_yeu_cu", "gia_dinh", "tien_bac", "hon_nhan", "con_cai", "than_mat", "ton_thuong_qua_khu", "mau_thuan_hien_tai",
+  ].map((id) => [id, "unset"])),
+};
 const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v1.json"), "utf8"));
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
 
@@ -85,7 +91,7 @@ async function request(pathname, cookie, method = "GET", input) {
 async function create(cookie, feature, idempotencyKey, conditions = foodConditions) {
   return request("/api/sessions", cookie, "POST", {
     feature, idempotencyKey,
-    ...(feature === "blind_bag" ? { conditions: blindBagConditions } : feature === "food_vote" ? { conditions } : {}),
+    conditions: feature === "blind_bag" ? blindBagConditions : feature === "deep_talk" ? deepTalkConditions : conditions,
   });
 }
 
@@ -117,6 +123,10 @@ try {
   })).response.status, 400);
   assert.equal((await request("/api/sessions", phong, "POST", {
     feature: "food_vote", idempotencyKey: "bad-food-category", conditions: { ...foodConditions, category: "hotpot" },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "deep_talk", idempotencyKey: "bad-deep-consent",
+    conditions: { ...deepTalkConditions, sensitiveTopics: { gia_dinh: "allow" } },
   })).response.status, 400);
 
   const created = await create(phong, "blind_bag", "create-blind-001");
@@ -298,14 +308,34 @@ try {
 
   const concurrentSession = await create(phong, "deep_talk", "create-deep-0001");
   const concurrentId = concurrentSession.data.session.id;
-  assert.equal((await act(nhi, concurrentId, "join", 1, "join-deep-000001")).data.session.status, "active");
+  assert.equal((await act(nhi, concurrentId, "join", 1, "join-deep-blocked")).response.status, 409);
+  const consentPath = `/api/sessions/${concurrentId}/deep-talk-consent`;
+  const revisedTopics = { ...deepTalkConditions.sensitiveTopics, gia_dinh: "deny" };
+  const reviewed = await request(consentPath, nhi, "POST", {
+    action: "review", expectedVersion: 1, sensitiveTopics: revisedTopics, idempotencyKey: "review-deep-nhi01",
+  });
+  assert.equal(reviewed.response.status, 201);
+  assert.equal(reviewed.data.session.status, "pending");
+  assert.equal(reviewed.data.consent.stage, "final_confirmation");
+  assert.equal(reviewed.data.consent.conditions.sensitiveTopics.gia_dinh, "deny");
+  const creatorConfirmed = await request(consentPath, phong, "POST", {
+    action: "confirm", expectedVersion: 2, idempotencyKey: "confirm-deep-phong",
+  });
+  assert.equal(creatorConfirmed.data.session.status, "pending");
+  assert.equal(creatorConfirmed.data.consent.confirmedByMe, true);
+  const ready = await request(consentPath, nhi, "POST", {
+    action: "confirm", expectedVersion: 3, idempotencyKey: "confirm-deep-nhi01",
+  });
+  assert.equal(ready.data.session.status, "active");
+  assert.equal(ready.data.consent.stage, "ready");
+  assert.equal(ready.data.consent.conditions.sensitiveTopics.gia_dinh, "deny");
   const competing = await Promise.all([
-    act(phong, concurrentId, "cancel", 2, "cancel-deep-001"),
-    act(nhi, concurrentId, "complete", 2, "complete-deep-1"),
+    act(phong, concurrentId, "cancel", 4, "cancel-deep-001"),
+    act(nhi, concurrentId, "complete", 4, "complete-deep-1"),
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
-  console.log("P1.9/P3.2-P3.11 sessions: secrecy, simultaneous match and safety = OK");
+  console.log("P1.9/P3.2-P4.2 sessions: food safety and versioned Deep Talk consent = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

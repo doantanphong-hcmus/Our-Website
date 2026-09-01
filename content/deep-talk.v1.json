@@ -18,6 +18,11 @@
     "userAnswersAllowedInPrompt": false,
     "unopenedCardsAllowedInClientPayload": false
   },
+  "consentStates": [
+    { "id": "unset", "label": "Chưa chọn" },
+    { "id": "allow", "label": "Đồng ý" },
+    { "id": "deny", "label": "Không đồng ý" }
+  ],
   "severities": [
     { "id": "light", "rank": 1, "label": "Nhẹ", "description": "Dễ trả lời, không gây áp lực cảm xúc." },
     { "id": "medium", "rank": 2, "label": "Suy ngẫm", "description": "Cần thành thật và suy nghĩ nhưng không ép đào sâu." },
