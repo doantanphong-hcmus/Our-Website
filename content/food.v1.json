@@ -1,9 +1,9 @@
 {
   "version": 1,
   "approval": {
-    "status": "pending_owner_review",
-    "reviewedBy": null,
-    "reviewedAt": null
+    "status": "approved",
+    "reviewedBy": "customer",
+    "reviewedAt": "2026-09-01"
   },
   "allergenPolicy": "possible_presence_conservative",
   "allergenNotice": "Công thức và nguy cơ nhiễm chéo thay đổi theo nơi bán. Nếu có dị ứng, luôn xác nhận trực tiếp với nơi chế biến trước khi ăn.",
