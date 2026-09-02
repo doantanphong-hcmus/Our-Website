@@ -134,7 +134,7 @@ try {
   assert.deepEqual(resumedDeck.data.opened.map((item) => item.position), [0, 1]);
   assert.equal(resumedDeck.data.opened.length, 2);
   assert.deepEqual(resumedDeck.data.progress, {
-    started: false, currentPosition: 2, openedPositions: [0, 1], skippedPositions: [], turnMode: null, playMode: "one",
+    started: false, startedAt: null, currentPosition: 2, openedPositions: [0, 1], skippedPositions: [], turnMode: null, playMode: "one",
     answererUserIds: [], readyUserIds: [], skippedByUserIds: [],
   });
   assert.equal(JSON.stringify(resumedDeck.data).includes(deepTalkCards[3].question), false,
@@ -391,6 +391,7 @@ try {
   assert.equal(startPlay.response.status, 200);
   assert.deepEqual(startPlay.data.progress.answererUserIds, ["user-phong"]);
   assert.equal(startPlay.data.progress.turnMode, "alternate");
+  assert.equal(Number.isInteger(startPlay.data.progress.startedAt), true);
   assert.equal((await request(playPath, phong, "POST", {
     action: "start", starterUserId: "user-phong", turnMode: "alternate", expectedVersion: 5, idempotencyKey: "play-start-phong",
   })).data.duplicate, true);
@@ -419,6 +420,14 @@ try {
   });
   assert.equal(ended.response.status, 200);
   assert.equal(ended.data.session.status, "completed");
+  assert.equal(Number.isInteger(ended.data.session.completedAt), true);
+  const resumedCompleted = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, nhi);
+  assert.equal(resumedCompleted.data.progress.currentPosition, ended.data.progress.currentPosition);
+  assert.deepEqual(resumedCompleted.data.progress.openedPositions, ended.data.progress.openedPositions);
+  assert.deepEqual(resumedCompleted.data.progress.skippedPositions, ended.data.progress.skippedPositions);
+  assert.deepEqual(resumedCompleted.data.opened, ended.data.opened);
+  assert.equal((JSON.stringify(resumedCompleted.data).match(/question/g) ?? []).length, resumedCompleted.data.opened.length,
+    "completed review must expose opened questions only");
 
   const twoDeviceSession = await create(phong, "deep_talk", "create-deep-two01");
   const twoDeviceId = twoDeviceSession.data.session.id;
@@ -468,7 +477,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.13 sessions: Deep Talk private reveal, one/two-device play and idempotency = OK");
+  console.log("P1.9/P3.2-P4.14 sessions: Deep Talk resume, completion review and idempotency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

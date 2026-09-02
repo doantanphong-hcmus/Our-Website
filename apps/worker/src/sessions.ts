@@ -28,6 +28,7 @@ type DeepTalkProgress = {
   currentPosition: number;
   openedPositions: number[];
   skippedPositions: number[];
+  startedAt?: number;
   starterUserId?: string;
   answererUserId?: string;
   turnMode?: "alternate" | "manual";
@@ -680,6 +681,8 @@ function storedDeepTalkProgress(resultJson: string | null): DeepTalkProgress {
         ? [...new Set(((progress as Record<string, unknown>).skippedPositions as unknown[]).filter((position): position is number =>
           typeof position === "number" && Number.isInteger(position) && position >= 0 && position < 20))]
         : [],
+      ...(Number.isInteger((progress as Record<string, unknown>).startedAt) && Number((progress as Record<string, unknown>).startedAt) > 0
+        ? { startedAt: Number((progress as Record<string, unknown>).startedAt) } : {}),
       ...(typeof (progress as Record<string, unknown>).starterUserId === "string" ? { starterUserId: (progress as Record<string, string>).starterUserId } : {}),
       ...(typeof (progress as Record<string, unknown>).answererUserId === "string" ? { answererUserId: (progress as Record<string, string>).answererUserId } : {}),
       ...(["alternate", "manual"].includes(String((progress as Record<string, unknown>).turnMode))
@@ -708,6 +711,7 @@ function publicDeepTalkPlay(session: SessionRow, deck: DeepTalkDeckRow, players:
     players: players.map((player) => ({ id: player.id, name: player.nickname ?? player.display_name, color: player.color })),
     progress: {
       started: Boolean(progress.starterUserId),
+      startedAt: progress.startedAt ?? null,
       currentPosition: progress.currentPosition,
       openedPositions: progress.openedPositions,
       skippedPositions: progress.skippedPositions,
@@ -779,6 +783,7 @@ async function deepTalkPlay(request: Request, env: SessionEnv, userId: string, s
     next.answererUserId = next.starterUserId;
     next.turnMode = input!.turnMode as "alternate" | "manual";
     next.playMode = (input?.playMode ?? "one") as "one" | "two";
+    next.startedAt = Math.floor(Date.now() / 1000);
     next.readyUserIds = [];
     next.skippedByUserIds = [];
   } else {
