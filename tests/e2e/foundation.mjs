@@ -204,6 +204,13 @@ try {
   const deepConfirmed = new Set();
   const deepCommands = [];
   const deepDeckSources = [];
+  const deepQuestions = [
+    "Điều gì ở bản thân khiến bạn thấy tự hào nhất lúc này?",
+    "Bạn muốn người kia hiểu thêm điều gì về mình?",
+    "Hai đứa muốn cùng thử điều gì trong thời gian tới?",
+  ];
+  let deepDeckReady = false;
+  let deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null, answererUserIds: [] };
   let releaseDeepAi;
   const deepAiPending = new Promise((resolve) => { releaseDeepAi = resolve; });
   const deepRoute = (userId) => async (route) => {
@@ -219,10 +226,37 @@ try {
     if (request.method() === "GET" && pathname.endsWith("/deep-talk-consent")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: deepSession, consent: consent() }) });
     }
+    const deckView = () => ({
+      deck: { id: "fallback-deck", sessionId: deepSession.id, cardCount: 20, createdAt: 1 },
+      players: [{ id: phong.id, name: "Phong", color: "#9F3F59" }, { id: nhi.id, name: "Nhi", color: "#3F6F61" }],
+      progress: deepProgress,
+      current: { position: deepProgress.currentPosition, card: { question: deepQuestions[deepProgress.currentPosition] } },
+      opened: deepProgress.openedPositions.map((position) => ({ position, card: { question: deepQuestions[position] } })),
+    });
+    if (request.method() === "GET" && pathname.endsWith("/deep-talk-deck")) {
+      return deepDeckReady
+        ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(deckView()) })
+        : route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Chưa có bộ bài." }) });
+    }
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
       eventVersion: deepSession?.version ?? 0, sessions: deepSession ? [deepSession] : [],
     }) });
     deepCommands.push({ pathname, body });
+    if (pathname.endsWith("/deep-talk-play")) {
+      const ids = [phong.id, nhi.id];
+      if (body.action === "start") deepProgress = { ...deepProgress, started: true, turnMode: body.turnMode, answererUserIds: [body.starterUserId] };
+      if (body.action === "reveal") deepProgress = { ...deepProgress, openedPositions: [...deepProgress.openedPositions, deepProgress.currentPosition] };
+      if (body.action === "both") deepProgress = { ...deepProgress, answererUserIds: ids };
+      if (body.action === "switch") deepProgress = { ...deepProgress, answererUserIds: [ids.find((id) => id !== deepProgress.answererUserIds[0])] };
+      if (["next", "skip"].includes(body.action)) {
+        const answerer = deepProgress.answererUserIds.length === 1 ? deepProgress.answererUserIds[0] : nhi.id;
+        deepProgress = { ...deepProgress, currentPosition: deepProgress.currentPosition + 1,
+          skippedPositions: body.action === "skip" ? [...deepProgress.skippedPositions, deepProgress.currentPosition] : deepProgress.skippedPositions,
+          answererUserIds: deepProgress.turnMode === "alternate" ? [ids.find((id) => id !== answerer)] : [answerer] };
+      }
+      deepSession = { ...deepSession, version: deepSession.version + 1, status: body.action === "end" ? "completed" : "active" };
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: deepSession, ...deckView() }) });
+    }
     if (pathname.endsWith("/deep-talk-deck")) {
       deepDeckSources.push(body.source);
       if (body.source === "ai") {
@@ -230,6 +264,7 @@ try {
         return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "AI phản hồi muộn." }) });
       }
       deepSession = { ...deepSession, version: deepSession.version + 1 };
+      deepDeckReady = true;
       return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
         session: deepSession, deck: { id: "fallback-deck", sessionId: deepSession.id, cardCount: 20, createdAt: 1 },
       }) });
@@ -291,13 +326,28 @@ try {
   await nhiPage.getByText("Đang xếp nhịp mở lòng cho hai đứa…").waitFor();
   await nhiPage.clock.fastForward(30_000);
   await nhiPage.getByRole("button", { name: "Dùng bộ an toàn có sẵn" }).click();
-  await nhiPage.getByRole("heading", { name: "Bộ bài đã sẵn sàng" }).waitFor();
+  await nhiPage.getByRole("heading", { name: "Ai sẽ bắt đầu?" }).waitFor();
   assert.deepEqual(deepDeckSources, ["ai", "fallback"]);
   assert.deepEqual(deepCommands.at(-1).body, {
     expectedVersion: 4, idempotencyKey: deepCommands.at(-1).body.idempotencyKey, source: "fallback",
   });
   assert.match(deepCommands.at(-1).body.idempotencyKey, /^[0-9a-f-]{36}$/);
   await assertA11y(nhiPage);
+  await nhiPage.getByRole("button", { name: "Bắt đầu chơi" }).click();
+  await nhiPage.getByRole("heading", { name: "Lượt của Nhi" }).waitFor();
+  assert.equal(await nhiPage.getByText(deepQuestions[0]).count(), 0, "the face-down card must not render its question");
+  await nhiPage.getByRole("button", { name: "Lật lá 1" }).click();
+  await nhiPage.getByText(deepQuestions[0]).waitFor();
+  await nhiPage.getByRole("button", { name: "Cả hai cùng trả lời" }).click();
+  await nhiPage.getByRole("heading", { name: "Cả hai cùng trả lời" }).waitFor();
+  await nhiPage.getByRole("button", { name: "Tiếp tục" }).click();
+  await nhiPage.getByRole("heading", { name: "Lượt của Phong" }).waitFor();
+  await nhiPage.getByRole("button", { name: "Bỏ qua" }).click();
+  await nhiPage.getByRole("button", { name: "Đổi người" }).click();
+  await nhiPage.getByRole("heading", { name: "Lượt của Phong" }).waitFor();
+  nhiPage.once("dialog", (dialog) => dialog.accept());
+  await nhiPage.getByRole("button", { name: "Kết thúc phiên" }).click();
+  await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
   releaseDeepAi();
 
   await phongPage.goto(server.url);
@@ -307,7 +357,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.9 E2E: food flows, Deep Talk consent and 30-second fallback UI = OK");
+  console.log("P1.14/P2.1/P3.2-P4.11 E2E: food flows, Deep Talk consent, fallback and one-device play = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

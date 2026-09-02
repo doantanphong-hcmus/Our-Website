@@ -6,8 +6,14 @@ import type { User } from "./user";
 
 type TopicState = "unset" | "allow" | "deny";
 type Conditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
-type Session = { id: string; status: "pending" | "active"; createdByUserId: string; version: number; conditions: Conditions };
+type Session = { id: string; status: "pending" | "active" | "completed"; createdByUserId: string; version: number; conditions: Conditions };
 type Consent = { stage: "partner_review" | "final_confirmation" | "ready"; revision: number; confirmedByMe: boolean; conditions: Conditions };
+type Player = { id: string; name: string; color: string };
+type DeckView = {
+  players: Player[];
+  progress: { started: boolean; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null; answererUserIds: string[] };
+  current: { position: number; card: { question: string } };
+};
 
 const levels = {
   gentle: "Nhẹ nhàng", understand: "Muốn hiểu nhau hơn", deep: "Thành thật sâu sắc", mixed: "Trộn tất cả",
@@ -99,10 +105,23 @@ export function DeepTalkSetup({ user }: { user: User }) {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [generation, setGeneration] = useState<"idle" | "waiting" | "fallback" | "ready">("idle");
+  const [deck, setDeck] = useState<DeckView | null>(null);
+  const [starter, setStarter] = useState(user.id);
+  const [turnMode, setTurnMode] = useState<"alternate" | "manual">("alternate");
   const [offerFallback, setOfferFallback] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const generationRequest = useRef(0);
+
+  async function loadDeck(target: Session) {
+    const response = await fetch(`/api/sessions/${target.id}/deep-talk-deck`, { credentials: "same-origin" });
+    if (response.status === 404) return false;
+    if (!response.ok) throw new Error(await responseError(response, "Không tải được bộ Deep Talk."));
+    const value = await response.json() as DeckView;
+    setDeck(value);
+    setGeneration("ready");
+    return true;
+  }
 
   async function load() {
     setLoading(true);
@@ -118,6 +137,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
       const data = await consentResponse.json() as { consent: Consent };
       setConsent(data.consent);
       setTopics(data.consent.conditions.sensitiveTopics);
+      if (data.consent.stage === "ready") await loadDeck(found);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được phiên Deep Talk.");
     } finally {
@@ -174,13 +194,34 @@ export function DeepTalkSetup({ user }: { user: User }) {
       if (!response.ok) throw new Error(await responseError(response, "Chưa tạo được bộ Deep Talk."));
       const payload = await response.json() as { session?: Session };
       if (requestId !== generationRequest.current) return;
-      if (payload.session) setSession(payload.session);
-      setGeneration("ready");
+      const current = payload.session ?? session;
+      setSession(current);
+      await loadDeck(current);
     } catch (reason) {
       if (requestId !== generationRequest.current) return;
       setError(reason instanceof Error ? reason.message : "Chưa tạo được bộ Deep Talk.");
       setOfferFallback(true);
       setGeneration("waiting");
+    }
+  }
+
+  async function play(action: string, extra: Record<string, unknown> = {}) {
+    if (!session) return;
+    setPending(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/deep-talk-play`, {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, expectedVersion: session.version, idempotencyKey: crypto.randomUUID(), ...extra }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "Không cập nhật được lượt Deep Talk."));
+      const payload = await response.json() as DeckView & { session: Session };
+      setSession(payload.session);
+      setDeck(payload);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không cập nhật được lượt Deep Talk.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -194,13 +235,53 @@ export function DeepTalkSetup({ user }: { user: User }) {
     </>;
   }
 
-  if (session && consent?.stage === "ready" && generation === "ready") {
-    return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
+  if (session && consent?.stage === "ready" && generation === "ready" && deck) {
+    if (session.status === "completed") return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
+      <p className="eyebrow">Deep Talk · đã khép lại</p>
+      <div className="deep-talk-ready__mark" aria-hidden="true">♡</div>
+      <h1 id="page-title">Cảm ơn hai đứa đã lắng nghe nhau</h1>
+      <p>Phiên đã kết thúc. Hai đứa không cần phải chơi hết 20 lá.</p>
+    </section>;
+
+    if (!deck.progress.started) return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
       <p className="eyebrow">Deep Talk · sẵn sàng</p>
       <div className="deep-talk-ready__mark" aria-hidden="true">20</div>
-      <h1 id="page-title">Bộ bài đã sẵn sàng</h1>
-      <p>Đủ 20 lá, đúng thiết lập hai đứa vừa thống nhất. Nội dung từng lá vẫn được giữ kín cho đến lúc chơi.</p>
-      <div className="settings-feedback" role="status" aria-live="polite">Có thể bắt đầu trải nghiệm chơi ở bước tiếp theo.</div>
+      <h1 id="page-title">Ai sẽ bắt đầu?</h1>
+      <p>Chọn người trả lời lá đầu tiên và cách đổi lượt. Nội dung từng lá vẫn được giữ kín.</p>
+      <form className="deep-talk-start" onSubmit={(event) => { event.preventDefault(); void play("start", { starterUserId: starter, turnMode }); }}>
+        <fieldset><legend>Người bắt đầu</legend>{deck.players.map((player) => <label key={player.id}>
+          <input type="radio" name="starter" value={player.id} checked={starter === player.id} onChange={() => setStarter(player.id)} />
+          <span style={{ background: player.color }} aria-hidden="true">{player.name.slice(0, 1)}</span>{player.name}
+        </label>)}</fieldset>
+        <label>Cách đổi lượt<select value={turnMode} onChange={(event) => setTurnMode(event.target.value as "alternate" | "manual")}>
+          <option value="alternate">Tự đổi sau mỗi câu</option><option value="manual">Tự chọn người trả lời</option>
+        </select></label>
+        <button type="submit" disabled={pending}>Bắt đầu chơi</button>
+      </form>
+      <div className="settings-feedback" role={error ? "alert" : "status"}>{error}</div>
+    </section>;
+
+    const revealed = deck.progress.openedPositions.includes(deck.current.position);
+    const answerers = deck.players.filter(({ id }) => deck.progress.answererUserIds.includes(id));
+    return <section className="deep-talk-play" aria-labelledby="page-title">
+      <header><p className="eyebrow">Deep Talk · lá {deck.current.position + 1}/20</p>
+        <h1 id="page-title">{answerers.length === 2 ? "Cả hai cùng trả lời" : `Lượt của ${answerers[0]?.name ?? "hai đứa"}`}</h1></header>
+      <button type="button" className={`deep-talk-card${revealed ? " deep-talk-card--open" : ""}`} disabled={pending || revealed}
+        aria-label={revealed ? undefined : `Lật lá ${deck.current.position + 1}`} onClick={() => void play("reveal")}>
+        {revealed ? <span>{deck.current.card.question}</span> : <><b aria-hidden="true">♡</b><span>Chạm để lật</span></>}
+      </button>
+      <div className="deep-talk-play__primary">
+        {revealed && <button type="button" disabled={pending} onClick={() => void play("next")}>Tiếp tục</button>}
+        <button type="button" className="secondary-button" disabled={pending} onClick={() => void play("skip")}>Bỏ qua</button>
+      </div>
+      <div className="deep-talk-play__choices">
+        <button type="button" disabled={pending || answerers.length === 2} onClick={() => void play("both")}>Cả hai cùng trả lời</button>
+        <button type="button" disabled={pending} onClick={() => void play("switch")}>Đổi người</button>
+        <button type="button" className="text-button" disabled={pending} onClick={() => {
+          if (window.confirm("Kết thúc phiên Deep Talk tại đây?")) void play("end");
+        }}>Kết thúc phiên</button>
+      </div>
+      <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error}</div>
     </section>;
   }
 
