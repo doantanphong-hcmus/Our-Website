@@ -130,7 +130,7 @@ try {
   assert.doesNotMatch(JSON.stringify(replayedDeck.data), /seed|cards|question/i);
   const resumedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong);
   assert.equal(resumedDeck.response.status, 200);
-  assert.deepEqual(resumedDeck.data.current, { position: 2, card: deepTalkCards[2] });
+  assert.deepEqual(resumedDeck.data.current, { position: 2 });
   assert.deepEqual(resumedDeck.data.opened.map((item) => item.position), [0, 1]);
   assert.equal(resumedDeck.data.opened.length, 2);
   assert.deepEqual(resumedDeck.data.progress, {
@@ -377,7 +377,7 @@ try {
   assert.deepEqual(Object.keys(creatorView.data).sort(), ["current", "deck", "opened", "players", "progress"]);
   assert.equal(creatorView.data.current.position, 0);
   assert.equal(creatorView.data.opened.length, 0);
-  assert.equal((JSON.stringify(creatorView.data).match(/question/g) ?? []).length, 1,
+  assert.equal((JSON.stringify(creatorView.data).match(/question/g) ?? []).length, 0,
     "the creator must not receive unopened cards");
   assert.equal((await request(`/api/sessions/${concurrentId}/deep-talk-deck`, "invalid-session-cookie")).response.status, 401);
   const replayedFallback = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong, "POST", {
@@ -402,6 +402,8 @@ try {
     action: "reveal", expectedVersion: 7, idempotencyKey: "play-reveal-card1",
   });
   assert.deepEqual(revealed.data.progress.openedPositions, [0]);
+  assert.equal(typeof revealed.data.current.card.question, "string");
+  assert.deepEqual(revealed.data.current.card, revealed.data.opened[0].card);
   const competingAdvance = await Promise.all([
     request(playPath, phong, "POST", { action: "next", expectedVersion: 8, idempotencyKey: "play-next-card-001" }),
     request(playPath, nhi, "POST", { action: "skip", expectedVersion: 8, idempotencyKey: "play-skip-card-001" }),
@@ -466,7 +468,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.12 sessions: Deep Talk one/two-device play, sync, idempotency and quota = OK");
+  console.log("P1.9/P3.2-P4.13 sessions: Deep Talk private reveal, one/two-device play and idempotency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

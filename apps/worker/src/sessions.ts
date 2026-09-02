@@ -717,7 +717,10 @@ function publicDeepTalkPlay(session: SessionRow, deck: DeepTalkDeckRow, players:
       readyUserIds: progress.readyUserIds ?? [],
       skippedByUserIds: progress.skippedByUserIds ?? [],
     },
-    current: { position: progress.currentPosition, card: stored.cards[progress.currentPosition] },
+    current: {
+      position: progress.currentPosition,
+      ...(progress.openedPositions.includes(progress.currentPosition) ? { card: stored.cards[progress.currentPosition] } : {}),
+    },
     opened: progress.openedPositions.map((position) => ({ position, card: stored.cards[position] })),
   };
 }
