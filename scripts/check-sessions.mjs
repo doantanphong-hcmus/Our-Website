@@ -30,8 +30,8 @@ const deepTalkConditions = {
 };
 const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v1.json"), "utf8"));
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
-const deepTalkDeckJson = JSON.stringify(JSON.parse(await readFile(path.join(root, "content", "deep-talk-fallback.v1.json"), "utf8")).cards)
-  .replaceAll("'", "''");
+const deepTalkCards = JSON.parse(await readFile(path.join(root, "content", "deep-talk-fallback.v1.json"), "utf8")).cards;
+const deepTalkDeckJson = JSON.stringify(deepTalkCards).replaceAll("'", "''");
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -64,7 +64,8 @@ for (let index = 1; index <= 2; index++) {
     INSERT INTO activity_sessions
       (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,payload_json,result_json,completed_at,updated_at)
     VALUES ('${sessionId}','couple-main','deep_talk','completed','user-phong','history-session-${index}',
-      '{"conditions":{"level":"understand","duration":"30","sensitiveTopics":{}}}','{}',unixepoch()-${index},unixepoch()-${index});
+      '{"conditions":{"level":"understand","duration":"30","sensitiveTopics":{}}}',
+      '${index === 1 ? '{"deepTalkProgress":{"currentPosition":2,"openedPositions":[0,1]}}' : '{}'}',unixepoch()-${index},unixepoch()-${index});
     INSERT INTO deep_talk_decks
       (id,session_id,couple_space_id,created_by_user_id,idempotency_key,seed,generation_day,cards_json,created_at)
     VALUES ('history-deck-${index}','${sessionId}','couple-main','user-phong','history-deck-key-${index}',${index},date('now','+7 hours'),'${deepTalkDeckJson}',unixepoch()-${index});
@@ -127,6 +128,15 @@ try {
   assert.equal(replayedDeck.data.duplicate, true);
   assert.equal(replayedDeck.data.deck.cardCount, 20);
   assert.doesNotMatch(JSON.stringify(replayedDeck.data), /seed|cards|question/i);
+  const resumedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong);
+  assert.equal(resumedDeck.response.status, 200);
+  assert.deepEqual(resumedDeck.data.current, { position: 2, card: deepTalkCards[2] });
+  assert.deepEqual(resumedDeck.data.opened.map((item) => item.position), [0, 1]);
+  assert.equal(resumedDeck.data.opened.length, 2);
+  assert.equal(JSON.stringify(resumedDeck.data).includes(deepTalkCards[3].question), false,
+    "unopened cards must stay server-side");
+  assert.deepEqual((await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", nhi)).data, resumedDeck.data,
+    "both authorized partners must see the same current and opened cards");
 
   const initial = await request("/api/sessions", phong);
   assert.equal(initial.response.status, 200);
@@ -358,6 +368,14 @@ try {
   assert.equal(fallbackDeck.response.status, 201);
   assert.equal(fallbackDeck.data.deck.cardCount, 20);
   assert.doesNotMatch(JSON.stringify(fallbackDeck.data), /seed|cards|question/i);
+  const creatorView = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong);
+  assert.equal(creatorView.response.status, 200);
+  assert.deepEqual(Object.keys(creatorView.data).sort(), ["current", "deck", "opened"]);
+  assert.equal(creatorView.data.current.position, 0);
+  assert.equal(creatorView.data.opened.length, 0);
+  assert.equal((JSON.stringify(creatorView.data).match(/question/g) ?? []).length, 1,
+    "the creator must not receive unopened cards");
+  assert.equal((await request(`/api/sessions/${concurrentId}/deep-talk-deck`, "invalid-session-cookie")).response.status, 401);
   const replayedFallback = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong, "POST", {
     expectedVersion: 4, idempotencyKey: "fallback-deep-001", source: "fallback",
   });
@@ -379,7 +397,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.9 sessions: food safety, Deep Talk consent, AI/fallback deck idempotency and quota = OK");
+  console.log("P1.9/P3.2-P4.10 sessions: food safety, Deep Talk consent, secret cards, idempotency and quota = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

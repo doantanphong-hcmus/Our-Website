@@ -650,7 +650,42 @@ function storedDeepTalkDeck(row: { cards_json: string }): DeepTalkDeck | null {
   }
 }
 
+function storedDeepTalkProgress(resultJson: string | null): { currentPosition: number; openedPositions: number[] } {
+  try {
+    const progress = (JSON.parse(resultJson ?? "{}") as { deepTalkProgress?: unknown }).deepTalkProgress;
+    if (!progress || typeof progress !== "object" || Array.isArray(progress)) throw new Error();
+    const { currentPosition, openedPositions } = progress as Record<string, unknown>;
+    if (!Number.isInteger(currentPosition) || Number(currentPosition) < 0 || Number(currentPosition) > 19
+      || !Array.isArray(openedPositions)) throw new Error();
+    return {
+      currentPosition: Number(currentPosition),
+      openedPositions: [...new Set(openedPositions.filter((position): position is number =>
+        Number.isInteger(position) && position >= 0 && position < 20 && position !== currentPosition))],
+    };
+  } catch {
+    return { currentPosition: 0, openedPositions: [] };
+  }
+}
+
+async function deepTalkDeckView(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
+  const [session, deck] = await Promise.all([
+    env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>(),
+    env.DB.prepare(`${selectDeepTalkDeck} WHERE session_id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<DeepTalkDeckRow>(),
+  ]);
+  if (!session || !deck) return json({ error: "Không tìm thấy bộ Deep Talk." }, 404);
+  if (session.feature !== "deep_talk") return json({ error: "Không tìm thấy bộ Deep Talk." }, 404);
+  const stored = storedDeepTalkDeck(deck);
+  if (!stored) return json({ error: "Bộ Deep Talk không hợp lệ." }, 500);
+  const progress = storedDeepTalkProgress(session.result_json);
+  return json({
+    deck: publicDeepTalkDeck(deck),
+    current: { position: progress.currentPosition, card: stored.cards[progress.currentPosition] },
+    opened: progress.openedPositions.map((position) => ({ position, card: stored.cards[position] })),
+  });
+}
+
 async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  if (request.method === "GET") return deepTalkDeckView(env, spaceId, sessionId);
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const input = await body(request);
   const expectedVersion = input?.expectedVersion;
@@ -706,7 +741,11 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   }
 
   const deckId = crypto.randomUUID();
-  const resultJson = JSON.stringify({ ...(JSON.parse(current.result_json!) as Record<string, unknown>), deepTalkDeckId: deckId });
+  const resultJson = JSON.stringify({
+    ...(JSON.parse(current.result_json!) as Record<string, unknown>),
+    deepTalkDeckId: deckId,
+    deepTalkProgress: { currentPosition: 0, openedPositions: [] },
+  });
   const statements = [
     env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
       WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
