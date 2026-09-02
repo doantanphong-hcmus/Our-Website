@@ -231,7 +231,8 @@ try {
       deck: { id: "fallback-deck", sessionId: deepSession.id, cardCount: 20, createdAt: 1 },
       players: [{ id: phong.id, name: "Phong", color: "#9F3F59" }, { id: nhi.id, name: "Nhi", color: "#3F6F61" }],
       progress: deepProgress,
-      current: { position: deepProgress.currentPosition, card: { question: deepQuestions[deepProgress.currentPosition] } },
+      current: { position: deepProgress.currentPosition,
+        ...(deepProgress.openedPositions.includes(deepProgress.currentPosition) ? { card: { question: deepQuestions[deepProgress.currentPosition] } } : {}) },
       opened: deepProgress.openedPositions.map((position) => ({ position, card: { question: deepQuestions[position] } })),
     });
     if (request.method() === "GET" && pathname.endsWith("/deep-talk-deck")) {
@@ -348,8 +349,21 @@ try {
   await nhiPage.getByRole("button", { name: "Bắt đầu chơi" }).click();
   await nhiPage.getByRole("heading", { name: "Lượt của Nhi" }).waitFor();
   assert.equal(await nhiPage.getByText(deepQuestions[0]).count(), 0, "the face-down card must not render its question");
+  const cardInner = nhiPage.locator(".deep-talk-card__inner");
+  const normalFlipMs = await cardInner.evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration) * 1_000);
+  assert.ok(normalFlipMs >= 400 && normalFlipMs <= 700, `flip duration must be 400-700ms, got ${normalFlipMs}`);
+  const reducedFlipMs = await cardInner.evaluate((element) => {
+    document.documentElement.dataset.motion = "reduced";
+    return Number.parseFloat(getComputedStyle(element).transitionDuration) * 1_000;
+  });
+  assert.ok(reducedFlipMs <= 10, `reduced motion flip must be near-instant, got ${reducedFlipMs}`);
+  await nhiPage.evaluate(() => {
+    document.documentElement.dataset.motion = "full";
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: (duration) => { globalThis.deepTalkVibration = duration; return true; } });
+  });
   await nhiPage.getByRole("button", { name: "Lật lá 1" }).click();
   await nhiPage.getByText(deepQuestions[0]).waitFor();
+  assert.equal(await nhiPage.evaluate(() => globalThis.deepTalkVibration), 18);
   await nhiPage.getByRole("button", { name: "Cả hai cùng trả lời" }).click();
   await nhiPage.getByRole("heading", { name: "Cả hai cùng trả lời" }).waitFor();
   await nhiPage.getByRole("button", { name: "Tiếp tục" }).click();
@@ -371,7 +385,10 @@ try {
   await phongPage.goto(`${server.url}/deep-talk`);
   await phongPage.getByText("Nhi đã chọn bỏ qua.").waitFor();
   await phongPage.getByText("1/2 người đã sẵn sàng sang lá tiếp theo.").waitFor();
-  await phongPage.getByRole("button", { name: "Lật lá 1" }).click();
+  const swipeCard = phongPage.getByRole("button", { name: "Lật lá 1" });
+  await swipeCard.dispatchEvent("pointerdown", { clientX: 240, pointerId: 1 });
+  await swipeCard.dispatchEvent("pointerup", { clientX: 120, pointerId: 1 });
+  await phongPage.getByText(deepQuestions[0]).waitFor();
   await phongPage.getByRole("button", { name: "Tôi đã sẵn sàng" }).click();
   await phongPage.getByText("Deep Talk · lá 2/20").waitFor();
   await nhiPage.reload();
@@ -387,7 +404,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.12 E2E: Deep Talk one/two-device play and shared progress = OK");
+  console.log("P1.14/P2.1/P3.2-P4.13 E2E: private payload, tap/swipe flip, haptic and reduced motion = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

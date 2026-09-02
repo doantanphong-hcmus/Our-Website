@@ -13,7 +13,7 @@ type DeckView = {
   players: Player[];
   progress: { started: boolean; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null;
     playMode: "one" | "two"; answererUserIds: string[]; readyUserIds: string[]; skippedByUserIds: string[] };
-  current: { position: number; card: { question: string } };
+  current: { position: number; card?: { question: string } };
 };
 
 const levels = {
@@ -114,6 +114,8 @@ export function DeepTalkSetup({ user }: { user: User }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const generationRequest = useRef(0);
+  const swipeStart = useRef<number | null>(null);
+  const suppressClick = useRef(false);
 
   async function loadDeck(target: Session) {
     const response = await fetch(`/api/sessions/${target.id}/deep-talk-deck`, { credentials: "same-origin" });
@@ -261,6 +263,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
       const payload = await response.json() as DeckView & { session: Session };
       setSession(payload.session);
       setDeck(payload);
+      if (action === "reveal" && !user.preferences.reducedMotion) navigator.vibrate?.(18);
     } catch (reason) {
       if (!navigator.onLine || reason instanceof TypeError) {
         await queueSessionCommand(path, command);
@@ -318,8 +321,25 @@ export function DeepTalkSetup({ user }: { user: User }) {
       <header><p className="eyebrow">Deep Talk · lá {deck.current.position + 1}/20</p>
         <h1 id="page-title">{answerers.length === 2 ? "Cả hai cùng trả lời" : `Lượt của ${answerers[0]?.name ?? "hai đứa"}`}</h1></header>
       <button type="button" className={`deep-talk-card${revealed ? " deep-talk-card--open" : ""}`} disabled={pending || revealed}
-        aria-label={revealed ? undefined : `Lật lá ${deck.current.position + 1}`} onClick={() => void play("reveal")}>
-        {revealed ? <span>{deck.current.card.question}</span> : <><b aria-hidden="true">♡</b><span>Chạm để lật</span></>}
+        aria-label={revealed ? `Lá ${deck.current.position + 1}: ${deck.current.card?.question ?? ""}` : `Lật lá ${deck.current.position + 1}`}
+        onPointerDown={(event) => { swipeStart.current = revealed ? null : event.clientX; }}
+        onPointerUp={(event) => {
+          if (swipeStart.current !== null && Math.abs(event.clientX - swipeStart.current) >= 48) {
+            suppressClick.current = true;
+            window.setTimeout(() => { suppressClick.current = false; }, 0);
+            void play("reveal");
+          }
+          swipeStart.current = null;
+        }}
+        onPointerCancel={() => { swipeStart.current = null; }}
+        onClick={() => {
+          if (suppressClick.current) return;
+          void play("reveal");
+        }}>
+        <span className="deep-talk-card__inner">
+          <span className="deep-talk-card__face deep-talk-card__back"><b aria-hidden="true">♡</b><span>Chạm hoặc vuốt để lật</span></span>
+          {revealed && deck.current.card && <span className="deep-talk-card__face deep-talk-card__front">{deck.current.card.question}</span>}
+        </span>
       </button>
       <div className="deep-talk-play__primary">
         {revealed && (deck.progress.playMode === "two"

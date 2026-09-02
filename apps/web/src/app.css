@@ -1001,22 +1001,51 @@ main {
 .deep-talk-play header h1 { margin-block-end: 0; }
 
 .deep-talk-card {
-  display: grid;
-  place-items: center;
-  gap: var(--space-3);
+  display: block;
   min-block-size: min(25rem, 55dvh);
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-large);
-  background: linear-gradient(145deg, var(--color-shared-soft), var(--color-surface));
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-shared);
-  box-shadow: var(--shadow-card);
+  perspective: 75rem;
+  touch-action: pan-y;
 }
 
 .deep-talk-card:disabled { opacity: 1; }
-.deep-talk-card b { font-size: 3rem; }
-.deep-talk-card > span { color: var(--color-text); font-size: clamp(1.3rem, 1.05rem + 1.2vw, 1.85rem); font-weight: 750; line-height: 1.45; }
-.deep-talk-card--open { background: var(--color-surface); }
+
+.deep-talk-card__inner {
+  position: relative;
+  display: block;
+  min-block-size: min(25rem, 55dvh);
+  transform-style: preserve-3d;
+  transition: transform 560ms var(--ease-standard);
+}
+
+.deep-talk-card--open .deep-talk-card__inner { transform: rotateY(180deg); }
+
+.deep-talk-card__face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-card);
+  backface-visibility: hidden;
+}
+
+.deep-talk-card__back { background: linear-gradient(145deg, var(--color-shared-soft), var(--color-surface)); }
+.deep-talk-card__back b { font-size: 3rem; }
+.deep-talk-card__front {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: clamp(1.3rem, 1.05rem + 1.2vw, 1.85rem);
+  font-weight: 750;
+  line-height: 1.45;
+  transform: rotateY(180deg);
+}
 
 .deep-talk-play__primary,
 .deep-talk-play__choices {
