@@ -6,10 +6,12 @@ import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
 export class DeepTalkGenerationError extends Error {}
 
 export async function buildDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput,
-  currentDeck: DeepTalkDeck | null = null, recentDecks: DeepTalkDeck[] = []): Promise<DeepTalkDeck> {
+  currentDeck: DeepTalkDeck | null = null, recentDecks: DeepTalkDeck[] = [], timeoutMs = 30_000): Promise<DeepTalkDeck> {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => Math.max(1, deadline - Date.now());
   const history = [currentDeck, ...recentDecks.slice(0, 5)].filter((deck): deck is DeepTalkDeck => Boolean(deck));
   const historyQuestions = history.flatMap((deck) => deck.cards.map((card) => card.question));
-  const initial = await generateDeepTalkDeck(ai, { ...input, avoidQuestions: historyQuestions });
+  const initial = await generateDeepTalkDeck(ai, { ...input, avoidQuestions: historyQuestions }, remaining());
   let cards = removeRepeatedDeepTalkCards(initial, currentDeck, recentDecks).cards;
 
   for (let attempt = 0; cards.length < 20 && attempt < 2; attempt++) {
@@ -17,7 +19,7 @@ export async function buildDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAi
       ...input,
       seed: (input.seed + attempt + 1) >>> 0,
       avoidQuestions: [...historyQuestions, ...cards.map((card) => card.question)].slice(-140),
-    }, cards);
+    }, cards, remaining());
     const references: DeepTalkDeck = { cards: [...(currentDeck?.cards ?? []), ...cards] };
     cards = [...cards, ...removeRepeatedDeepTalkCards({ cards: supplement }, references, recentDecks).cards];
   }

@@ -31,4 +31,22 @@ describe("Deep Talk generation pipeline", () => {
     }, null, [safeDeck])).rejects.toBeInstanceOf(DeepTalkGenerationError);
     expect(ai.run).toHaveBeenCalledTimes(3);
   });
+
+  it("shares one deadline across the initial deck and supplements", async () => {
+    vi.useFakeTimers();
+    try {
+      const ai = { run: vi.fn()
+        .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve({ response: safeDeck }), 6)))
+        .mockImplementationOnce(() => new Promise(() => {})) };
+      const result = buildDeepTalkDeck(ai, {
+        level: "understand", allowedSensitiveTopics: [], seed: 42,
+      }, null, [{ cards: [safeDeck.cards[0]] }], 10);
+      const timedOut = expect(result).rejects.toMatchObject({ code: "timeout" });
+      await vi.advanceTimersByTimeAsync(10);
+      await timedOut;
+      expect(ai.run).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
