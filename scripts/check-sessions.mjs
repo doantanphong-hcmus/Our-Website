@@ -133,6 +133,9 @@ try {
   assert.deepEqual(resumedDeck.data.current, { position: 2, card: deepTalkCards[2] });
   assert.deepEqual(resumedDeck.data.opened.map((item) => item.position), [0, 1]);
   assert.equal(resumedDeck.data.opened.length, 2);
+  assert.deepEqual(resumedDeck.data.progress, {
+    started: false, currentPosition: 2, openedPositions: [0, 1], skippedPositions: [], turnMode: null, answererUserIds: [],
+  });
   assert.equal(JSON.stringify(resumedDeck.data).includes(deepTalkCards[3].question), false,
     "unopened cards must stay server-side");
   assert.deepEqual((await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", nhi)).data, resumedDeck.data,
@@ -370,7 +373,7 @@ try {
   assert.doesNotMatch(JSON.stringify(fallbackDeck.data), /seed|cards|question/i);
   const creatorView = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong);
   assert.equal(creatorView.response.status, 200);
-  assert.deepEqual(Object.keys(creatorView.data).sort(), ["current", "deck", "opened"]);
+  assert.deepEqual(Object.keys(creatorView.data).sort(), ["current", "deck", "opened", "players", "progress"]);
   assert.equal(creatorView.data.current.position, 0);
   assert.equal(creatorView.data.opened.length, 0);
   assert.equal((JSON.stringify(creatorView.data).match(/question/g) ?? []).length, 1,
@@ -380,11 +383,39 @@ try {
     expectedVersion: 4, idempotencyKey: "fallback-deep-001", source: "fallback",
   });
   assert.equal(replayedFallback.data.duplicate, true);
-  const competing = await Promise.all([
-    act(phong, concurrentId, "cancel", 5, "cancel-deep-001"),
-    act(nhi, concurrentId, "complete", 5, "complete-deep-1"),
+  const playPath = `/api/sessions/${concurrentId}/deep-talk-play`;
+  const startPlay = await request(playPath, phong, "POST", {
+    action: "start", starterUserId: "user-phong", turnMode: "alternate", expectedVersion: 5, idempotencyKey: "play-start-phong",
+  });
+  assert.equal(startPlay.response.status, 200);
+  assert.deepEqual(startPlay.data.progress.answererUserIds, ["user-phong"]);
+  assert.equal(startPlay.data.progress.turnMode, "alternate");
+  assert.equal((await request(playPath, phong, "POST", {
+    action: "start", starterUserId: "user-phong", turnMode: "alternate", expectedVersion: 5, idempotencyKey: "play-start-phong",
+  })).data.duplicate, true);
+  const both = await request(playPath, phong, "POST", {
+    action: "both", expectedVersion: 6, idempotencyKey: "play-both-card-01",
+  });
+  assert.deepEqual(both.data.progress.answererUserIds.sort(), ["user-nhi", "user-phong"]);
+  const revealed = await request(playPath, phong, "POST", {
+    action: "reveal", expectedVersion: 7, idempotencyKey: "play-reveal-card1",
+  });
+  assert.deepEqual(revealed.data.progress.openedPositions, [0]);
+  const competingAdvance = await Promise.all([
+    request(playPath, phong, "POST", { action: "next", expectedVersion: 8, idempotencyKey: "play-next-card-001" }),
+    request(playPath, nhi, "POST", { action: "skip", expectedVersion: 8, idempotencyKey: "play-skip-card-001" }),
   ]);
-  assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
+  assert.deepEqual(competingAdvance.map((item) => item.response.status).sort(), [200, 409]);
+  const afterAdvance = (await request(`/api/sessions/${concurrentId}`, phong)).data.session;
+  const switched = await request(playPath, phong, "POST", {
+    action: "switch", expectedVersion: afterAdvance.version, idempotencyKey: "play-switch-card1",
+  });
+  assert.deepEqual(switched.data.progress.answererUserIds, ["user-phong"]);
+  const ended = await request(playPath, phong, "POST", {
+    action: "end", expectedVersion: switched.data.session.version, idempotencyKey: "play-end-session1",
+  });
+  assert.equal(ended.response.status, 200);
+  assert.equal(ended.data.session.status, "completed");
 
   const quotaSession = await create(phong, "deep_talk", "create-deep-quota1");
   const quotaId = quotaSession.data.session.id;
@@ -397,7 +428,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.10 sessions: food safety, Deep Talk consent, secret cards, idempotency and quota = OK");
+  console.log("P1.9/P3.2-P4.11 sessions: food safety, Deep Talk consent, one-device play, idempotency and quota = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

@@ -23,6 +23,18 @@ type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "mat
 type TopicState = "unset" | "allow" | "deny";
 type DeepTalkConditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
 type DeepTalkConsent = { stage: "final_confirmation" | "ready"; revision: number; confirmedUserIds: string[]; changed: boolean };
+type DeepTalkPlayAction = "start" | "reveal" | "next" | "skip" | "switch" | "both" | "end";
+type DeepTalkProgress = {
+  currentPosition: number;
+  openedPositions: number[];
+  skippedPositions: number[];
+  starterUserId?: string;
+  answererUserId?: string;
+  turnMode?: "alternate" | "manual";
+  bothAnswer?: boolean;
+  lastCommand?: { key: string; action: DeepTalkPlayAction };
+};
+type DeepTalkPlayer = { id: string; display_name: string; nickname: string | null; color: string };
 
 interface SessionRow {
   id: string;
@@ -650,7 +662,7 @@ function storedDeepTalkDeck(row: { cards_json: string }): DeepTalkDeck | null {
   }
 }
 
-function storedDeepTalkProgress(resultJson: string | null): { currentPosition: number; openedPositions: number[] } {
+function storedDeepTalkProgress(resultJson: string | null): DeepTalkProgress {
   try {
     const progress = (JSON.parse(resultJson ?? "{}") as { deepTalkProgress?: unknown }).deepTalkProgress;
     if (!progress || typeof progress !== "object" || Array.isArray(progress)) throw new Error();
@@ -660,28 +672,124 @@ function storedDeepTalkProgress(resultJson: string | null): { currentPosition: n
     return {
       currentPosition: Number(currentPosition),
       openedPositions: [...new Set(openedPositions.filter((position): position is number =>
-        Number.isInteger(position) && position >= 0 && position < 20 && position !== currentPosition))],
+        Number.isInteger(position) && position >= 0 && position < 20))],
+      skippedPositions: Array.isArray((progress as Record<string, unknown>).skippedPositions)
+        ? [...new Set(((progress as Record<string, unknown>).skippedPositions as unknown[]).filter((position): position is number =>
+          typeof position === "number" && Number.isInteger(position) && position >= 0 && position < 20))]
+        : [],
+      ...(typeof (progress as Record<string, unknown>).starterUserId === "string" ? { starterUserId: (progress as Record<string, string>).starterUserId } : {}),
+      ...(typeof (progress as Record<string, unknown>).answererUserId === "string" ? { answererUserId: (progress as Record<string, string>).answererUserId } : {}),
+      ...(["alternate", "manual"].includes(String((progress as Record<string, unknown>).turnMode))
+        ? { turnMode: (progress as Record<string, "alternate" | "manual">).turnMode } : {}),
+      ...((progress as Record<string, unknown>).bothAnswer === true ? { bothAnswer: true } : {}),
+      ...((progress as Record<string, unknown>).lastCommand && typeof (progress as Record<string, { key?: unknown }>).lastCommand.key === "string"
+        ? { lastCommand: (progress as Record<string, { key: string; action: DeepTalkPlayAction }>).lastCommand } : {}),
     };
   } catch {
-    return { currentPosition: 0, openedPositions: [] };
+    return { currentPosition: 0, openedPositions: [], skippedPositions: [] };
   }
 }
 
+function publicDeepTalkPlay(session: SessionRow, deck: DeepTalkDeckRow, players: DeepTalkPlayer[]) {
+  const stored = storedDeepTalkDeck(deck);
+  if (!stored) return null;
+  const progress = storedDeepTalkProgress(session.result_json);
+  return {
+    deck: publicDeepTalkDeck(deck),
+    players: players.map((player) => ({ id: player.id, name: player.nickname ?? player.display_name, color: player.color })),
+    progress: {
+      started: Boolean(progress.starterUserId),
+      currentPosition: progress.currentPosition,
+      openedPositions: progress.openedPositions,
+      skippedPositions: progress.skippedPositions,
+      turnMode: progress.turnMode ?? null,
+      answererUserIds: progress.bothAnswer ? players.map(({ id }) => id) : progress.answererUserId ? [progress.answererUserId] : [],
+    },
+    current: { position: progress.currentPosition, card: stored.cards[progress.currentPosition] },
+    opened: progress.openedPositions.map((position) => ({ position, card: stored.cards[position] })),
+  };
+}
+
 async function deepTalkDeckView(env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
-  const [session, deck] = await Promise.all([
+  const [session, deck, players] = await Promise.all([
     env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>(),
     env.DB.prepare(`${selectDeepTalkDeck} WHERE session_id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<DeepTalkDeckRow>(),
+    env.DB.prepare("SELECT id, display_name, nickname, color FROM users WHERE couple_space_id = ? ORDER BY role")
+      .bind(spaceId).all<DeepTalkPlayer>(),
   ]);
   if (!session || !deck) return json({ error: "Không tìm thấy bộ Deep Talk." }, 404);
   if (session.feature !== "deep_talk") return json({ error: "Không tìm thấy bộ Deep Talk." }, 404);
-  const stored = storedDeepTalkDeck(deck);
-  if (!stored) return json({ error: "Bộ Deep Talk không hợp lệ." }, 500);
+  const payload = publicDeepTalkPlay(session, deck, players.results ?? []);
+  return payload ? json(payload) : json({ error: "Bộ Deep Talk không hợp lệ." }, 500);
+}
+
+async function deepTalkPlay(request: Request, env: SessionEnv, spaceId: string, sessionId: string): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const input = await body(request);
+  const action = input?.action as DeepTalkPlayAction;
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!["start", "reveal", "next", "skip", "switch", "both", "end"].includes(action)
+    || !Number.isInteger(expectedVersion) || Number(expectedVersion) < 1
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh chơi Deep Talk không hợp lệ." }, 400);
+  }
+  const [session, deck, playerRows] = await Promise.all([
+    env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>(),
+    env.DB.prepare(`${selectDeepTalkDeck} WHERE session_id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<DeepTalkDeckRow>(),
+    env.DB.prepare("SELECT id, display_name, nickname, color FROM users WHERE couple_space_id = ? ORDER BY role")
+      .bind(spaceId).all<DeepTalkPlayer>(),
+  ]);
+  if (!session || !deck || session.feature !== "deep_talk") return json({ error: "Không tìm thấy bộ Deep Talk." }, 404);
+  const players = playerRows.results ?? [];
+  if (players.length !== 2) return json({ error: "Không tìm thấy đủ người chơi." }, 409);
   const progress = storedDeepTalkProgress(session.result_json);
-  return json({
-    deck: publicDeepTalkDeck(deck),
-    current: { position: progress.currentPosition, card: stored.cards[progress.currentPosition] },
-    opened: progress.openedPositions.map((position) => ({ position, card: stored.cards[position] })),
-  });
+  if (progress.lastCommand?.key === idempotencyKey) {
+    if (progress.lastCommand.action !== action) return json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+    const replay = publicDeepTalkPlay(session, deck, players);
+    return replay ? json({ session: publicSession(session), ...replay, duplicate: true }) : json({ error: "Bộ Deep Talk không hợp lệ." }, 500);
+  }
+  if (session.status !== "active" || session.version !== expectedVersion) {
+    return json({ error: "Phiên đã thay đổi.", session: publicSession(session) }, 409);
+  }
+
+  const ids = players.map(({ id }) => id);
+  const next = structuredClone(progress);
+  if (action === "start") {
+    if (progress.starterUserId || !ids.includes(String(input?.starterUserId))
+      || !["alternate", "manual"].includes(String(input?.turnMode))) return json({ error: "Thiết lập lượt chơi không hợp lệ." }, 409);
+    next.starterUserId = String(input!.starterUserId);
+    next.answererUserId = next.starterUserId;
+    next.turnMode = input!.turnMode as "alternate" | "manual";
+  } else {
+    if (!progress.starterUserId || !progress.answererUserId || !progress.turnMode) return json({ error: "Hãy chọn cách chơi trước." }, 409);
+    if (action === "reveal") next.openedPositions = [...new Set([...next.openedPositions, next.currentPosition])];
+    if (action === "both") next.bothAnswer = true;
+    if (action === "switch") {
+      next.answererUserId = ids.find((id) => id !== progress.answererUserId)!;
+      next.bothAnswer = false;
+    }
+    if (["next", "skip"].includes(action)) {
+      if (action === "next" && !next.openedPositions.includes(next.currentPosition)) return json({ error: "Hãy lật lá hiện tại trước." }, 409);
+      if (action === "skip") next.skippedPositions = [...new Set([...next.skippedPositions, next.currentPosition])];
+      if (next.turnMode === "alternate") next.answererUserId = ids.find((id) => id !== next.answererUserId)!;
+      next.bothAnswer = false;
+      if (next.currentPosition < 19) next.currentPosition += 1;
+    }
+  }
+  next.lastCommand = { key: idempotencyKey, action };
+  const completes = action === "end" || (["next", "skip"].includes(action) && progress.currentPosition === 19);
+  const result = JSON.parse(session.result_json ?? "{}") as Record<string, unknown>;
+  result.deepTalkProgress = next;
+  const now = Math.floor(Date.now() / 1000);
+  const saved = await env.DB.prepare(`UPDATE activity_sessions SET result_json = ?, status = ?, version = version + 1,
+    completed_at = ?, updated_at = ? WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+    .bind(JSON.stringify(result), completes ? "completed" : "active", completes ? now : null, now,
+      sessionId, spaceId, expectedVersion).run();
+  if (saved.meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  const payload = publicDeepTalkPlay(updated!, deck, players);
+  return payload ? json({ session: publicSession(updated!), ...payload }) : json({ error: "Bộ Deep Talk không hợp lệ." }, 500);
 }
 
 async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
@@ -744,7 +852,7 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   const resultJson = JSON.stringify({
     ...(JSON.parse(current.result_json!) as Record<string, unknown>),
     deepTalkDeckId: deckId,
-    deepTalkProgress: { currentPosition: 0, openedPositions: [] },
+    deepTalkProgress: { currentPosition: 0, openedPositions: [], skippedPositions: [] },
   });
   const statements = [
     env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
@@ -946,6 +1054,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "deep-talk-deck") {
     return deepTalkDeck(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "deep-talk-play") {
+    return deepTalkPlay(request, env, spaceId, sessionId);
   }
   const action = parts[3] as Action;
   if (parts.length === 4 && request.method === "POST" && ["join", "decline", "cancel", "complete"].includes(action)) {
