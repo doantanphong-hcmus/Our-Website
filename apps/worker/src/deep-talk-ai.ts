@@ -24,11 +24,15 @@ const levels = {
   gentle: "nhẹ nhàng", understand: "muốn hiểu nhau hơn", deep: "thành thật sâu sắc", mixed: "trộn cân bằng các mức độ",
 };
 const sensitiveLabels = new Map(deepTalkSpec.sensitiveTopics.map((topic) => [topic.id, topic.label]));
+const { uniqueItems: _uniqueItems, ...aiSensitivityTopicsSchema } = deepTalkSpec.cardSchema.properties.sensitivityTopics;
 const responseSchema = (cardCount: number) => ({
   type: "object",
   additionalProperties: false,
   properties: {
-    cards: { type: "array", minItems: cardCount, maxItems: cardCount, items: deepTalkSpec.cardSchema },
+    cards: { type: "array", minItems: cardCount, maxItems: cardCount, items: {
+      ...deepTalkSpec.cardSchema,
+      properties: { ...deepTalkSpec.cardSchema.properties, sensitivityTopics: aiSensitivityTopicsSchema },
+    } },
   },
   required: ["cards"],
 });

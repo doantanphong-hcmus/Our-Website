@@ -16,6 +16,7 @@ describe("Deep Talk AI adapter", () => {
     expect(request.seed).toBe(42);
     expect(request.response_format.type).toBe("json_schema");
     expect(request.response_format.json_schema.properties.cards).toMatchObject({ minItems: 20, maxItems: 20 });
+    expect(JSON.stringify(request.response_format)).not.toContain("uniqueItems");
     const sent = JSON.stringify(request);
     expect(sent).toContain("Gia đình");
     expect(sent).toContain("Người yêu cũ");
