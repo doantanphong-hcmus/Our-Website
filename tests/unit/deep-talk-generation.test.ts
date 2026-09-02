@@ -7,7 +7,9 @@ const replacement: DeepTalkCard = {
   ...safeDeck.cards[0],
   question: "Phẩm chất đáng quý nào của người kia làm bạn trân trọng nhất?",
 };
-const safeQuestions = { questions: safeDeck.cards.map(({ question }) => question) };
+const questions = safeDeck.cards.map(({ question }) => question);
+const safeQuestions = { self: questions.slice(0, 8), partner: questions.slice(8, 14), couple: questions.slice(14) };
+const supplementQuestions = { questions };
 
 describe("Deep Talk generation pipeline", () => {
   it("keeps novel cards and requests only the missing supplement", async () => {
@@ -26,7 +28,9 @@ describe("Deep Talk generation pipeline", () => {
   });
 
   it("stops after two supplement rounds when every result repeats", async () => {
-    const ai = { run: vi.fn().mockResolvedValue({ response: safeQuestions }) };
+    const ai = { run: vi.fn()
+      .mockResolvedValueOnce({ response: safeQuestions })
+      .mockResolvedValue({ response: supplementQuestions }) };
     await expect(buildDeepTalkDeck(ai, {
       level: "gentle", allowedSensitiveTopics: [], seed: 7,
     }, null, [safeDeck])).rejects.toBeInstanceOf(DeepTalkGenerationError);

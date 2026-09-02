@@ -24,26 +24,43 @@ const levels = {
   gentle: "nhẹ nhàng", understand: "muốn hiểu nhau hơn", deep: "thành thật sâu sắc", mixed: "trộn cân bằng các mức độ",
 };
 const sensitiveLabels = new Map(deepTalkSpec.sensitiveTopics.map((topic) => [topic.id, topic.label]));
+const questionArray = (count: number) => ({ type: "array", minItems: count, maxItems: count, items: { type: "string" } });
 const responseSchema = (cardCount: number) => ({
   type: "object",
   additionalProperties: false,
   properties: {
-    questions: { type: "array", minItems: cardCount, maxItems: cardCount, items: { type: "string" } },
+    questions: questionArray(cardCount),
   },
   required: ["questions"],
 });
 
 const groupIds = deepTalkSpec.groups.map(({ id }) => id);
 const formIds = deepTalkSpec.forms.map(({ id }) => id);
-const initialGroups = groupIds.flatMap((id) => Array(deepTalkSpec.deck.cardsPerGroup).fill(id));
+const perspectiveGroups = {
+  self: ["mo_long", "mo_long", "ky_uc", "ky_uc", "thau_hieu", "chan_that", "chan_that", "tuong_lai"],
+  partner: ["mo_long", "ky_uc", "ky_uc", "thau_hieu", "thau_hieu", "chan_that"],
+  couple: ["mo_long", "thau_hieu", "chan_that", "tuong_lai", "tuong_lai", "tuong_lai"],
+};
+const perspectiveKeys = Object.keys(perspectiveGroups) as Array<keyof typeof perspectiveGroups>;
+const initialGroups = perspectiveKeys.flatMap((key) => perspectiveGroups[key]);
+const initialResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: Object.fromEntries(perspectiveKeys.map((key) => [key, questionArray(perspectiveGroups[key].length)])),
+  required: perspectiveKeys,
+};
 
-function cardsFrom(output: unknown, groups: string[], formOffset = 0, positiveNeeded = 2): DeepTalkCard[] {
-  if (!output || typeof output !== "object" || Array.isArray(output) || Object.keys(output).length !== 1
-    || !("questions" in output) || !Array.isArray(output.questions) || output.questions.length !== groups.length
-    || output.questions.some((question) => typeof question !== "string")) {
+function cardsFrom(output: unknown, groups: string[], formOffset = 0, positiveNeeded = 2,
+  keys: string[] = ["questions"]): DeepTalkCard[] {
+  if (!output || typeof output !== "object" || Array.isArray(output)
+    || JSON.stringify(Object.keys(output).sort()) !== JSON.stringify([...keys].sort())) {
     throw new DeepTalkValidationError([`Cần đúng ${groups.length} câu hỏi`]);
   }
-  return output.questions.map((question, index) => ({
+  const questions = keys.flatMap((key) => (output as Record<string, unknown>)[key] as unknown[]);
+  if (questions.length !== groups.length || questions.some((question) => typeof question !== "string")) {
+    throw new DeepTalkValidationError([`Cần đúng ${groups.length} câu hỏi`]);
+  }
+  return questions.map((question, index) => ({
     group: groups[index],
     form: formIds[(formOffset + index) % formIds.length],
     sensitivityTopics: [],
@@ -61,9 +78,13 @@ function prompt(input: DeepTalkAiInput, missingGroups?: Record<string, number>, 
     : initialGroups;
   const task = missingGroups
     ? `Tạo đúng ${count} câu hỏi bổ sung.`
-    : "Tạo đúng 20 câu hỏi.";
+    : "Tạo đúng 20 câu hỏi: self=8, partner=6, couple=6.";
   return `${task} Viết bằng tiếng Việt tự nhiên cho một cặp đôi, mức độ ${levels[input.level]}.
-Theo thứ tự mảng, chủ đề nhóm của từng câu là: ${groups.join(", ")}.
+${missingGroups ? `Theo thứ tự mảng, group là: ${groups.join(", ")}.`
+    : `Group theo từng field: ${perspectiveKeys.map((key) => `${key}=[${perspectiveGroups[key].join(", ")}]`).join("; ")}.`}
+${missingGroups ? "" : `self hỏi người trả lời về cảm xúc, nhu cầu, thói quen và ký ức cá nhân; hạn chế dùng “chúng ta” hoặc “hai đứa”.
+partner hỏi cách người trả lời nhìn, trân trọng hoặc tò mò về người kia; không bắt họ đoán suy nghĩ của người kia.
+couple chỉ hỏi tương tác hiện tại, khác biệt, hoạt động chung hoặc tương lai; tuyệt đối không hỏi kỷ niệm, lần đầu hay chuyện quá khứ.`}
 Ý nghĩa group: mo_long=dễ trả lời về hiện tại; ky_uc=một kỷ niệm cụ thể; thau_hieu=thói quen hoặc cảm nhận; chan_that=nhu cầu hoặc khác biệt cần thành thật; tuong_lai=kế hoạch hoặc hành động chung.
 Luân phiên phong cách: kể chuyện, lựa chọn, tưởng tượng, nhìn người kia, nhìn bản thân, hoàn thành câu, biết ơn, mong muốn, cảm giác, hành động.
 Tuyệt đối không dùng chủ đề nhạy cảm: ${blocked.join(", ")}.
@@ -132,8 +153,8 @@ async function generate<T>(ai: DeepTalkAiBinding, input: DeepTalkAiInput, schema
 }
 
 export async function generateDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput, timeoutMs = 30_000): Promise<DeepTalkDeck> {
-  return generate(ai, input, responseSchema(deepTalkSpec.deck.cardCount), prompt(input, undefined, 2),
-    (output) => validateDeepTalkDeck({ cards: cardsFrom(output, initialGroups, input.seed % formIds.length) }, input.allowedSensitiveTopics), timeoutMs);
+  return generate(ai, input, initialResponseSchema, prompt(input, undefined, 2),
+    (output) => validateDeepTalkDeck({ cards: cardsFrom(output, initialGroups, input.seed % formIds.length, 2, perspectiveKeys) }, input.allowedSensitiveTopics), timeoutMs);
 }
 
 export async function generateDeepTalkSupplement(ai: DeepTalkAiBinding, input: DeepTalkAiInput,
