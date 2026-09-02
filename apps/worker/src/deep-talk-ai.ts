@@ -24,33 +24,52 @@ const levels = {
   gentle: "nhẹ nhàng", understand: "muốn hiểu nhau hơn", deep: "thành thật sâu sắc", mixed: "trộn cân bằng các mức độ",
 };
 const sensitiveLabels = new Map(deepTalkSpec.sensitiveTopics.map((topic) => [topic.id, topic.label]));
-const { uniqueItems: _uniqueItems, ...aiSensitivityTopicsSchema } = deepTalkSpec.cardSchema.properties.sensitivityTopics;
 const responseSchema = (cardCount: number) => ({
   type: "object",
   additionalProperties: false,
   properties: {
-    cards: { type: "array", minItems: cardCount, maxItems: cardCount, items: {
-      ...deepTalkSpec.cardSchema,
-      properties: { ...deepTalkSpec.cardSchema.properties, sensitivityTopics: aiSensitivityTopicsSchema },
-    } },
+    questions: { type: "array", minItems: cardCount, maxItems: cardCount, items: { type: "string" } },
   },
-  required: ["cards"],
+  required: ["questions"],
 });
 
+const groupIds = deepTalkSpec.groups.map(({ id }) => id);
+const formIds = deepTalkSpec.forms.map(({ id }) => id);
+const initialGroups = groupIds.flatMap((id) => Array(deepTalkSpec.deck.cardsPerGroup).fill(id));
+
+function cardsFrom(output: unknown, groups: string[], formOffset = 0, positiveNeeded = 2): DeepTalkCard[] {
+  if (!output || typeof output !== "object" || Array.isArray(output) || Object.keys(output).length !== 1
+    || !("questions" in output) || !Array.isArray(output.questions) || output.questions.length !== groups.length
+    || output.questions.some((question) => typeof question !== "string")) {
+    throw new DeepTalkValidationError([`Cần đúng ${groups.length} câu hỏi`]);
+  }
+  return output.questions.map((question, index) => ({
+    group: groups[index],
+    form: formIds[(formOffset + index) % formIds.length],
+    sensitivityTopics: [],
+    severity: groups[index] === "chan_that" ? "medium" : "light",
+    positive: index >= groups.length - positiveNeeded,
+    question,
+  }));
+}
+
 function prompt(input: DeepTalkAiInput, missingGroups?: Record<string, number>, positiveNeeded = 0): string {
-  const allowed = input.allowedSensitiveTopics.map((id) => sensitiveLabels.get(id));
-  const blocked = deepTalkSpec.sensitiveTopics.filter(({ id }) => !input.allowedSensitiveTopics.includes(id)).map(({ label }) => label);
+  const blocked = deepTalkSpec.sensitiveTopics.map(({ label }) => label);
   const count = missingGroups ? Object.values(missingGroups).reduce((sum, value) => sum + value, 0) : deepTalkSpec.deck.cardCount;
+  const groups = missingGroups
+    ? groupIds.flatMap((id) => Array(missingGroups[id] ?? 0).fill(id))
+    : initialGroups;
   const task = missingGroups
-    ? `Tạo đúng ${count} lá bổ sung. Số lá còn thiếu theo nhóm: ${Object.entries(missingGroups).map(([id, value]) => `${id}=${value}`).join(", ")}. Ít nhất ${positiveNeeded} lá bổ sung phải positive=true và severity khác heavy.`
-    : "Tạo đúng 20 lá; mỗi nhóm mo_long, ky_uc, thau_hieu, chan_that, tuong_lai có đúng 4 lá.";
-  return `${task} Viết bằng tiếng Việt tự nhiên cho một cặp đôi, mức độ ${levels[input.level]}. Dùng đa dạng form trong schema.
-Chủ đề nhạy cảm được phép: ${allowed.length ? allowed.join(", ") : "không có"}.
-Tuyệt đối không dùng chủ đề: ${blocked.join(", ")}.
-Mỗi lá phải khai báo đúng group, form, sensitivityTopics, severity, positive và question. Chỉ gắn sensitivityTopics đã được phép.
+    ? `Tạo đúng ${count} câu hỏi bổ sung.`
+    : "Tạo đúng 20 câu hỏi.";
+  return `${task} Viết bằng tiếng Việt tự nhiên cho một cặp đôi, mức độ ${levels[input.level]}.
+Theo thứ tự mảng, chủ đề nhóm của từng câu là: ${groups.join(", ")}.
+Ý nghĩa group: mo_long=dễ trả lời về hiện tại; ky_uc=một kỷ niệm cụ thể; thau_hieu=thói quen hoặc cảm nhận; chan_that=nhu cầu hoặc khác biệt cần thành thật; tuong_lai=kế hoạch hoặc hành động chung.
+Luân phiên phong cách: kể chuyện, lựa chọn, tưởng tượng, nhìn người kia, nhìn bản thân, hoàn thành câu, biết ơn, mong muốn, cảm giác, hành động.
+Tuyệt đối không dùng chủ đề nhạy cảm: ${blocked.join(", ")}.
 Câu hỏi không phán xét, chẩn đoán, trị liệu, ép trả lời, ép chứng minh tình yêu, khơi ghen, quảng cáo hay yêu cầu bí mật nguy hiểm.
 Không lặp hoặc chỉ đổi vài từ từ các câu cần tránh: ${input.avoidQuestions?.length ? input.avoidQuestions.join(" | ") : "không có"}.
-${missingGroups ? "" : "Hai lá cuối phải positive=true và hướng tới biết ơn hoặc hành động tích cực."} Chỉ trả về JSON đúng schema.`;
+${positiveNeeded ? `${positiveNeeded} câu cuối phải hướng tới biết ơn hoặc hành động tích cực.` : ""} Chỉ trả về JSON đúng schema.`;
 }
 
 function parse(output: unknown): unknown {
@@ -113,8 +132,8 @@ async function generate<T>(ai: DeepTalkAiBinding, input: DeepTalkAiInput, schema
 }
 
 export async function generateDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput, timeoutMs = 30_000): Promise<DeepTalkDeck> {
-  return generate(ai, input, responseSchema(deepTalkSpec.deck.cardCount), prompt(input),
-    (output) => validateDeepTalkDeck(output, input.allowedSensitiveTopics), timeoutMs);
+  return generate(ai, input, responseSchema(deepTalkSpec.deck.cardCount), prompt(input, undefined, 2),
+    (output) => validateDeepTalkDeck({ cards: cardsFrom(output, initialGroups, input.seed % formIds.length) }, input.allowedSensitiveTopics), timeoutMs);
 }
 
 export async function generateDeepTalkSupplement(ai: DeepTalkAiBinding, input: DeepTalkAiInput,
@@ -128,10 +147,10 @@ export async function generateDeepTalkSupplement(ai: DeepTalkAiBinding, input: D
   if (!missing) return [];
   const positiveNeeded = Math.max(0, deepTalkSpec.deck.positiveEndingCards
     - acceptedCards.filter((card) => card.positive && card.severity !== "heavy").length);
+  const groups = groupIds.flatMap((id) => Array(missingGroups[id] ?? 0).fill(id));
   return generate(ai, input, responseSchema(missing), prompt(input, missingGroups, positiveNeeded), (output) => {
-    if (!output || typeof output !== "object" || Array.isArray(output) || !("cards" in output) || !Array.isArray(output.cards)
-      || output.cards.length !== missing) throw new DeepTalkValidationError([`Cần đúng ${missing} lá bổ sung`]);
-    const combined = validateDeepTalkDeck({ cards: [...acceptedCards, ...output.cards] }, input.allowedSensitiveTopics);
+    const supplementalCards = cardsFrom(output, groups, (input.seed % formIds.length) + acceptedCards.length, positiveNeeded);
+    const combined = validateDeepTalkDeck({ cards: [...acceptedCards, ...supplementalCards] }, input.allowedSensitiveTopics);
     return combined.cards.slice(acceptedCards.length);
   }, timeoutMs);
 }

@@ -38,6 +38,8 @@ export default {
     }
 
     const isSessions = url.pathname === "/api/sessions" || url.pathname.startsWith("/api/sessions/");
+    const isDeckGeneration = /^\/api\/sessions\/[0-9a-f-]{36}\/deep-talk-deck$/i.test(url.pathname)
+      && request.method === "POST";
     const isSocket = url.pathname === "/ws";
     if (isSessions || isSocket) {
       try {
@@ -46,7 +48,8 @@ export default {
         }
         const auth = await authenticatedUser(request, env);
         if (!auth) return unauthorized();
-        if (isSessions && request.method === "GET") return handleSessions(request, env);
+        // ponytail: P4.9 lets AI and fallback race; P4.10 can add a dedicated deck-status broadcast.
+        if (isSessions && (request.method === "GET" || isDeckGeneration)) return handleSessions(request, env);
         return env.REALTIME_ROOM.getByName(auth.user.couple_space_id).fetch(request);
       } catch {
         return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });

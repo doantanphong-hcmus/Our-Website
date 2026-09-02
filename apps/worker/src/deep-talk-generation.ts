@@ -6,7 +6,7 @@ import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
 export class DeepTalkGenerationError extends Error {}
 
 export async function buildDeepTalkDeck(ai: DeepTalkAiBinding, input: DeepTalkAiInput,
-  currentDeck: DeepTalkDeck | null = null, recentDecks: DeepTalkDeck[] = [], timeoutMs = 30_000): Promise<DeepTalkDeck> {
+  currentDeck: DeepTalkDeck | null = null, recentDecks: DeepTalkDeck[] = [], timeoutMs = 180_000): Promise<DeepTalkDeck> {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   const history = [currentDeck, ...recentDecks.slice(0, 5)].filter((deck): deck is DeepTalkDeck => Boolean(deck));

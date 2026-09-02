@@ -16,7 +16,7 @@ liveTest("live Workers AI builds one production Deep Talk deck", async () => {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(35_000),
+      signal: AbortSignal.timeout(185_000),
     });
     const payload = await response.json() as { result?: unknown; errors?: Array<{ message?: string }> };
     if (!response.ok) throw new Error(`Workers AI ${response.status}: ${payload.errors?.[0]?.message ?? "unknown error"}`);
@@ -24,14 +24,9 @@ liveTest("live Workers AI builds one production Deep Talk deck", async () => {
   } };
 
   const started = performance.now();
-  try {
-    const deck = await buildDeepTalkDeck(ai, {
-      level: "understand", allowedSensitiveTopics: [], seed: 2092026,
-    });
-    expect(deck.cards).toHaveLength(20);
-    console.log(JSON.stringify({ outcome: "generated", latencyMs: Math.round(performance.now() - started), calls, cards: 20 }));
-  } catch (error) {
-    expect(error).toMatchObject({ code: "timeout" });
-    console.log(JSON.stringify({ outcome: "fallback", latencyMs: Math.round(performance.now() - started), calls }));
-  }
-}, 40_000);
+  const deck = await buildDeepTalkDeck(ai, {
+    level: "understand", allowedSensitiveTopics: [], seed: 2092026,
+  });
+  expect(deck.cards).toHaveLength(20);
+  console.log(JSON.stringify({ outcome: "generated", latencyMs: Math.round(performance.now() - started), calls, cards: 20 }));
+}, 190_000);

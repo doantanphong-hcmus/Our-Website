@@ -7,12 +7,13 @@ const replacement: DeepTalkCard = {
   ...safeDeck.cards[0],
   question: "Phẩm chất đáng quý nào của người kia làm bạn trân trọng nhất?",
 };
+const safeQuestions = { questions: safeDeck.cards.map(({ question }) => question) };
 
 describe("Deep Talk generation pipeline", () => {
   it("keeps novel cards and requests only the missing supplement", async () => {
     const ai = { run: vi.fn()
-      .mockResolvedValueOnce({ response: safeDeck })
-      .mockResolvedValueOnce({ response: { cards: [replacement] } }) };
+      .mockResolvedValueOnce({ response: safeQuestions })
+      .mockResolvedValueOnce({ response: { questions: [replacement.question] } }) };
     const result = await buildDeepTalkDeck(ai, {
       level: "understand", allowedSensitiveTopics: [], seed: 42,
     }, null, [{ cards: [safeDeck.cards[0]] }]);
@@ -20,12 +21,12 @@ describe("Deep Talk generation pipeline", () => {
     expect(result.cards.map(({ question }) => question)).toContain(replacement.question);
     expect(ai.run).toHaveBeenCalledTimes(2);
     const supplementRequest = ai.run.mock.calls[1][1];
-    expect(supplementRequest.response_format.json_schema.properties.cards).toMatchObject({ minItems: 1, maxItems: 1 });
-    expect(supplementRequest.messages[1].content).toContain("đúng 1 lá bổ sung");
+    expect(supplementRequest.response_format.json_schema.properties.questions).toMatchObject({ minItems: 1, maxItems: 1 });
+    expect(supplementRequest.messages[1].content).toContain("đúng 1 câu hỏi bổ sung");
   });
 
   it("stops after two supplement rounds when every result repeats", async () => {
-    const ai = { run: vi.fn().mockResolvedValue({ response: safeDeck }) };
+    const ai = { run: vi.fn().mockResolvedValue({ response: safeQuestions }) };
     await expect(buildDeepTalkDeck(ai, {
       level: "gentle", allowedSensitiveTopics: [], seed: 7,
     }, null, [safeDeck])).rejects.toBeInstanceOf(DeepTalkGenerationError);
@@ -36,7 +37,7 @@ describe("Deep Talk generation pipeline", () => {
     vi.useFakeTimers();
     try {
       const ai = { run: vi.fn()
-        .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve({ response: safeDeck }), 6)))
+        .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve({ response: safeQuestions }), 6)))
         .mockImplementationOnce(() => new Promise(() => {})) };
       const result = buildDeepTalkDeck(ai, {
         level: "understand", allowedSensitiveTopics: [], seed: 42,
@@ -45,6 +46,21 @@ describe("Deep Talk generation pipeline", () => {
       await vi.advanceTimersByTimeAsync(10);
       await timedOut;
       expect(ai.run).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows the production pipeline up to 180 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const ai = { run: vi.fn(() => new Promise(() => {})) };
+      const result = buildDeepTalkDeck(ai, { level: "gentle", allowedSensitiveTopics: [], seed: 1 });
+      const timedOut = expect(result).rejects.toMatchObject({ code: "timeout" });
+      await vi.advanceTimersByTimeAsync(179_999);
+      expect(ai.run).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await timedOut;
     } finally {
       vi.useRealTimers();
     }
