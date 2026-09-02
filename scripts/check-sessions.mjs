@@ -58,7 +58,7 @@ wranglerCommand(["d1", "execute", ...local, "--command", `
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,result_json,completed_at,updated_at)
   VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"],"foodFinal":{"dishId":"xoi-man","foodStyle":"snack","mode":"dish","source":"match","accepted":true}}',unixepoch(),unixepoch());`]);
 
-for (let index = 1; index <= 2; index++) {
+for (let index = 1; index <= 1; index++) {
   const sessionId = `00000000-0000-4000-8000-00000000010${index}`;
   wranglerCommand(["d1", "execute", ...local, "--command", `
     INSERT INTO activity_sessions
@@ -134,7 +134,8 @@ try {
   assert.deepEqual(resumedDeck.data.opened.map((item) => item.position), [0, 1]);
   assert.equal(resumedDeck.data.opened.length, 2);
   assert.deepEqual(resumedDeck.data.progress, {
-    started: false, currentPosition: 2, openedPositions: [0, 1], skippedPositions: [], turnMode: null, answererUserIds: [],
+    started: false, currentPosition: 2, openedPositions: [0, 1], skippedPositions: [], turnMode: null, playMode: "one",
+    answererUserIds: [], readyUserIds: [], skippedByUserIds: [],
   });
   assert.equal(JSON.stringify(resumedDeck.data).includes(deepTalkCards[3].question), false,
     "unopened cards must stay server-side");
@@ -417,6 +418,43 @@ try {
   assert.equal(ended.response.status, 200);
   assert.equal(ended.data.session.status, "completed");
 
+  const twoDeviceSession = await create(phong, "deep_talk", "create-deep-two01");
+  const twoDeviceId = twoDeviceSession.data.session.id;
+  const twoReady = await request(`/api/sessions/${twoDeviceId}/deep-talk-consent`, nhi, "POST", {
+    action: "review", expectedVersion: 1, sensitiveTopics: deepTalkConditions.sensitiveTopics, idempotencyKey: "review-deep-two01",
+  });
+  assert.equal(twoReady.data.session.status, "active");
+  const twoDeck = await request(`/api/sessions/${twoDeviceId}/deep-talk-deck`, phong, "POST", {
+    expectedVersion: 2, idempotencyKey: "fallback-deep-two", source: "fallback",
+  });
+  assert.equal(twoDeck.response.status, 201);
+  const twoPlayPath = `/api/sessions/${twoDeviceId}/deep-talk-play`;
+  const twoStarted = await request(twoPlayPath, phong, "POST", {
+    action: "start", starterUserId: "user-phong", turnMode: "alternate", playMode: "two",
+    expectedVersion: 3, idempotencyKey: "play-two-start01",
+  });
+  assert.equal(twoStarted.data.progress.playMode, "two");
+  assert.equal((await request(twoPlayPath, phong, "POST", {
+    action: "next", expectedVersion: 4, idempotencyKey: "play-two-next-no",
+  })).response.status, 409);
+  await request(twoPlayPath, phong, "POST", { action: "reveal", expectedVersion: 4, idempotencyKey: "play-two-reveal" });
+  const partnerSkipped = await request(twoPlayPath, nhi, "POST", {
+    action: "skip", expectedVersion: 5, idempotencyKey: "play-two-skip-nhi",
+  });
+  assert.equal(partnerSkipped.data.progress.currentPosition, 0);
+  assert.deepEqual(partnerSkipped.data.progress.readyUserIds, ["user-nhi"]);
+  assert.deepEqual(partnerSkipped.data.progress.skippedByUserIds, ["user-nhi"]);
+  const creatorSynced = await request(`/api/sessions/${twoDeviceId}/deep-talk-deck`, phong);
+  assert.deepEqual(creatorSynced.data.progress.skippedByUserIds, ["user-nhi"], "partner must see who skipped");
+  const bothReady = await request(twoPlayPath, phong, "POST", {
+    action: "ready", expectedVersion: 6, idempotencyKey: "play-two-ready-ph",
+  });
+  assert.equal(bothReady.data.progress.currentPosition, 1, "the card advances only after both players are ready");
+  assert.deepEqual(bothReady.data.progress.readyUserIds, []);
+  assert.equal((await request(twoPlayPath, nhi, "POST", {
+    action: "end", expectedVersion: 7, idempotencyKey: "play-two-end-001",
+  })).data.session.status, "completed");
+
   const quotaSession = await create(phong, "deep_talk", "create-deep-quota1");
   const quotaId = quotaSession.data.session.id;
   const quotaReview = await request(`/api/sessions/${quotaId}/deep-talk-consent`, nhi, "POST", {
@@ -428,7 +466,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.11 sessions: food safety, Deep Talk consent, one-device play, idempotency and quota = OK");
+  console.log("P1.9/P3.2-P4.12 sessions: Deep Talk one/two-device play, sync, idempotency and quota = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
