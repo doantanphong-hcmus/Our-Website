@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "playwright-core";
@@ -16,6 +16,9 @@ const password = "realtime check password";
 const pepper = "test-only-pepper-at-least-thirty-two-bytes";
 const timeoutMs = 2_000;
 const env = { ...process.env, CI: "1", NO_COLOR: "1", XDG_CONFIG_HOME: state, WRANGLER_LOG: "error" };
+const deepTalkCards = JSON.stringify(JSON.parse(await readFile(path.join(root, "content", "deep-talk-fallback.v1.json"), "utf8")).cards)
+  .replaceAll("'", "''");
+const deepTalkSessionId = "00000000-0000-4000-8000-000000000412";
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -33,7 +36,13 @@ wranglerCommand(["d1", "migrations", "apply", ...local]);
 wranglerCommand(["d1", "execute", ...local, "--file", seed]);
 wranglerCommand(["d1", "execute", ...local, "--command", `
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-phong';
-  UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-nhi';`]);
+  UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-nhi';
+  INSERT INTO activity_sessions (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,payload_json,result_json)
+  VALUES ('${deepTalkSessionId}','couple-main','deep_talk','active','user-phong','realtime-deep-session',
+    '{"conditions":{"level":"gentle","duration":"30","sensitiveTopics":{}}}',
+    '{"deepTalkDeckId":"realtime-deck","deepTalkProgress":{"currentPosition":0,"openedPositions":[],"skippedPositions":[],"starterUserId":"user-phong","answererUserId":"user-phong","turnMode":"alternate","playMode":"two","readyUserIds":[],"skippedByUserIds":[]}}');
+  INSERT INTO deep_talk_decks (id,session_id,couple_space_id,created_by_user_id,idempotency_key,seed,generation_day,cards_json)
+  VALUES ('realtime-deck','${deepTalkSessionId}','couple-main','user-phong','realtime-deep-deck',1,date('now','+7 hours'),'${deepTalkCards}');`]);
 
 const server = spawn(process.execPath, [
   wrangler, "dev", "--config", config, "--ip", "127.0.0.1", "--port", "8797", "--persist-to", state,
@@ -93,6 +102,13 @@ async function api(page, pathName, input) {
   }, { pathName, input });
 }
 
+async function get(page, pathName) {
+  return page.evaluate(async (path) => {
+    const response = await fetch(path);
+    return { status: response.status, data: await response.json() };
+  }, pathName);
+}
+
 let browser;
 try {
   await waitUntilReady();
@@ -110,6 +126,25 @@ try {
 
   await first.page.evaluate(() => globalThis.p110.socket.send("ping"));
   await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "pong"));
+
+  const playPath = `/api/sessions/${deepTalkSessionId}/deep-talk-play`;
+  const skipped = await api(second.page, playPath, { action: "skip", expectedVersion: 1, idempotencyKey: "realtime-skip-nhi" });
+  assert.equal(skipped.status, 200);
+  await Promise.all([
+    waitFor(first.page, () => globalThis.p110.events.some((event) => event.session?.id === "00000000-0000-4000-8000-000000000412" && event.session.version === 2)),
+    waitFor(second.page, () => globalThis.p110.events.some((event) => event.session?.id === "00000000-0000-4000-8000-000000000412" && event.session.version === 2)),
+  ]);
+  assert.deepEqual((await get(first.page, `/api/sessions/${deepTalkSessionId}/deep-talk-deck`)).data.progress.skippedByUserIds, ["user-nhi"]);
+  await second.page.evaluate(() => new Promise((resolve) => {
+    globalThis.p110.socket.addEventListener("close", resolve, { once: true });
+    globalThis.p110.socket.close(1000, "offline");
+  }));
+  const advanced = await api(first.page, playPath, { action: "ready", expectedVersion: 2, idempotencyKey: "realtime-ready-ph" });
+  assert.equal(advanced.data.progress.currentPosition, 1);
+  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.session?.id === "00000000-0000-4000-8000-000000000412" && event.session.version === 3));
+  await connect(second.page, 0);
+  assert.equal((await get(second.page, `/api/sessions/${deepTalkSessionId}/deep-talk-deck`)).data.progress.currentPosition, 1,
+    "reconnected device must recover the shared current card from D1");
 
   let started = performance.now();
   const created = await api(first.page, "/api/sessions", {
@@ -156,17 +191,20 @@ try {
   assert.equal(exact.reconciled, false);
 
   const revokedSocketClosed = second.page.evaluate(() => new Promise((resolve) => {
-    const timer = setTimeout(() => resolve({ code: 0, readyState: globalThis.p110.socket.readyState }), 500);
+    const timer = setTimeout(() => resolve({ code: 0, readyState: globalThis.p110.socket.readyState }), 1_500);
     globalThis.p110.socket.addEventListener("close", ({ code }) => { clearTimeout(timer); resolve({ code }); }, { once: true });
   }));
   assert.equal(await second.page.evaluate(async () => (await fetch("/api/auth/logout", { method: "POST" })).status), 204);
-  const afterLogout = await api(first.page, "/api/sessions", { feature: "food_vote", idempotencyKey: "p110-after-logout" });
+  const afterLogout = await api(first.page, "/api/sessions", {
+    feature: "food_vote", idempotencyKey: "p110-after-logout",
+    conditions: { foodStyle: "snack", meal: "any", category: "any", allergens: [], exclusions: [] },
+  });
   assert.equal(afterLogout.status, 201);
   await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 4));
   const revoked = await revokedSocketClosed;
   assert.ok(revoked.code === 4401 || revoked.readyState === 2 || revoked.readyState === 3, JSON.stringify(revoked));
 
-  console.log(`P1.10 realtime: auth/revoke, heartbeat, ${broadcastMs}ms broadcast and ${reconnectMs}ms D1 reconnect = OK`);
+  console.log(`P1.10/P4.12 realtime: auth/revoke, two-device ready/skip sync, ${broadcastMs}ms broadcast and ${reconnectMs}ms reconnect = OK`);
   await Promise.all([first.context.close(), second.context.close()]);
 } finally {
   await browser?.close().catch(() => {});

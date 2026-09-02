@@ -1030,6 +1030,15 @@ main {
 .deep-talk-play__choices button { min-block-size: 2.75rem; background: var(--color-shared-soft); color: var(--color-shared); }
 .deep-talk-play__choices .text-button { background: transparent; color: var(--color-text-muted); }
 
+.deep-talk-sync {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+  color: var(--color-shared);
+}
+
 @keyframes deep-talk-breathe {
   50% { transform: translateY(-0.45rem) rotate(2deg); }
 }

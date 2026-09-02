@@ -210,7 +210,8 @@ try {
     "Hai đứa muốn cùng thử điều gì trong thời gian tới?",
   ];
   let deepDeckReady = false;
-  let deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null, answererUserIds: [] };
+  let deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
+    playMode: "one", answererUserIds: [], readyUserIds: [], skippedByUserIds: [] };
   let releaseDeepAi;
   const deepAiPending = new Promise((resolve) => { releaseDeepAi = resolve; });
   const deepRoute = (userId) => async (route) => {
@@ -244,15 +245,26 @@ try {
     deepCommands.push({ pathname, body });
     if (pathname.endsWith("/deep-talk-play")) {
       const ids = [phong.id, nhi.id];
-      if (body.action === "start") deepProgress = { ...deepProgress, started: true, turnMode: body.turnMode, answererUserIds: [body.starterUserId] };
+      if (body.action === "start") deepProgress = { ...deepProgress, started: true, turnMode: body.turnMode, playMode: body.playMode, answererUserIds: [body.starterUserId] };
       if (body.action === "reveal") deepProgress = { ...deepProgress, openedPositions: [...deepProgress.openedPositions, deepProgress.currentPosition] };
       if (body.action === "both") deepProgress = { ...deepProgress, answererUserIds: ids };
       if (body.action === "switch") deepProgress = { ...deepProgress, answererUserIds: [ids.find((id) => id !== deepProgress.answererUserIds[0])] };
-      if (["next", "skip"].includes(body.action)) {
+      const advance = () => {
         const answerer = deepProgress.answererUserIds.length === 1 ? deepProgress.answererUserIds[0] : nhi.id;
         deepProgress = { ...deepProgress, currentPosition: deepProgress.currentPosition + 1,
-          skippedPositions: body.action === "skip" ? [...deepProgress.skippedPositions, deepProgress.currentPosition] : deepProgress.skippedPositions,
+          readyUserIds: [], skippedByUserIds: [],
           answererUserIds: deepProgress.turnMode === "alternate" ? [ids.find((id) => id !== answerer)] : [answerer] };
+      };
+      if (body.action === "next") advance();
+      if (body.action === "skip") {
+        deepProgress = { ...deepProgress, skippedPositions: [...deepProgress.skippedPositions, deepProgress.currentPosition] };
+        if (deepProgress.playMode === "two") {
+          deepProgress = { ...deepProgress, readyUserIds: [...deepProgress.readyUserIds, userId], skippedByUserIds: [...deepProgress.skippedByUserIds, userId] };
+        } else advance();
+      }
+      if (body.action === "ready") {
+        deepProgress = { ...deepProgress, readyUserIds: [...deepProgress.readyUserIds, userId] };
+        if (deepProgress.readyUserIds.length === 2) advance();
       }
       deepSession = { ...deepSession, version: deepSession.version + 1, status: body.action === "end" ? "completed" : "active" };
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: deepSession, ...deckView() }) });
@@ -348,6 +360,24 @@ try {
   nhiPage.once("dialog", (dialog) => dialog.accept());
   await nhiPage.getByRole("button", { name: "Kết thúc phiên" }).click();
   await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
+
+  deepSession = { ...deepSession, status: "active", version: 1 };
+  deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
+    playMode: "one", answererUserIds: [], readyUserIds: [], skippedByUserIds: [] };
+  await nhiPage.reload();
+  await nhiPage.getByLabel("Thiết bị chơi").selectOption("two");
+  await nhiPage.getByRole("button", { name: "Bắt đầu chơi" }).click();
+  await nhiPage.getByRole("button", { name: "Bỏ qua" }).click();
+  await phongPage.goto(`${server.url}/deep-talk`);
+  await phongPage.getByText("Nhi đã chọn bỏ qua.").waitFor();
+  await phongPage.getByText("1/2 người đã sẵn sàng sang lá tiếp theo.").waitFor();
+  await phongPage.getByRole("button", { name: "Lật lá 1" }).click();
+  await phongPage.getByRole("button", { name: "Tôi đã sẵn sàng" }).click();
+  await phongPage.getByText("Deep Talk · lá 2/20").waitFor();
+  await nhiPage.reload();
+  await nhiPage.getByText("Deep Talk · lá 2/20").waitFor();
+  nhiPage.once("dialog", (dialog) => dialog.accept());
+  await nhiPage.getByRole("button", { name: "Kết thúc phiên" }).click();
   releaseDeepAi();
 
   await phongPage.goto(server.url);
@@ -357,7 +387,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.11 E2E: food flows, Deep Talk consent, fallback and one-device play = OK");
+  console.log("P1.14/P2.1/P3.2-P4.12 E2E: Deep Talk one/two-device play and shared progress = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

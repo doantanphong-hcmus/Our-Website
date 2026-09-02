@@ -20,7 +20,7 @@ interface StoredCommand {
 const eventName = "our:offline-queue";
 const databaseName = "our-website-offline";
 const storeName = "commands";
-const sessionPath = /^\/api\/sessions(?:\/[0-9a-f-]{36}\/(?:join|decline|cancel|complete|food-result|deep-talk-consent))?$/i;
+const sessionPath = /^\/api\/sessions(?:\/[0-9a-f-]{36}\/(?:join|decline|cancel|complete|food-result|deep-talk-consent|deep-talk-play))?$/i;
 let activeUserId: string | null = null;
 let databasePromise: Promise<IDBDatabase> | null = null;
 let running = false;

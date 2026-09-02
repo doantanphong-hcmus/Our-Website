@@ -11,7 +11,8 @@ type Consent = { stage: "partner_review" | "final_confirmation" | "ready"; revis
 type Player = { id: string; name: string; color: string };
 type DeckView = {
   players: Player[];
-  progress: { started: boolean; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null; answererUserIds: string[] };
+  progress: { started: boolean; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null;
+    playMode: "one" | "two"; answererUserIds: string[]; readyUserIds: string[]; skippedByUserIds: string[] };
   current: { position: number; card: { question: string } };
 };
 
@@ -108,6 +109,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
   const [deck, setDeck] = useState<DeckView | null>(null);
   const [starter, setStarter] = useState(user.id);
   const [turnMode, setTurnMode] = useState<"alternate" | "manual">("alternate");
+  const [playMode, setPlayMode] = useState<"one" | "two">("one");
   const [offerFallback, setOfferFallback] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -154,6 +156,41 @@ export function DeepTalkSetup({ user }: { user: User }) {
     window.addEventListener("our:offline-queue", sync);
     return () => window.removeEventListener("our:offline-queue", sync);
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    let stopped = false;
+    let retry = 0;
+    let socket: WebSocket | null = null;
+    const connect = () => {
+      if (stopped || !navigator.onLine) return;
+      const url = new URL("/ws", location.href);
+      url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(url);
+      socket.addEventListener("message", ({ data }) => {
+        if (data === "pong") return;
+        try {
+          const event = JSON.parse(String(data)) as { type?: string; session?: Session; sessions?: Session[] };
+          if (!["session.snapshot", "session.updated"].includes(event.type ?? "")) return;
+          const synced = event.session?.id === session.id ? event.session : event.sessions?.find(({ id }) => id === session.id);
+          if (synced) setSession(synced);
+          void loadDeck(synced ?? session);
+        } catch { /* ignore malformed realtime messages */ }
+      });
+      socket.addEventListener("close", () => {
+        if (!stopped) retry = window.setTimeout(connect, 1_000);
+      });
+    };
+    const online = () => { void loadDeck(session); connect(); };
+    connect();
+    window.addEventListener("online", online);
+    return () => {
+      stopped = true;
+      window.clearTimeout(retry);
+      window.removeEventListener("online", online);
+      socket?.close();
+    };
+  }, [session?.id]);
 
   async function command(path: string, input: Record<string, unknown>, success: string) {
     setPending(true);
@@ -209,17 +246,26 @@ export function DeepTalkSetup({ user }: { user: User }) {
     if (!session) return;
     setPending(true);
     setError("");
+    setMessage("");
+    const path = `/api/sessions/${session.id}/deep-talk-play`;
+    const command = { action, expectedVersion: session.version, idempotencyKey: crypto.randomUUID(), ...extra };
     try {
-      const response = await fetch(`/api/sessions/${session.id}/deep-talk-play`, {
+      const response = await fetch(path, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, expectedVersion: session.version, idempotencyKey: crypto.randomUUID(), ...extra }),
+        body: JSON.stringify(command),
       });
-      if (!response.ok) throw new Error(await responseError(response, "Không cập nhật được lượt Deep Talk."));
+      if (!response.ok) {
+        if (response.status === 409) await loadDeck(session);
+        throw new Error(await responseError(response, "Không cập nhật được lượt Deep Talk."));
+      }
       const payload = await response.json() as DeckView & { session: Session };
       setSession(payload.session);
       setDeck(payload);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không cập nhật được lượt Deep Talk.");
+      if (!navigator.onLine || reason instanceof TypeError) {
+        await queueSessionCommand(path, command);
+        setMessage("Đã giữ thao tác. Sẽ đồng bộ khi có mạng trở lại.");
+      } else setError(reason instanceof Error ? reason.message : "Không cập nhật được lượt Deep Talk.");
     } finally {
       setPending(false);
     }
@@ -248,13 +294,16 @@ export function DeepTalkSetup({ user }: { user: User }) {
       <div className="deep-talk-ready__mark" aria-hidden="true">20</div>
       <h1 id="page-title">Ai sẽ bắt đầu?</h1>
       <p>Chọn người trả lời lá đầu tiên và cách đổi lượt. Nội dung từng lá vẫn được giữ kín.</p>
-      <form className="deep-talk-start" onSubmit={(event) => { event.preventDefault(); void play("start", { starterUserId: starter, turnMode }); }}>
+      <form className="deep-talk-start" onSubmit={(event) => { event.preventDefault(); void play("start", { starterUserId: starter, turnMode, playMode }); }}>
         <fieldset><legend>Người bắt đầu</legend>{deck.players.map((player) => <label key={player.id}>
           <input type="radio" name="starter" value={player.id} checked={starter === player.id} onChange={() => setStarter(player.id)} />
           <span style={{ background: player.color }} aria-hidden="true">{player.name.slice(0, 1)}</span>{player.name}
         </label>)}</fieldset>
         <label>Cách đổi lượt<select value={turnMode} onChange={(event) => setTurnMode(event.target.value as "alternate" | "manual")}>
           <option value="alternate">Tự đổi sau mỗi câu</option><option value="manual">Tự chọn người trả lời</option>
+        </select></label>
+        <label>Thiết bị chơi<select value={playMode} onChange={(event) => setPlayMode(event.target.value as "one" | "two")}>
+          <option value="one">Chơi chung một thiết bị</option><option value="two">Mỗi người một thiết bị</option>
         </select></label>
         <button type="submit" disabled={pending}>Bắt đầu chơi</button>
       </form>
@@ -263,6 +312,8 @@ export function DeepTalkSetup({ user }: { user: User }) {
 
     const revealed = deck.progress.openedPositions.includes(deck.current.position);
     const answerers = deck.players.filter(({ id }) => deck.progress.answererUserIds.includes(id));
+    const readyByMe = deck.progress.readyUserIds.includes(user.id);
+    const skippedBy = deck.players.filter(({ id }) => deck.progress.skippedByUserIds.includes(id));
     return <section className="deep-talk-play" aria-labelledby="page-title">
       <header><p className="eyebrow">Deep Talk · lá {deck.current.position + 1}/20</p>
         <h1 id="page-title">{answerers.length === 2 ? "Cả hai cùng trả lời" : `Lượt của ${answerers[0]?.name ?? "hai đứa"}`}</h1></header>
@@ -271,9 +322,15 @@ export function DeepTalkSetup({ user }: { user: User }) {
         {revealed ? <span>{deck.current.card.question}</span> : <><b aria-hidden="true">♡</b><span>Chạm để lật</span></>}
       </button>
       <div className="deep-talk-play__primary">
-        {revealed && <button type="button" disabled={pending} onClick={() => void play("next")}>Tiếp tục</button>}
-        <button type="button" className="secondary-button" disabled={pending} onClick={() => void play("skip")}>Bỏ qua</button>
+        {revealed && (deck.progress.playMode === "two"
+          ? <button type="button" disabled={pending || readyByMe} onClick={() => void play("ready")}>{readyByMe ? "Đã sẵn sàng · chờ người kia" : "Tôi đã sẵn sàng"}</button>
+          : <button type="button" disabled={pending} onClick={() => void play("next")}>Tiếp tục</button>)}
+        <button type="button" className="secondary-button" disabled={pending || deck.progress.skippedByUserIds.includes(user.id)} onClick={() => void play("skip")}>Bỏ qua</button>
       </div>
+      {deck.progress.playMode === "two" && (deck.progress.readyUserIds.length > 0 || skippedBy.length > 0) && <div className="deep-talk-sync" role="status" aria-live="polite">
+        {skippedBy.length > 0 && <span>{skippedBy.map(({ name }) => name).join(" và ")} đã chọn bỏ qua.</span>}
+        <span>{deck.progress.readyUserIds.length}/2 người đã sẵn sàng sang lá tiếp theo.</span>
+      </div>}
       <div className="deep-talk-play__choices">
         <button type="button" disabled={pending || answerers.length === 2} onClick={() => void play("both")}>Cả hai cùng trả lời</button>
         <button type="button" disabled={pending} onClick={() => void play("switch")}>Đổi người</button>
@@ -281,7 +338,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
           if (window.confirm("Kết thúc phiên Deep Talk tại đây?")) void play("end");
         }}>Kết thúc phiên</button>
       </div>
-      <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error}</div>
+      <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
     </section>;
   }
 
