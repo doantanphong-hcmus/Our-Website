@@ -2,6 +2,7 @@ import { authenticatedUser } from "./auth";
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import foodCatalog from "../../../content/food.v1.json";
 import { buildDeepTalkDeck } from "./deep-talk-generation";
+import { getDeepTalkFallback } from "./deep-talk-fallback";
 import type { DeepTalkAiBinding } from "./deep-talk-ai";
 import { fingerprintDeepTalkQuestion } from "./deep-talk-similarity";
 import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
@@ -654,8 +655,10 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   const input = await body(request);
   const expectedVersion = input?.expectedVersion;
   const idempotencyKey = input?.idempotencyKey;
+  const source = input?.source ?? "ai";
   if (!Number.isInteger(expectedVersion) || Number(expectedVersion) < 1
-    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)
+    || !["ai", "fallback"].includes(String(source))) {
     return json({ error: "Lệnh tạo bộ Deep Talk không hợp lệ." }, 400);
   }
 
@@ -683,7 +686,7 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   const quota = await env.DB.prepare(`SELECT count(*) AS total FROM deep_talk_decks
     WHERE couple_space_id = ? AND generation_day = ?`).bind(spaceId, generationDay).first<{ total: number }>();
   if (Number(quota?.total ?? 0) >= 3) return json({ error: "Hôm nay hai bạn đã tạo đủ 3 bộ Deep Talk." }, 429);
-  if (!env.AI?.run) return json({ error: "Workers AI chưa được cấu hình." }, 503);
+  if (source === "ai" && !env.AI?.run) return json({ error: "Workers AI chưa được cấu hình." }, 503);
 
   const conditions = deepTalkConditions((JSON.parse(current.payload_json) as { conditions?: unknown }).conditions);
   if (!conditions) return json({ error: "Thiết lập Deep Talk không hợp lệ." }, 500);
@@ -693,7 +696,7 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   let generated: DeepTalkDeck;
   try {
-    generated = await buildDeepTalkDeck(env.AI, {
+    generated = source === "fallback" ? getDeepTalkFallback(seed) : await buildDeepTalkDeck(env.AI!, {
       level: conditions.level as "gentle" | "understand" | "deep" | "mixed",
       allowedSensitiveTopics: deepTalkTopicIds.filter((id) => conditions.sensitiveTopics[id] === "allow"),
       seed,

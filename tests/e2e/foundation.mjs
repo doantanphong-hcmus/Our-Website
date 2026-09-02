@@ -203,6 +203,9 @@ try {
   let deepRevision = 1;
   const deepConfirmed = new Set();
   const deepCommands = [];
+  const deepDeckSources = [];
+  let releaseDeepAi;
+  const deepAiPending = new Promise((resolve) => { releaseDeepAi = resolve; });
   const deepRoute = (userId) => async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -220,6 +223,17 @@ try {
       eventVersion: deepSession?.version ?? 0, sessions: deepSession ? [deepSession] : [],
     }) });
     deepCommands.push({ pathname, body });
+    if (pathname.endsWith("/deep-talk-deck")) {
+      deepDeckSources.push(body.source);
+      if (body.source === "ai") {
+        await deepAiPending;
+        return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "AI phản hồi muộn." }) });
+      }
+      deepSession = { ...deepSession, version: deepSession.version + 1 };
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        session: deepSession, deck: { id: "fallback-deck", sessionId: deepSession.id, cardCount: 20, createdAt: 1 },
+      }) });
+    }
     if (pathname === "/api/sessions") {
       deepSession = { id: foodSessionId, feature: "deep_talk", status: "pending", createdByUserId: phong.id,
         version: 1, conditions: body.conditions };
@@ -271,6 +285,21 @@ try {
   assert.equal(deepCommands.filter(({ body }) => body.action === "confirm").length, 2);
   await assertA11y(nhiPage);
 
+  await nhiPage.clock.install();
+  await nhiPage.getByRole("button", { name: "Tạo bộ 20 lá" }).click();
+  await nhiPage.getByRole("heading", { name: "Đang chuẩn bị 20 lá cho hai đứa" }).waitFor();
+  await nhiPage.getByText("Đang xếp nhịp mở lòng cho hai đứa…").waitFor();
+  await nhiPage.clock.fastForward(30_000);
+  await nhiPage.getByRole("button", { name: "Dùng bộ an toàn có sẵn" }).click();
+  await nhiPage.getByRole("heading", { name: "Bộ bài đã sẵn sàng" }).waitFor();
+  assert.deepEqual(deepDeckSources, ["ai", "fallback"]);
+  assert.deepEqual(deepCommands.at(-1).body, {
+    expectedVersion: 4, idempotencyKey: deepCommands.at(-1).body.idempotencyKey, source: "fallback",
+  });
+  assert.match(deepCommands.at(-1).body.idempotencyKey, /^[0-9a-f-]{36}$/);
+  await assertA11y(nhiPage);
+  releaseDeepAi();
+
   await phongPage.goto(server.url);
   const restore = await network.fail(phongPage, "**/api/sessions");
   await phongPage.reload();
@@ -278,7 +307,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.2 E2E: food flows and two-device Deep Talk consent = OK");
+  console.log("P1.14/P2.1/P3.2-P4.9 E2E: food flows, Deep Talk consent and 30-second fallback UI = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

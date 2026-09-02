@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import { queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 import { ErrorState, LoadingState } from "./uiStates";
@@ -49,14 +49,60 @@ function TopicChoices({ topics, change }: { topics: Record<string, TopicState>; 
   </div>;
 }
 
+const waitingCopy = [
+  "Đang xếp nhịp mở lòng cho hai đứa…",
+  "Đang kiểm tra để các câu không lặp ý…",
+  "Đang giữ đúng những chủ đề cả hai đã đồng ý…",
+  "Sắp đủ 20 lá rồi, nội dung vẫn được giữ kín.",
+];
+
+function DeepTalkWaiting({ offerNow, switching, useFallback }: {
+  offerNow: boolean; switching: boolean; useFallback: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [fallbackAvailable, setFallbackAvailable] = useState(offerNow);
+
+  useEffect(() => {
+    if (offerNow) setFallbackAvailable(true);
+  }, [offerNow]);
+
+  useEffect(() => {
+    const copyTimer = window.setInterval(() => setStep((value) => (value + 1) % waitingCopy.length), 6_000);
+    const fallbackTimer = window.setTimeout(() => setFallbackAvailable(true), 30_000);
+    return () => {
+      window.clearInterval(copyTimer);
+      window.clearTimeout(fallbackTimer);
+    };
+  }, []);
+
+  return <section className="blind-bag-form food-setup deep-talk-waiting" aria-labelledby="page-title" aria-busy="true">
+    <p className="eyebrow">Deep Talk · tạo bộ bài</p>
+    <h1 id="page-title">{switching ? "Đang mở bộ an toàn có sẵn" : "Đang chuẩn bị 20 lá cho hai đứa"}</h1>
+    <div className="deep-talk-card-stack" aria-hidden="true">
+      <span /><span /><span><b>?</b></span>
+    </div>
+    <p className="deep-talk-waiting__copy" role="status" aria-live="polite">
+      {switching ? "Chỉ còn một chút nữa thôi…" : waitingCopy[step]}
+    </p>
+    {fallbackAvailable && <div className="deep-talk-fallback">
+      <strong>Không cần chờ thêm đâu.</strong>
+      <p>Hai đứa có thể dùng ngay bộ 20 lá đã được kiểm tra sẵn, vẫn đúng các nguyên tắc an toàn.</p>
+      <button type="button" disabled={switching} onClick={useFallback}>{switching ? "Đang chuyển…" : "Dùng bộ an toàn có sẵn"}</button>
+    </div>}
+  </section>;
+}
+
 export function DeepTalkSetup({ user }: { user: User }) {
   const [session, setSession] = useState<Session | null>(null);
   const [consent, setConsent] = useState<Consent | null>(null);
   const [topics, setTopics] = useState(emptyTopics);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [generation, setGeneration] = useState<"idle" | "waiting" | "fallback" | "ready">("idle");
+  const [offerFallback, setOfferFallback] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const generationRequest = useRef(0);
 
   async function load() {
     setLoading(true);
@@ -111,8 +157,52 @@ export function DeepTalkSetup({ user }: { user: User }) {
     } }, "Đã gửi thiết lập để người kia xem lại.");
   }
 
+  async function generateDeck(source: "ai" | "fallback") {
+    if (!session) return;
+    const requestId = ++generationRequest.current;
+    setGeneration(source === "fallback" ? "fallback" : "waiting");
+    if (source === "ai") setOfferFallback(false);
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/deep-talk-deck`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedVersion: session.version, idempotencyKey: crypto.randomUUID(), source }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "Chưa tạo được bộ Deep Talk."));
+      const payload = await response.json() as { session?: Session };
+      if (requestId !== generationRequest.current) return;
+      if (payload.session) setSession(payload.session);
+      setGeneration("ready");
+    } catch (reason) {
+      if (requestId !== generationRequest.current) return;
+      setError(reason instanceof Error ? reason.message : "Chưa tạo được bộ Deep Talk.");
+      setOfferFallback(true);
+      setGeneration("waiting");
+    }
+  }
+
   if (loading) return <LoadingState label="Đang tải thiết lập Deep Talk…" />;
   if (error && !session) return <ErrorState title="Chưa mở được Deep Talk" retry={() => void load()}>{error}</ErrorState>;
+
+  if (session && consent?.stage === "ready" && (generation === "waiting" || generation === "fallback")) {
+    return <>
+      <DeepTalkWaiting offerNow={offerFallback} switching={generation === "fallback"} useFallback={() => void generateDeck("fallback")} />
+      {error && <div className="settings-feedback deep-talk-generation-error" role="alert">{error}</div>}
+    </>;
+  }
+
+  if (session && consent?.stage === "ready" && generation === "ready") {
+    return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
+      <p className="eyebrow">Deep Talk · sẵn sàng</p>
+      <div className="deep-talk-ready__mark" aria-hidden="true">20</div>
+      <h1 id="page-title">Bộ bài đã sẵn sàng</h1>
+      <p>Đủ 20 lá, đúng thiết lập hai đứa vừa thống nhất. Nội dung từng lá vẫn được giữ kín cho đến lúc chơi.</p>
+      <div className="settings-feedback" role="status" aria-live="polite">Có thể bắt đầu trải nghiệm chơi ở bước tiếp theo.</div>
+    </section>;
+  }
 
   if (session && consent) {
     const ownsSession = session.createdByUserId === user.id;
@@ -135,6 +225,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
         {session.status === "pending" && ownsSession && <button type="button" className="secondary-button" disabled={pending} onClick={() => void command(`/api/sessions/${session.id}/cancel`, {
           expectedVersion: session.version,
         }, "Đã hủy thiết lập.")}>Hủy thiết lập</button>}
+        {consent.stage === "ready" && <button type="button" disabled={pending} onClick={() => void generateDeck("ai")}>Tạo bộ 20 lá</button>}
       </div>
       <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
     </section>;

@@ -58,7 +58,7 @@ wranglerCommand(["d1", "execute", ...local, "--command", `
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,result_json,completed_at,updated_at)
   VALUES ('00000000-0000-4000-8000-000000000002','couple-main','food_vote','completed','user-phong','recent-food-pool','{"dishPool":["xoi-man"],"foodFinal":{"dishId":"xoi-man","foodStyle":"snack","mode":"dish","source":"match","accepted":true}}',unixepoch(),unixepoch());`]);
 
-for (let index = 1; index <= 3; index++) {
+for (let index = 1; index <= 2; index++) {
   const sessionId = `00000000-0000-4000-8000-00000000010${index}`;
   wranglerCommand(["d1", "execute", ...local, "--command", `
     INSERT INTO activity_sessions
@@ -352,9 +352,19 @@ try {
   assert.equal(ready.data.session.status, "active");
   assert.equal(ready.data.consent.stage, "ready");
   assert.equal(ready.data.consent.conditions.sensitiveTopics.gia_dinh, "deny");
+  const fallbackDeck = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong, "POST", {
+    expectedVersion: 4, idempotencyKey: "fallback-deep-001", source: "fallback",
+  });
+  assert.equal(fallbackDeck.response.status, 201);
+  assert.equal(fallbackDeck.data.deck.cardCount, 20);
+  assert.doesNotMatch(JSON.stringify(fallbackDeck.data), /seed|cards|question/i);
+  const replayedFallback = await request(`/api/sessions/${concurrentId}/deep-talk-deck`, phong, "POST", {
+    expectedVersion: 4, idempotencyKey: "fallback-deep-001", source: "fallback",
+  });
+  assert.equal(replayedFallback.data.duplicate, true);
   const competing = await Promise.all([
-    act(phong, concurrentId, "cancel", 4, "cancel-deep-001"),
-    act(nhi, concurrentId, "complete", 4, "complete-deep-1"),
+    act(phong, concurrentId, "cancel", 5, "cancel-deep-001"),
+    act(nhi, concurrentId, "complete", 5, "complete-deep-1"),
   ]);
   assert.deepEqual(competing.map((item) => item.response.status).sort(), [200, 409]);
 
@@ -369,7 +379,7 @@ try {
   });
   assert.equal(quotaResult.response.status, 429);
 
-  console.log("P1.9/P3.2-P4.7 sessions: food safety, Deep Talk consent, deck idempotency and quota = OK");
+  console.log("P1.9/P3.2-P4.9 sessions: food safety, Deep Talk consent, AI/fallback deck idempotency and quota = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
