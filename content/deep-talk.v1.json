@@ -80,7 +80,8 @@
     { "id": "therapy", "action": "block", "patterns": ["trị liệu", "nhà trị liệu", "bác sĩ tâm lý"] },
     { "id": "llm_brand", "action": "block", "patterns": ["ChatGPT|OpenAI|Claude|Gemini|Llama|Cloudflare"] },
     { "id": "advertising", "action": "block", "patterns": ["quảng cáo|mã giảm giá|tài trợ bởi"] },
-    { "id": "gender_assumption", "action": "block", "patterns": ["anh ấy|cô ấy"] }
+    { "id": "gender_assumption", "action": "block", "patterns": ["anh ấy|cô ấy"] },
+    { "id": "prompt_injection", "action": "block", "patterns": ["(?:bỏ qua|phớt lờ).*(?:chỉ dẫn|hướng dẫn).*(?:trước|ở trên)", "(?:system|assistant|developer)\\s*:"] }
   ],
   "cardSchema": {
     "type": "object",
