@@ -210,7 +210,7 @@ try {
     "Hai đứa muốn cùng thử điều gì trong thời gian tới?",
   ];
   let deepDeckReady = false;
-  let deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
+  let deepProgress = { started: false, startedAt: null, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
     playMode: "one", answererUserIds: [], readyUserIds: [], skippedByUserIds: [] };
   let releaseDeepAi;
   const deepAiPending = new Promise((resolve) => { releaseDeepAi = resolve; });
@@ -246,7 +246,8 @@ try {
     deepCommands.push({ pathname, body });
     if (pathname.endsWith("/deep-talk-play")) {
       const ids = [phong.id, nhi.id];
-      if (body.action === "start") deepProgress = { ...deepProgress, started: true, turnMode: body.turnMode, playMode: body.playMode, answererUserIds: [body.starterUserId] };
+      if (body.action === "start") deepProgress = { ...deepProgress, started: true, startedAt: 1_750_000_000,
+        turnMode: body.turnMode, playMode: body.playMode, answererUserIds: [body.starterUserId] };
       if (body.action === "reveal") deepProgress = { ...deepProgress, openedPositions: [...deepProgress.openedPositions, deepProgress.currentPosition] };
       if (body.action === "both") deepProgress = { ...deepProgress, answererUserIds: ids };
       if (body.action === "switch") deepProgress = { ...deepProgress, answererUserIds: [ids.find((id) => id !== deepProgress.answererUserIds[0])] };
@@ -267,7 +268,8 @@ try {
         deepProgress = { ...deepProgress, readyUserIds: [...deepProgress.readyUserIds, userId] };
         if (deepProgress.readyUserIds.length === 2) advance();
       }
-      deepSession = { ...deepSession, version: deepSession.version + 1, status: body.action === "end" ? "completed" : "active" };
+      deepSession = { ...deepSession, version: deepSession.version + 1, status: body.action === "end" ? "completed" : "active",
+        completedAt: body.action === "end" ? 1_750_000_300 : null };
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ session: deepSession, ...deckView() }) });
     }
     if (pathname.endsWith("/deep-talk-deck")) {
@@ -284,7 +286,7 @@ try {
     }
     if (pathname === "/api/sessions") {
       deepSession = { id: foodSessionId, feature: "deep_talk", status: "pending", createdByUserId: phong.id,
-        version: 1, conditions: body.conditions };
+        version: 1, createdAt: 1_750_000_000, completedAt: null, conditions: body.conditions };
       return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: deepSession }) });
     }
     if (body.action === "review") {
@@ -374,9 +376,16 @@ try {
   nhiPage.once("dialog", (dialog) => dialog.accept());
   await nhiPage.getByRole("button", { name: "Kết thúc phiên" }).click();
   await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
+  await nhiPage.reload();
+  await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
+  assert.match(await nhiPage.locator(".deep-talk-summary").textContent(), /Đã chơi1 lá.*Đã bỏ qua1 lá.*Bắt đầu.*Kết thúc/s);
+  await nhiPage.getByText("Xem lại câu hỏi đã mở", { exact: true }).click();
+  await nhiPage.getByText(deepQuestions[0]).waitFor();
+  assert.equal(await nhiPage.getByText(deepQuestions[1]).count(), 0, "review must not render skipped or unopened questions");
+  await assertA11y(nhiPage);
 
   deepSession = { ...deepSession, status: "active", version: 1 };
-  deepProgress = { started: false, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
+  deepProgress = { started: false, startedAt: null, currentPosition: 0, openedPositions: [], skippedPositions: [], turnMode: null,
     playMode: "one", answererUserIds: [], readyUserIds: [], skippedByUserIds: [] };
   await nhiPage.reload();
   await nhiPage.getByLabel("Thiết bị chơi").selectOption("two");
@@ -404,7 +413,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.13 E2E: private payload, tap/swipe flip, haptic and reduced motion = OK");
+  console.log("P1.14/P2.1/P3.2-P4.14 E2E: resume, completion summary and private review = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

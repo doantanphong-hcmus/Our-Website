@@ -6,14 +6,16 @@ import type { User } from "./user";
 
 type TopicState = "unset" | "allow" | "deny";
 type Conditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
-type Session = { id: string; status: "pending" | "active" | "completed"; createdByUserId: string; version: number; conditions: Conditions };
+type Session = { id: string; status: "pending" | "active" | "completed"; createdByUserId: string; version: number; conditions: Conditions;
+  createdAt?: number; completedAt?: number | null };
 type Consent = { stage: "partner_review" | "final_confirmation" | "ready"; revision: number; confirmedByMe: boolean; conditions: Conditions };
 type Player = { id: string; name: string; color: string };
 type DeckView = {
   players: Player[];
-  progress: { started: boolean; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null;
+  progress: { started: boolean; startedAt: number | null; currentPosition: number; openedPositions: number[]; skippedPositions: number[]; turnMode: "alternate" | "manual" | null;
     playMode: "one" | "two"; answererUserIds: string[]; readyUserIds: string[]; skippedByUserIds: string[] };
   current: { position: number; card?: { question: string } };
+  opened: Array<{ position: number; card: { question: string } }>;
 };
 
 const levels = {
@@ -24,11 +26,17 @@ const emptyTopics = () => Object.fromEntries(deepTalkSpec.sensitiveTopics.map(({
 
 function sessionFrom(payload: unknown): Session | null {
   if (!payload || typeof payload !== "object" || !("sessions" in payload) || !Array.isArray(payload.sessions)) return null;
-  const session = payload.sessions.find((item) => item && typeof item === "object" && "feature" in item && item.feature === "deep_talk") as Record<string, unknown> | undefined;
-  if (!session || typeof session.id !== "string" || !["pending", "active"].includes(String(session.status))
+  const deepTalk = payload.sessions.filter((item) => item && typeof item === "object" && "feature" in item && item.feature === "deep_talk") as Record<string, unknown>[];
+  const session = deepTalk.find(({ status }) => ["pending", "active"].includes(String(status)))
+    ?? deepTalk.find(({ status }) => status === "completed");
+  if (!session || typeof session.id !== "string" || !["pending", "active", "completed"].includes(String(session.status))
     || typeof session.createdByUserId !== "string" || !Number.isInteger(session.version)
     || !session.conditions || typeof session.conditions !== "object") return null;
   return session as unknown as Session;
+}
+
+function dateTime(value?: number | null) {
+  return value ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(value * 1_000) : "—";
 }
 
 async function responseError(response: Response, fallback: string) {
@@ -136,6 +144,11 @@ export function DeepTalkSetup({ user }: { user: User }) {
       const found = sessionFrom(await response.json());
       setSession(found);
       if (!found) return setConsent(null);
+      if (found.status === "completed") {
+        setConsent(null);
+        await loadDeck(found);
+        return;
+      }
       const consentResponse = await fetch(`/api/sessions/${found.id}/deep-talk-consent`, { credentials: "same-origin" });
       if (!consentResponse.ok) throw new Error(await responseError(consentResponse, "Không tải được xác nhận Deep Talk."));
       const data = await consentResponse.json() as { consent: Consent };
@@ -284,12 +297,22 @@ export function DeepTalkSetup({ user }: { user: User }) {
     </>;
   }
 
-  if (session && consent?.stage === "ready" && generation === "ready" && deck) {
+  if (session && (session.status === "completed" || consent?.stage === "ready") && generation === "ready" && deck) {
     if (session.status === "completed") return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
       <p className="eyebrow">Deep Talk · đã khép lại</p>
       <div className="deep-talk-ready__mark" aria-hidden="true">♡</div>
       <h1 id="page-title">Cảm ơn hai đứa đã lắng nghe nhau</h1>
       <p>Phiên đã kết thúc. Hai đứa không cần phải chơi hết 20 lá.</p>
+      <dl className="deep-talk-summary">
+        <div><dt>Đã chơi</dt><dd>{deck.progress.openedPositions.length} lá</dd></div>
+        <div><dt>Đã bỏ qua</dt><dd>{deck.progress.skippedPositions.length} lá</dd></div>
+        <div><dt>Bắt đầu</dt><dd>{dateTime(deck.progress.startedAt ?? session.createdAt)}</dd></div>
+        <div><dt>Kết thúc</dt><dd>{dateTime(session.completedAt)}</dd></div>
+      </dl>
+      {deck.opened.length > 0 && <details className="deep-talk-review">
+        <summary>Xem lại câu hỏi đã mở</summary>
+        <ol>{deck.opened.map(({ position, card }) => <li key={position}>{card.question}</li>)}</ol>
+      </details>}
     </section>;
 
     if (!deck.progress.started) return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
