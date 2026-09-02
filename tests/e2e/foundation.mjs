@@ -413,7 +413,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.14 E2E: resume, completion summary and private review = OK");
+  console.log("P1.14/P2.1/P3.2-P4.15 E2E: Deep Talk consent, fallback, two-device play and private review = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DeepTalkShuffleError, shuffleDeepTalkDeck } from "../../apps/worker/src/deep-talk-shuffle";
-import type { DeepTalkDeck } from "../../apps/worker/src/deep-talk-validator";
+import { validateDeepTalkDeck, type DeepTalkDeck } from "../../apps/worker/src/deep-talk-validator";
 import safeDeck from "../../content/deep-talk-fallback.v1.json";
 
 const questions = (deck: DeepTalkDeck) => deck.cards.map(({ question }) => question);
@@ -15,6 +15,7 @@ describe("Deep Talk controlled shuffle", () => {
     const original = [...questions(safeDeck)].sort();
     for (let seed = 0; seed < 200; seed++) {
       const cards = shuffleDeepTalkDeck(safeDeck, seed).cards;
+      expect(validateDeepTalkDeck({ cards })).toEqual({ cards });
       expect([...cards.map(({ question }) => question)].sort()).toEqual(original);
       expect(cards.slice(0, 3).every(({ severity }) => severity === "light")).toBe(true);
       expect(cards.slice(0, 6).every(({ severity }) => severity !== "heavy")).toBe(true);

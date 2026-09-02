@@ -476,8 +476,11 @@ try {
     expectedVersion: 2, idempotencyKey: "generate-deep-quota1",
   });
   assert.equal(quotaResult.response.status, 429);
+  assert.equal(quotaResult.data.error, "Hôm nay hai bạn đã tạo đủ 3 bộ Deep Talk.");
+  assert.equal((await request(`/api/sessions/${quotaId}/deep-talk-deck`, phong)).response.status, 404,
+    "quota exhaustion must fail closed without storing a deck");
 
-  console.log("P1.9/P3.2-P4.14 sessions: Deep Talk resume, completion review and idempotency = OK");
+  console.log("P1.9/P3.2-P4.15 sessions: Deep Talk privacy, idempotency and quota fail-closed = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
