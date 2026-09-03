@@ -569,7 +569,7 @@ main {
 
 .activity-cards a {
   display: grid;
-  grid-template-columns: 3rem 1fr;
+  grid-template-columns: 4.25rem 1fr;
   align-items: center;
   gap: 0 var(--space-3);
   min-block-size: 4.75rem;
@@ -584,15 +584,19 @@ main {
 .activity-cards a > span {
   display: grid;
   place-items: center;
-  inline-size: 3rem;
-  block-size: 3rem;
+  inline-size: 4.25rem;
+  block-size: 4.25rem;
   border-radius: var(--radius-medium);
   background: var(--color-shared-soft);
   color: var(--color-shared);
   font-size: 1.45rem;
 }
 
-.activity-cards svg { inline-size: 1.65rem; }
+.activity-cards img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
 .today-card small { color: var(--color-text-muted); }
 
 .home-section h2 {

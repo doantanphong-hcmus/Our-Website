@@ -92,9 +92,9 @@ type ActivitySession = {
 };
 
 const activities = {
-  blind_bag: { label: "Xé Túi Mù", path: "/di-dau/xe-tui-mu", icon: "sparkle" },
-  food_vote: { label: "Hôm Nay Ăn Gì", path: "/an-gi", icon: "food" },
-  deep_talk: { label: "Deep Talk", path: "/deep-talk", icon: "heart" },
+  blind_bag: { label: "Xé Túi Mù", path: "/di-dau/xe-tui-mu", icon: "sparkle", image: "/activity-blind-bag.png" },
+  food_vote: { label: "Hôm Nay Ăn Gì", path: "/an-gi", icon: "food", image: "/activity-food.png" },
+  deep_talk: { label: "Deep Talk", path: "/deep-talk", icon: "heart", image: "/activity-deep-talk.png" },
 } as const;
 
 function sessionsFrom(payload: unknown): ActivitySession[] {
@@ -170,7 +170,7 @@ function Home({ user }: { user: User }) {
       <nav className="activity-cards" aria-label="Hoạt động chính">
         {Object.values(activities).map((activity) => (
           <AppLink key={activity.path} path={activity.path}>
-            <span><Icon name={activity.icon} /></span>
+            <span><img src={activity.image} alt="" /></span>
             <strong>{activity.label}</strong>
           </AppLink>
         ))}
