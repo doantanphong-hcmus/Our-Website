@@ -23,6 +23,7 @@ const levels = {
 };
 const durations = { "15": "15 phút", "30": "30 phút", "60": "60 phút", unlimited: "Không giới hạn" };
 const emptyTopics = () => Object.fromEntries(deepTalkSpec.sensitiveTopics.map(({ id }) => [id, "unset"])) as Record<string, TopicState>;
+const visibleTopics = deepTalkSpec.sensitiveTopics.filter(({ id }) => id !== "nguoi_yeu_cu");
 
 function sessionFrom(payload: unknown): Session | null {
   if (!payload || typeof payload !== "object" || !("sessions" in payload) || !Array.isArray(payload.sessions)) return null;
@@ -48,13 +49,13 @@ function Summary({ conditions }: { conditions: Conditions }) {
   return <dl className="food-summary">
     <div><dt>Mức độ</dt><dd>{levels[conditions.level as keyof typeof levels]}</dd></div>
     <div><dt>Thời lượng gợi ý</dt><dd>{durations[conditions.duration as keyof typeof durations]}</dd></div>
-    {deepTalkSpec.sensitiveTopics.map((topic) => <div key={topic.id}><dt>{topic.label}</dt><dd>{deepTalkSpec.consentStates.find(({ id }) => id === conditions.sensitiveTopics[topic.id])?.label}</dd></div>)}
+    {visibleTopics.map((topic) => <div key={topic.id}><dt>{topic.label}</dt><dd>{deepTalkSpec.consentStates.find(({ id }) => id === conditions.sensitiveTopics[topic.id])?.label}</dd></div>)}
   </dl>;
 }
 
 function TopicChoices({ topics, change }: { topics: Record<string, TopicState>; change: (id: string, state: TopicState) => void }) {
   return <div className="deep-talk-topics">
-    {deepTalkSpec.sensitiveTopics.map((topic) => <fieldset key={topic.id}>
+    {visibleTopics.map((topic) => <fieldset key={topic.id}>
       <legend>{topic.label}</legend>
       {deepTalkSpec.consentStates.map((state) => <label key={state.id}>
         <input type="radio" name={topic.id} value={state.id} checked={topics[topic.id] === state.id} onChange={() => change(topic.id, state.id as TopicState)} />
@@ -415,7 +416,6 @@ export function DeepTalkSetup({ user }: { user: User }) {
   return <section className="blind-bag-form food-setup" aria-labelledby="page-title">
     <p className="eyebrow">Deep Talk</p>
     <h1 id="page-title">Hai đứa muốn trò chuyện đến đâu?</h1>
-    <p>Bộ luôn có đúng 20 lá. Thời lượng chỉ gợi ý số lá nên chơi, còn chủ đề nhạy cảm chỉ xuất hiện khi cả hai cùng đồng ý.</p>
     <form onSubmit={create} aria-busy={pending}>
       <label>Mức độ
         <select name="level" defaultValue="understand">
@@ -428,7 +428,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
         </select>
       </label>
       <TopicChoices topics={topics} change={(id, state) => setTopics((value) => ({ ...value, [id]: state }))} />
-      <p className="blind-bag-form__safety">“Không đồng ý” luôn loại tuyệt đối chủ đề đó. Câu trả lời của hai đứa không được thu thập hay gửi cho AI.</p>
+      <p className="blind-bag-form__safety">Không thoải mái thì cứ chọn “Không đồng ý” — cuộc trò chuyện này luôn tôn trọng cả hai.</p>
       <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
       <button type="submit" disabled={pending}>{pending ? "Đang gửi…" : "Gửi người kia xem lại"}</button>
     </form>

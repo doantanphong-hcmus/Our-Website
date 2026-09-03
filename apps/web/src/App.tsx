@@ -11,23 +11,37 @@ type Route = {
   label: string;
   eyebrow: string;
   description: string;
-  icon: string;
+  icon: IconName;
 };
 
+type IconName = "home" | "compass" | "food" | "heart" | "calendar" | "sparkle" | "user" | "lock";
+
+function Icon({ name }: { name: IconName }) {
+  const paths = {
+    home: <><path d="m3 11 9-7 9 7"/><path d="M5 10v10h14V10M9 20v-6h6v6"/></>,
+    compass: <><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></>,
+    food: <><path d="M5 13h14c0 4-3 7-7 7s-7-3-7-7Z"/><path d="M8 10c-2-2 2-3 0-5M12 10c-2-2 2-3 0-5M16 10c-2-2 2-3 0-5"/></>,
+    heart: <path d="M20.8 5.7c-2-2-5.2-2-7.2 0L12 7.3l-1.6-1.6a5.1 5.1 0 0 0-7.2 7.2L12 21l8.8-8.1a5.1 5.1 0 0 0 0-7.2Z"/>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></>,
+    sparkle: <><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z"/><path d="m18 15 .8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8L18 15Z"/></>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4.2 3.5-6 8-6s7.2 1.8 8 6"/></>,
+    lock: <><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+}
+
 const bottomRoutes: Route[] = [
-  { path: "/", label: "Trang chủ", eyebrow: "Chào hai đứa", description: "Một góc nhỏ để bắt đầu điều gì đó cùng nhau.", icon: "⌂" },
-  { path: "/di-dau", label: "Đi đâu", eyebrow: "Cùng ra ngoài", description: "Chọn ngẫu nhiên hoặc xem lại những nơi mình đã lưu.", icon: "⌖" },
-  { path: "/an-gi", label: "Ăn gì", eyebrow: "Một món cho hôm nay", description: "Để việc chọn món nhẹ nhàng hơn một chút.", icon: "♨" },
-  { path: "/deep-talk", label: "Deep Talk", eyebrow: "Chuyện của hai đứa", description: "Một khoảng yên để nghe và hiểu nhau hơn.", icon: "♡" },
-  { path: "/lich", label: "Lịch", eyebrow: "Những ngày của mình", description: "Giữ các dịp quan trọng ở cùng một nơi.", icon: "□" },
+  { path: "/", label: "Trang chủ", eyebrow: "Chào hai đứa", description: "Một góc nhỏ để bắt đầu điều gì đó cùng nhau.", icon: "home" },
+  { path: "/di-dau", label: "Đi đâu", eyebrow: "Cùng ra ngoài", description: "", icon: "compass" },
+  { path: "/an-gi", label: "Ăn gì", eyebrow: "Một món cho hôm nay", description: "Để việc chọn món nhẹ nhàng hơn một chút.", icon: "food" },
+  { path: "/deep-talk", label: "Deep Talk", eyebrow: "Chuyện của hai đứa", description: "Một khoảng yên để nghe và hiểu nhau hơn.", icon: "heart" },
+  { path: "/lich", label: "Lịch", eyebrow: "Những ngày của mình", description: "Giữ các dịp quan trọng ở cùng một nơi.", icon: "calendar" },
 ];
 
 const extraRoutes: Route[] = [
-  { path: "/di-dau/xe-tui-mu", label: "Xé Túi Mù", eyebrow: "Đi đâu", description: "Mở một gợi ý bất ngờ cho buổi hẹn tiếp theo.", icon: "◇" },
-  { path: "/di-dau/ban-do", label: "Bản đồ", eyebrow: "Đi đâu", description: "Nhìn lại những địa điểm của hai đứa trên bản đồ.", icon: "⌖" },
-  { path: "/di-dau/ho-chieu", label: "Hộ chiếu", eyebrow: "Đi đâu", description: "Lưu dấu những nơi cả hai đã cùng ghé qua.", icon: "▧" },
-  { path: "/tai-khoan", label: "Thông tin tài khoản", eyebrow: "Cá nhân", description: "Thông tin của tài khoản đang đăng nhập.", icon: "○" },
-  { path: "/doi-mat-khau", label: "Đổi mật khẩu", eyebrow: "Bảo mật", description: "Cập nhật mật khẩu cho tài khoản.", icon: "◇" },
+  { path: "/di-dau/xe-tui-mu", label: "Xé Túi Mù", eyebrow: "Đi đâu", description: "Mở một gợi ý bất ngờ cho buổi hẹn tiếp theo.", icon: "sparkle" },
+  { path: "/tai-khoan", label: "Thông tin tài khoản", eyebrow: "Cá nhân", description: "Thông tin của tài khoản đang đăng nhập.", icon: "user" },
+  { path: "/doi-mat-khau", label: "Đổi mật khẩu", eyebrow: "Bảo mật", description: "Cập nhật mật khẩu cho tài khoản.", icon: "lock" },
 ];
 
 function navigate(event: MouseEvent<HTMLAnchorElement>, path: string) {
@@ -78,9 +92,9 @@ type ActivitySession = {
 };
 
 const activities = {
-  blind_bag: { label: "Xé Túi Mù", description: "Để một nơi bất ngờ chọn hai đứa.", path: "/di-dau/xe-tui-mu", icon: "◇" },
-  food_vote: { label: "Hôm Nay Ăn Gì", description: "Không cần hỏi nhau thêm 30 phút nữa.", path: "/an-gi", icon: "♨" },
-  deep_talk: { label: "Deep Talk", description: "20 câu hỏi chưa ai được biết trước.", path: "/deep-talk", icon: "♡" },
+  blind_bag: { label: "Xé Túi Mù", path: "/di-dau/xe-tui-mu", icon: "sparkle" },
+  food_vote: { label: "Hôm Nay Ăn Gì", path: "/an-gi", icon: "food" },
+  deep_talk: { label: "Deep Talk", path: "/deep-talk", icon: "heart" },
 } as const;
 
 function sessionsFrom(payload: unknown): ActivitySession[] {
@@ -156,9 +170,8 @@ function Home({ user }: { user: User }) {
       <nav className="activity-cards" aria-label="Hoạt động chính">
         {Object.values(activities).map((activity) => (
           <AppLink key={activity.path} path={activity.path}>
-            <span aria-hidden="true">{activity.icon}</span>
+            <span><Icon name={activity.icon} /></span>
             <strong>{activity.label}</strong>
-            <small>{activity.description}</small>
           </AppLink>
         ))}
       </nav>
@@ -204,10 +217,6 @@ function Home({ user }: { user: User }) {
         <b aria-hidden="true">→</b>
       </AppLink>
 
-      <nav className="home-shortcuts" aria-label="Lối tắt">
-        <AppLink path="/di-dau/ban-do"><span aria-hidden="true">⌖</span><strong>Bản đồ</strong></AppLink>
-        <AppLink path="/di-dau/ho-chieu"><span aria-hidden="true">▧</span><strong>Hộ chiếu</strong></AppLink>
-      </nav>
     </section>
   );
 }
@@ -449,19 +458,16 @@ export function App({ user, onUserChange, onLogout }: {
           <FoodSessionSetup user={user} />
         ) : route?.path === "/deep-talk" ? (
           <DeepTalkSetup user={user} />
+        ) : route?.path === "/di-dau" ? (
+          <section className="route-card coming-soon" aria-labelledby="page-title">
+            <h1 id="page-title">Coming soon ... em bé hãy đợi anh</h1>
+          </section>
         ) : route ? (
           <section className="route-card" aria-labelledby="page-title">
-            <span className="route-card__icon" aria-hidden="true">{route.icon}</span>
+            <span className="route-card__icon"><Icon name={route.icon} /></span>
             <p className="eyebrow">{route.eyebrow}</p>
             <h1 id="page-title">{route.label}</h1>
             <p>{route.description}</p>
-            {route.path === "/di-dau" && (
-              <nav className="place-links" aria-label="Các mục Đi đâu">
-                <AppLink path="/di-dau/xe-tui-mu">Xé Túi Mù</AppLink>
-                <AppLink path="/di-dau/ban-do">Bản đồ</AppLink>
-                <AppLink path="/di-dau/ho-chieu">Hộ chiếu</AppLink>
-              </nav>
-            )}
           </section>
         ) : (
           <section className="route-card" aria-labelledby="page-title">
@@ -481,7 +487,7 @@ export function App({ user, onUserChange, onLogout }: {
             className={activeBottomPath === item.path ? "is-active" : undefined}
             aria-current={activeBottomPath === item.path ? "page" : undefined}
           >
-            <span className="bottom-nav__icon" aria-hidden="true">{item.icon}</span>
+            <span className="bottom-nav__icon"><Icon name={item.icon} /></span>
             <span>{item.label}</span>
             {activeBottomPath === item.path && <span className="sr-only">, trang hiện tại</span>}
           </AppLink>

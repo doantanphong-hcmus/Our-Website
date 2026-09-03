@@ -35,8 +35,9 @@ async function main() {
     assert.equal(await nav.getByRole("link").count(), 5);
     await nav.getByRole("link", { name: /Đi đâu/ }).click();
     assert.equal(new URL(page.url()).pathname, "/di-dau");
-    assert.equal(await page.getByRole("heading", { level: 1 }).textContent(), "Đi đâu");
+    assert.equal(await page.getByRole("heading", { level: 1 }).textContent(), "Coming soon ... em bé hãy đợi anh");
     assert.equal(await nav.getByRole("link", { name: /Đi đâu/ }).getAttribute("aria-current"), "page");
+    assert.equal(await nav.locator("svg").count(), 5);
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
 
     await page.locator("summary[aria-label='Mở menu tài khoản']").click();

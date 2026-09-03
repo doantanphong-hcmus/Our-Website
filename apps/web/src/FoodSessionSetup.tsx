@@ -354,7 +354,6 @@ export function FoodSessionSetup({ user }: { user: User }) {
     <section className="blind-bag-form food-setup" aria-labelledby="page-title">
       <p className="eyebrow">Hôm Nay Ăn Gì</p>
       <h1 id="page-title">Hôm nay mình muốn ăn kiểu nào?</h1>
-      <p>Chọn trường phái trước, sau đó thêm vài điều kiện cần thiết. Không có bước chọn quán.</p>
       <form onSubmit={submit} aria-busy={pending}>
         <fieldset className="food-style-options">
           <legend>Trường phái</legend>

@@ -575,7 +575,7 @@ main {
   grid-template-columns: 3rem 1fr;
   align-items: center;
   gap: 0 var(--space-3);
-  min-block-size: 5.5rem;
+  min-block-size: 4.75rem;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
@@ -585,7 +585,6 @@ main {
 }
 
 .activity-cards a > span {
-  grid-row: 1 / 3;
   display: grid;
   place-items: center;
   inline-size: 3rem;
@@ -596,10 +595,8 @@ main {
   font-size: 1.45rem;
 }
 
-.activity-cards small,
-.today-card small {
-  color: var(--color-text-muted);
-}
+.activity-cards svg { inline-size: 1.65rem; }
+.today-card small { color: var(--color-text-muted); }
 
 .home-section h2 {
   margin-block-end: var(--space-3);
@@ -714,29 +711,6 @@ main {
 
 .today-card strong {
   text-transform: capitalize;
-}
-
-.home-shortcuts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.home-shortcuts a {
-  display: grid;
-  justify-items: start;
-  gap: var(--space-2);
-  min-block-size: 6rem;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-large);
-  background: var(--color-surface);
-  text-decoration: none;
-}
-
-.home-shortcuts span {
-  color: var(--color-shared);
-  font-size: 1.4rem;
 }
 
 .route-card {
@@ -1376,6 +1350,14 @@ main {
   font-size: 2rem;
 }
 
+.route-card__icon svg { inline-size: 2rem; }
+
+.coming-soon {
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
 .eyebrow {
   margin-block-end: var(--space-2);
   color: var(--color-shared);
@@ -1394,13 +1376,6 @@ main {
   color: var(--color-text-muted);
 }
 
-.place-links {
-  display: grid;
-  gap: var(--space-2);
-  margin-block-start: var(--space-6);
-}
-
-.place-links a,
 .primary-link {
   display: flex;
   align-items: center;
@@ -1457,9 +1432,13 @@ main {
 }
 
 .bottom-nav__icon {
+  display: grid;
+  place-items: center;
   font-size: 1.2rem;
   line-height: 1;
 }
+
+.bottom-nav__icon svg { inline-size: 1.35rem; }
 
 @media (min-width: 31rem) {
   .app-shell {

@@ -41,6 +41,7 @@ try {
   await phongPage.getByRole("link", { name: "Ăn gì", exact: true }).click();
   await phongPage.getByRole("heading", { name: "Hôm nay mình muốn ăn kiểu nào?" }).waitFor();
   assert.equal(await phongPage.getByText("Chọn quán", { exact: true }).count(), 0);
+  assert.equal(await phongPage.getByText(/Không có bước chọn quán/).count(), 0);
   await phongPage.getByRole("radio", { name: /Ăn vặt/ }).check();
   await phongPage.getByLabel("Bữa ăn").selectOption("late");
   await phongPage.getByLabel("Danh mục").selectOption("dessert");
@@ -305,6 +306,8 @@ try {
   await nhiPage.route("**/api/sessions**", deepRoute(nhi.id));
 
   await phongPage.goto(`${server.url}/deep-talk`);
+  assert.equal(await phongPage.getByRole("group", { name: "Người yêu cũ" }).count(), 0);
+  assert.equal(await phongPage.getByText(/Bộ luôn có đúng 20 lá/).count(), 0);
   await phongPage.getByLabel("Mức độ").selectOption("deep");
   await phongPage.getByLabel("Thời lượng gợi ý").selectOption("60");
   const creatorFamily = phongPage.getByRole("group", { name: "Gia đình" });

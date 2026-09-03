@@ -47,16 +47,19 @@ try {
   const activities = page.getByRole("navigation", { name: "Hoạt động chính" });
   await activities.waitFor();
   assert.equal(await activities.getByRole("link").count(), 3);
+  assert.equal(await activities.locator("svg").count(), 3);
+  assert.equal(await activities.locator("small").count(), 0);
   await page.getByRole("heading", { name: "Phiên đang diễn ra" }).waitFor();
   assert.match(await page.locator(".session-card").textContent(), /Xé Túi Mù.*Chờ người còn lại.*Phong/s);
-  assert.equal(await page.getByRole("navigation", { name: "Lối tắt" }).getByRole("link").count(), 2);
+  assert.equal(await page.getByText("Bản đồ", { exact: true }).count(), 0);
+  assert.equal(await page.getByText("Hộ chiếu", { exact: true }).count(), 0);
   assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
   await page.getByRole("button", { name: "Đóng phiên" }).click();
   await page.getByRole("heading", { name: "Chưa có phiên nào đang mở" }).waitFor();
   assert.equal(commands.length, 1);
   assert.equal(commands[0].expectedVersion, 1);
   assert.match(commands[0].idempotencyKey, /^[0-9a-f-]{36}$/);
-  console.log("P1.12 home: activities, live sessions, close command, today card, shortcuts and mobile width = OK");
+  console.log("P1.12 home: concise activities, live sessions, close command and mobile width = OK");
 } finally {
   await browser?.close().catch(() => {});
   server.kill("SIGTERM");
