@@ -56,7 +56,8 @@ async function main() {
     await page.getByLabel("Màu đại diện").fill("#77506e");
     await page.getByLabel("Giao diện").selectOption("dark");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
-    await page.getByText("Đã lưu thông tin của ông.").waitFor();
+    await page.waitForFunction(() => document.querySelector("form")?.getAttribute("aria-busy") === "false");
+    assert.equal(await page.getByText("Đã lưu thông tin của ông.").count(), 0);
     assert.equal(profileBodies[0].nickname, "Anh Phong");
     assert.equal(profileBodies[0].avatarKey, "plum");
     assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");

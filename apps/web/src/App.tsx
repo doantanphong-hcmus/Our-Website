@@ -243,7 +243,6 @@ function ProfileSettings({ user, save }: { user: User; save: (changes: ProfileCh
   const [theme, setTheme] = useState(user.preferences.theme);
   const [reducedMotion, setReducedMotion] = useState(user.preferences.reducedMotion);
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -257,7 +256,6 @@ function ProfileSettings({ user, save }: { user: User; save: (changes: ProfileCh
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setMessage("");
     setError("");
     try {
       await save({
@@ -267,7 +265,6 @@ function ProfileSettings({ user, save }: { user: User; save: (changes: ProfileCh
         theme,
         reducedMotion,
       });
-      setMessage("Đã lưu thông tin của ông.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không thể lưu thay đổi.");
     } finally {
@@ -313,7 +310,7 @@ function ProfileSettings({ user, save }: { user: User; save: (changes: ProfileCh
           <span>Giảm chuyển động</span>
           <input name="reducedMotion" type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.target.checked)} />
         </label>
-        <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
+        {error && <div className="settings-feedback" role="alert">{error}</div>}
         <button type="submit" disabled={pending}>{pending ? "Đang lưu…" : "Lưu thay đổi"}</button>
       </form>
     </section>
