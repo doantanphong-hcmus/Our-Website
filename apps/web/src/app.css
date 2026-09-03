@@ -261,6 +261,191 @@ button:disabled {
   backdrop-filter: blur(1rem);
 }
 
+.top-bar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gift-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-shared);
+  cursor: pointer;
+}
+
+.gift-button::after {
+  position: absolute;
+  content: "✦";
+  inset-block-start: -0.2rem;
+  inset-inline-end: -0.1rem;
+  color: var(--color-user-one);
+  font-size: 0.7rem;
+  animation: gift-sparkle 1.2s ease-in-out infinite alternate;
+}
+
+.gift-button svg {
+  inline-size: 2.35rem;
+  overflow: visible;
+  filter: drop-shadow(0 0.2rem 0.2rem rgb(67 42 36 / 18%));
+  animation: gift-float 2.4s ease-in-out infinite;
+}
+.gift-button path { fill: var(--color-shared); stroke: var(--color-text); stroke-width: 1.5; stroke-linejoin: round; }
+.gift-button .gift-button__lid,
+.gift-button .gift-button__ribbon { fill: var(--color-user-one); }
+.gift-button__lid { transform-origin: center; animation: gift-lid 2.4s ease-in-out infinite; }
+.gift-button__bow { fill: var(--color-user-one-soft) !important; }
+
+@keyframes gift-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-0.25rem) rotate(2deg); }
+}
+
+@keyframes gift-lid {
+  0%, 72%, 100% { transform: translateY(0); }
+  82% { transform: translateY(-0.2rem) rotate(-3deg); }
+  90% { transform: translateY(-0.1rem) rotate(2deg); }
+}
+
+@keyframes gift-sparkle {
+  from { opacity: 0.3; transform: scale(0.75) rotate(0); }
+  to { opacity: 1; transform: scale(1.15) rotate(35deg); }
+}
+
+.gift-letter-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(var(--space-3), var(--safe-top)) max(var(--space-3), var(--safe-right)) max(var(--space-3), var(--safe-bottom)) max(var(--space-3), var(--safe-left));
+  background: rgb(24 17 29 / 76%);
+  backdrop-filter: blur(0.35rem);
+  animation: gift-backdrop-in var(--duration-normal) ease-out both;
+}
+
+.gift-letter-dialog {
+  position: relative;
+  inline-size: min(100%, 34rem);
+  block-size: min(42rem, calc(100dvh - 2rem));
+  border-radius: var(--radius-large);
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #5c4568, #211827 72%);
+  box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 45%);
+}
+
+.gift-letter-close {
+  position: absolute;
+  z-index: 8;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 50%;
+  background: rgb(25 18 30 / 58%);
+  color: #fffaf4;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gift-letter-stage { position: relative; block-size: 100%; }
+
+.airmail-envelope {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 10%;
+  inset-block-end: 7%;
+  aspect-ratio: 1.55;
+  border: 0.55rem solid transparent;
+  background:
+    linear-gradient(#fffaf4, #f1e8df) padding-box,
+    repeating-linear-gradient(135deg, #cf465e 0 0.75rem, #fff 0.75rem 1.15rem, #315a8e 1.15rem 1.9rem, #fff 1.9rem 2.3rem) border-box;
+  box-shadow: 0 1rem 2rem rgb(0 0 0 / 28%);
+  animation: envelope-arrive 0.55s ease-out both;
+}
+
+.airmail-envelope::before,
+.airmail-envelope::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  background: #f7eee5;
+  clip-path: polygon(0 100%, 0 35%, 50% 72%, 100% 35%, 100% 100%);
+}
+
+.airmail-envelope::after {
+  background: #fffaf4;
+  clip-path: polygon(0 100%, 50% 52%, 100% 100%);
+}
+
+.airmail-envelope span {
+  position: absolute;
+  z-index: 2;
+  inset: -1px;
+  background: #ebe0d6;
+  clip-path: polygon(0 0, 100% 0, 50% 63%);
+  transform-origin: 50% 0;
+  animation: envelope-open 0.7s 0.35s ease-in-out both;
+}
+
+.gift-letter-paper {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 9%;
+  inset-block-end: 7%;
+  min-block-size: 24rem;
+  padding: clamp(2rem, 8vw, 3.4rem) clamp(1.5rem, 7vw, 3rem);
+  border: 0.55rem solid transparent;
+  background:
+    linear-gradient(#fffdf7, #f8efe5) padding-box,
+    repeating-linear-gradient(135deg, #cf465e 0 0.75rem, #fff 0.75rem 1.15rem, #315a8e 1.15rem 1.9rem, #fff 1.9rem 2.3rem) border-box;
+  color: #392b3e;
+  box-shadow: 0 1.2rem 2.5rem rgb(0 0 0 / 30%);
+  transform: translateY(35%) scale(0.88);
+  opacity: 0;
+  animation: letter-pull 1s 0.65s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.gift-letter-paper__to {
+  display: block;
+  margin-block-end: var(--space-4);
+  color: #b53f5a;
+  font: 700 1rem/1.2 "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+}
+
+.gift-letter-paper p {
+  min-block-size: 12rem;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: normal;
+  font: 600 clamp(1.05rem, 3.6vw, 1.35rem)/1.75 "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+}
+
+.gift-letter-caret {
+  display: inline-block;
+  inline-size: 0.08em;
+  block-size: 1.1em;
+  margin-inline-start: 0.12em;
+  background: currentColor;
+  vertical-align: -0.12em;
+  animation: letter-caret 0.65s steps(1) infinite;
+}
+
+@keyframes gift-backdrop-in { from { opacity: 0; } }
+@keyframes envelope-arrive { from { opacity: 0; transform: translateY(2rem) scale(0.85); } }
+@keyframes envelope-open { from { transform: rotateX(0); } to { transform: rotateX(180deg); z-index: -1; } }
+@keyframes letter-pull { to { opacity: 1; transform: translateY(-28%) scale(1); } }
+@keyframes letter-caret { 50% { opacity: 0; } }
+
 .offline-queue-notice {
   display: flex;
   align-items: center;

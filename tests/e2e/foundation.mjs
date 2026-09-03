@@ -13,6 +13,7 @@ try {
   await phongPage.goto(server.url);
   await phongPage.locator(".ui-skeleton").first().waitFor();
   await phongPage.getByRole("heading", { name: /Phong ơi/ }).waitFor();
+  assert.equal(await phongPage.getByRole("button", { name: "Mở món quà dành cho Nhi" }).count(), 0);
   assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
   await assertA11y(phongPage);
 
@@ -53,6 +54,15 @@ try {
   await mockAuthenticated(nhiPage, nhi);
   await nhiPage.goto(server.url);
   await nhiPage.getByRole("heading", { name: /Nhi ơi/ }).waitFor();
+  await nhiPage.getByRole("button", { name: "Mở món quà dành cho Nhi" }).click();
+  const giftDialog = nhiPage.getByRole("dialog", { name: "Bức thư dành cho Nhi" });
+  await giftDialog.waitFor();
+  assert.match(await nhiPage.locator("audio").getAttribute("src"), /gift-letter\.mp3$/);
+  await giftDialog.getByText("Nhi à", { exact: false }).waitFor();
+  assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+  await assertA11y(nhiPage);
+  await giftDialog.getByRole("button", { name: "Đóng bức thư" }).click();
+  assert.equal(await giftDialog.count(), 0);
 
   let confirmCommand;
   let voteCommand;

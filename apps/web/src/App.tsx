@@ -4,6 +4,7 @@ import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDeta
 import { EmptyState, ErrorState, LoadingState } from "./uiStates";
 import { FoodSessionSetup } from "./FoodSessionSetup";
 import { DeepTalkSetup } from "./DeepTalkSetup";
+import { GiftLetter } from "./GiftLetter";
 
 type Route = {
   path: string;
@@ -425,7 +426,10 @@ export function App({ user, onUserChange, onLogout }: {
     <div className="app-shell">
       <a className="skip-link" href="#main-content">Đến nội dung chính</a>
       <header className="top-bar">
-        <AppLink path="/" className="brand" aria-label="Về trang chủ"><img src="/favicon.png" alt="" /></AppLink>
+        <div className="top-bar__brand">
+          <AppLink path="/" className="brand" aria-label="Về trang chủ"><img src="/favicon.png" alt="" /></AppLink>
+          {user.username.toLocaleLowerCase() === "nhi" && <GiftLetter reducedMotion={user.preferences.reducedMotion} />}
+        </div>
         <details className="avatar-menu">
           <summary aria-label="Mở menu tài khoản" style={{ background: user.color }}><span aria-hidden="true">{(user.nickname ?? user.displayName).slice(0, 2).toUpperCase()}</span></summary>
           <div className="avatar-menu__panel">
