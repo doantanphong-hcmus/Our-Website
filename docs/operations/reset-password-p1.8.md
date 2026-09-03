@@ -12,7 +12,7 @@ Không có API hoặc giao diện admin public. Trước khi reset remote, owner
    $env:AUTH_PEPPER = [Net.NetworkCredential]::new('', $secret).Password
    $secret = Read-Host "Mật khẩu mới" -AsSecureString
    $env:RESET_PASSWORD = [Net.NetworkCredential]::new('', $secret).Password
-   npm.cmd run auth:reset -- --remote --username phong --confirm "RESET phong"
+   npm.cmd run auth:reset -- --remote --config .wrangler-deploy.json --username phong --confirm "RESET phong"
    Remove-Item Env:AUTH_PEPPER, Env:RESET_PASSWORD
    Remove-Variable secret
    ```

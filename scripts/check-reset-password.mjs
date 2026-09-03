@@ -38,7 +38,8 @@ try {
     VALUES ('a',1,0,unixepoch());`]);
 
   run(reset, ["--local", "--persist-to", state, "--username", "phong", "--confirm", "wrong"], 1);
-  const resetOutput = run(reset, ["--local", "--persist-to", state, "--username", "phong", "--confirm", "RESET phong"]);
+  const resetOutput = run(reset, ["--local", "--persist-to", state, "--config", config,
+    "--username", "phong", "--confirm", "RESET phong"]);
   assert.match(resetOutput, /Da dat lai mat khau/);
 
   const output = run(wrangler, ["d1", "execute", ...target, "--json", "--command",

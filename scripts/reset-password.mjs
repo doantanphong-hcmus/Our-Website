@@ -5,7 +5,6 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const wrangler = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const config = path.join(root, "apps", "worker", "wrangler.jsonc");
 
 function fail(message) {
   throw new Error(message);
@@ -19,6 +18,7 @@ function parseArgs(args) {
     else if (argument === "--username") options.username = args[++index];
     else if (argument === "--confirm") options.confirm = args[++index];
     else if (argument === "--persist-to") options.persistTo = args[++index];
+    else if (argument === "--config") options.config = args[++index];
     else fail(`Tuy chon khong hop le: ${argument ?? "(trong)"}`);
   }
   return options;
@@ -26,6 +26,7 @@ function parseArgs(args) {
 
 async function main() {
 const options = parseArgs(process.argv.slice(2));
+const config = path.resolve(root, options.config ?? "apps/worker/wrangler.jsonc");
 if (Boolean(options.local) === Boolean(options.remote)) fail("Chon dung mot moi truong: --local hoac --remote.");
 if (!/^(phong|nhi)$/.test(options.username ?? "")) fail("--username chi nhan phong hoac nhi.");
 if (options.confirm !== `RESET ${options.username}`) fail(`Xac minh owner bang: --confirm "RESET ${options.username}"`);
