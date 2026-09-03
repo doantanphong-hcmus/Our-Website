@@ -14,7 +14,7 @@ export function LoadingState({ label }: { label: string }) {
 export function EmptyState({ title, children, action }: { title: string; children: ReactNode; action: ReactNode }) {
   return (
     <div className="ui-state ui-state--empty">
-      <div className="ui-state__illustration" aria-hidden="true"><span>♡</span><i /><i /></div>
+      <div className="ui-state__illustration"><img src="/couple-empty-state.jpg" alt="Phong và Nhi" /></div>
       <h3>{title}</h3>
       <p>{children}</p>
       {action}

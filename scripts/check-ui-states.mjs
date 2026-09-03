@@ -47,6 +47,7 @@ try {
   assert.equal(await page.getByRole("button", { name: "Quay lại" }).count(), 1);
   await page.getByRole("button", { name: "Thử lại" }).click();
   await page.getByRole("heading", { name: "Chưa có phiên nào đang mở" }).waitFor();
+  assert.equal(await page.locator(".ui-state--empty").getByRole("img", { name: "Phong và Nhi" }).getAttribute("src"), "/couple-empty-state.jpg");
   assert.equal(await page.getByRole("link", { name: "Bắt đầu Xé Túi Mù" }).count(), 1);
 
   await context.setOffline(true);

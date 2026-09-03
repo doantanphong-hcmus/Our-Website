@@ -632,28 +632,21 @@ button:disabled {
 }
 
 .ui-state__illustration {
-  position: relative;
-  display: grid;
-  place-items: center;
-  inline-size: 6rem;
-  block-size: 4rem;
+  inline-size: clamp(7.5rem, 30vw, 9rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 0.22rem solid var(--color-shared-soft);
   border-radius: 50%;
-  background: var(--color-shared-soft);
-  color: var(--color-shared);
-  font-size: 1.4rem;
+  box-shadow: 0 0.65rem 1.6rem rgb(31 22 36 / 22%);
 }
 
-.ui-state__illustration i {
-  position: absolute;
-  inset-block-end: 0.55rem;
-  inline-size: 1.3rem;
-  block-size: 1.8rem;
-  border-radius: var(--radius-pill) var(--radius-pill) var(--radius-small) var(--radius-small);
-  background: var(--color-user-one);
+.ui-state__illustration img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: center 42%;
 }
-
-.ui-state__illustration i:first-of-type { inset-inline-start: 1.15rem; }
-.ui-state__illustration i:last-of-type { inset-inline-end: 1.15rem; background: var(--color-user-two); }
 
 .ui-state .primary-link {
   margin-block-start: 0;
