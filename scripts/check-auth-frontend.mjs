@@ -36,6 +36,8 @@ async function main() {
     await page.goto(baseUrl);
     await page.getByRole("heading", { name: /Đang mở góc nhỏ/ }).waitFor();
     await page.getByRole("heading", { name: "Chào mừng về nhà" }).waitFor();
+    assert.equal(await page.locator(".login-heading .product-mark").getAttribute("src"), "/favicon.png");
+    assert.equal(await page.getByRole("img", { name: "Phong và Nhi" }).getAttribute("src"), "/couple-empty-state.jpg");
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
     const username = page.getByLabel("Tên đăng nhập");

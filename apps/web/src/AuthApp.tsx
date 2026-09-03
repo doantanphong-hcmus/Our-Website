@@ -13,7 +13,7 @@ type AuthState =
 function StatusScreen({ retry, back }: { retry?: () => void; back?: () => void }) {
   return (
     <main className="auth-status" aria-live="polite">
-      <div className="product-mark" aria-hidden="true">P<span>&</span>N</div>
+      <img className="product-mark" src="/favicon.png" alt="" />
       {retry ? (
         <ErrorState title="Chưa thể kết nối" retry={retry} back={back}>
           Không kiểm tra được phiên đăng nhập. Kết nối của ông vẫn được giữ nguyên.
@@ -61,17 +61,13 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
     <main className="login-page">
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-heading">
-          <div className="product-mark" aria-hidden="true">P<span>&</span>N</div>
+          <img className="product-mark" src="/favicon.png" alt="" />
           <p className="eyebrow">Phong & Nhi</p>
           <h1 id="login-title">Chào mừng về nhà</h1>
           <p>Đăng nhập để tiếp tục câu chuyện của hai đứa.</p>
         </div>
 
-        <div className="login-illustration" aria-hidden="true">
-          <span className="character character--one"><i /></span>
-          <span className="character character--two"><i /></span>
-          <b />
-        </div>
+        <div className="login-illustration"><img src="/couple-empty-state.jpg" alt="Phong và Nhi" /></div>
 
         <form onSubmit={submit} aria-busy={pending}>
           <label htmlFor="username">Tên đăng nhập</label>
