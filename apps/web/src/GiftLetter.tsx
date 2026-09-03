@@ -11,6 +11,8 @@ Bước sang tuổi mới, anh mong em luôn giữ được nụ cười, tâm h
 
 Chúc mừng sinh nhật em.`;
 
+const signaturePath = "M71 113C40 134 14 111 24 72 35 29 76 8 106 22c26 13 16 48-7 69-11 10-21 15-30 15 M94 61c-6 36-6 66 2 84 M91 92c20 0 48-27 76-34-24 21-49 40-73 54 M23 133c49-27 108-31 196-31";
+
 export function GiftLetter() {
   const [open, setOpen] = useState(false);
   const [unsealed, setUnsealed] = useState(false);
@@ -97,14 +99,21 @@ export function GiftLetter() {
             <p aria-hidden="true">{letter.slice(0, visible)}{visible < letter.length && <i className="gift-letter-caret" />}</p>
             {visible >= letter.length && <div className="gift-letter-signature is-signing" role="img" aria-label="Chữ ký của Phong">
               <svg viewBox="0 0 240 160" aria-hidden="true">
-                <path className="gift-letter-signature__stroke stroke-one" pathLength="1" d="M71 113C40 134 14 111 24 72 35 29 76 8 106 22c26 13 16 48-7 69-11 10-21 15-30 15" />
-                <path className="gift-letter-signature__stroke stroke-two" pathLength="1" d="M94 61c-6 36-6 66 2 84" />
-                <path className="gift-letter-signature__stroke stroke-three" pathLength="1" d="M91 92c20 0 48-27 76-34-24 21-49 40-73 54" />
-                <path className="gift-letter-signature__stroke stroke-four" pathLength="1" d="M23 133c49-27 108-31 196-31" />
+                <defs>
+                  <linearGradient id="quill-feather" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#fff8e9" />
+                    <stop offset="0.55" stopColor="#e8cfae" />
+                    <stop offset="1" stopColor="#ba7d69" />
+                  </linearGradient>
+                </defs>
+                <path id="gift-signature-path" className="gift-letter-signature__stroke" pathLength="1" d={signaturePath} />
                 <g className="gift-letter-signature__quill">
-                  <path d="M0 0C-18-14-23-39-8-50 8-35 10-17 0 0Z" />
-                  <path d="m-9-39 12 47" />
-                  <path d="m3 8-5-8 3-1 5 6Z" />
+                  <animateMotion dur="5.2s" fill="freeze" rotate="auto"><mpath href="#gift-signature-path" /></animateMotion>
+                  <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.94;1" dur="5.2s" fill="freeze" />
+                  <path className="quill-feather" d="M-3-7C-21-17-46-42-36-70-11-61 6-34-3-7Z" />
+                  <path className="quill-shaft" d="M1 1-30-61" />
+                  <path className="quill-barbs" d="m-10-19-20-8m17 1-19-13m16 5-14-16m17 8 4-17m-1 25 9-17m-6 26 11-12" />
+                  <path className="quill-nib" d="M1 2-7-11l6-5 8 11Z" />
                 </g>
               </svg>
             </div>}

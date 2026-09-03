@@ -70,7 +70,8 @@ try {
   await typedLetter.getByText("Gửi em bé", { exact: false }).waitFor();
   const signature = giftDialog.getByRole("img", { name: "Chữ ký của Phong" });
   await signature.waitFor({ timeout: 40_000 });
-  const firstStroke = signature.locator(".stroke-one");
+  const firstStroke = signature.locator(".gift-letter-signature__stroke");
+  assert.equal(await signature.locator("animateMotion mpath").getAttribute("href"), "#gift-signature-path");
   const inkBefore = await firstStroke.evaluate((path) => getComputedStyle(path).strokeDashoffset);
   await network.delay(150);
   assert.notEqual(await firstStroke.evaluate((path) => getComputedStyle(path).strokeDashoffset), inkBefore);
