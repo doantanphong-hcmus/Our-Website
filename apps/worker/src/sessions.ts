@@ -873,7 +873,7 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
   const generationDay = deepTalkGenerationDay(now);
   const quota = await env.DB.prepare(`SELECT count(*) AS total FROM deep_talk_decks
     WHERE couple_space_id = ? AND generation_day = ?`).bind(spaceId, generationDay).first<{ total: number }>();
-  if (Number(quota?.total ?? 0) >= 3) return json({ error: "Hôm nay hai bạn đã tạo đủ 3 bộ Deep Talk." }, 429);
+  if (Number(quota?.total ?? 0) >= 1) return json({ error: "Hôm nay đã hết lượt chơi, ngày mai chúng mình chơi lại nhé" }, 429);
   if (source === "ai" && !env.AI?.run) return json({ error: "Workers AI chưa được cấu hình." }, 503);
 
   const conditions = deepTalkConditions((JSON.parse(current.payload_json) as { conditions?: unknown }).conditions);
@@ -928,13 +928,16 @@ async function deepTalkDeck(request: Request, env: SessionEnv, userId: string, s
 
 export async function sessionSnapshot(env: SessionEnv, spaceId: string) {
   await expirePending(env.DB, spaceId);
-  const [rows, latest] = await env.DB.batch([
+  const [rows, latest, dailyDeepTalk] = await env.DB.batch([
     env.DB.prepare(`${selectSession} WHERE couple_space_id = ? ORDER BY updated_at DESC LIMIT 20`).bind(spaceId),
     env.DB.prepare(`SELECT coalesce(max(rowid), 0) AS version FROM activity_session_events
       WHERE couple_space_id = ?`).bind(spaceId),
+    env.DB.prepare(`SELECT 1 FROM deep_talk_decks WHERE couple_space_id = ? AND generation_day = ? LIMIT 1`)
+      .bind(spaceId, deepTalkGenerationDay(Math.floor(Date.now() / 1000))),
   ]);
   return {
     eventVersion: Number((latest.results[0] as { version?: number } | undefined)?.version ?? 0),
+    deepTalkPlayedToday: dailyDeepTalk.results.length > 0,
     sessions: (rows.results as unknown as SessionRow[]).map(publicSession),
   };
 }

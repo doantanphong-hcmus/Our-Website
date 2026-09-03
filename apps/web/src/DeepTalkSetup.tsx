@@ -29,7 +29,7 @@ function sessionFrom(payload: unknown): Session | null {
   if (!payload || typeof payload !== "object" || !("sessions" in payload) || !Array.isArray(payload.sessions)) return null;
   const deepTalk = payload.sessions.filter((item) => item && typeof item === "object" && "feature" in item && item.feature === "deep_talk") as Record<string, unknown>[];
   const session = deepTalk.find(({ status }) => ["pending", "active"].includes(String(status)))
-    ?? deepTalk.find(({ status }) => status === "completed");
+    ?? ((payload as { deepTalkPlayedToday?: unknown }).deepTalkPlayedToday === true ? deepTalk.find(({ status }) => status === "completed") : undefined);
   if (!session || typeof session.id !== "string" || !["pending", "active", "completed"].includes(String(session.status))
     || typeof session.createdByUserId !== "string" || !Number.isInteger(session.version)
     || !session.conditions || typeof session.conditions !== "object") return null;
@@ -120,6 +120,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
   const [turnMode, setTurnMode] = useState<"alternate" | "manual">("alternate");
   const [playMode, setPlayMode] = useState<"one" | "two">("one");
   const [offerFallback, setOfferFallback] = useState(false);
+  const [playedToday, setPlayedToday] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const generationRequest = useRef(0);
@@ -142,7 +143,9 @@ export function DeepTalkSetup({ user }: { user: User }) {
     try {
       const response = await fetch("/api/sessions", { credentials: "same-origin" });
       if (!response.ok) throw new Error(await responseError(response, "Không tải được phiên Deep Talk."));
-      const found = sessionFrom(await response.json());
+      const payload = await response.json() as { deepTalkPlayedToday?: unknown };
+      const found = sessionFrom(payload);
+      setPlayedToday(payload.deepTalkPlayedToday === true);
       setSession(found);
       if (!found) return setConsent(null);
       if (found.status === "completed") {
@@ -290,6 +293,11 @@ export function DeepTalkSetup({ user }: { user: User }) {
 
   if (loading) return <LoadingState label="Đang tải thiết lập Deep Talk…" />;
   if (error && !session) return <ErrorState title="Chưa mở được Deep Talk" retry={() => void load()}>{error}</ErrorState>;
+  if (playedToday && !session) return <section className="blind-bag-form food-setup deep-talk-ready" aria-labelledby="page-title">
+    <p className="eyebrow">Deep Talk · hẹn ngày mai</p>
+    <div className="deep-talk-ready__mark" aria-hidden="true">♡</div>
+    <h1 id="page-title">Hôm nay đã hết lượt chơi, ngày mai chúng mình chơi lại nhé</h1>
+  </section>;
 
   if (session && consent?.stage === "ready" && (generation === "waiting" || generation === "fallback")) {
     return <>
@@ -303,7 +311,7 @@ export function DeepTalkSetup({ user }: { user: User }) {
       <p className="eyebrow">Deep Talk · đã khép lại</p>
       <div className="deep-talk-ready__mark" aria-hidden="true">♡</div>
       <h1 id="page-title">Cảm ơn hai đứa đã lắng nghe nhau</h1>
-      <p>Phiên đã kết thúc. Hai đứa không cần phải chơi hết 20 lá.</p>
+      <p>Hôm nay đã hết lượt chơi, ngày mai chúng mình chơi lại nhé</p>
       <dl className="deep-talk-summary">
         <div><dt>Đã chơi</dt><dd>{deck.progress.openedPositions.length} lá</dd></div>
         <div><dt>Đã bỏ qua</dt><dd>{deck.progress.skippedPositions.length} lá</dd></div>

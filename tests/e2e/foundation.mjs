@@ -232,7 +232,7 @@ try {
         : route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Chưa có bộ bài." }) });
     }
     if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      eventVersion: deepSession?.version ?? 0, sessions: deepSession ? [deepSession] : [],
+      eventVersion: deepSession?.version ?? 0, deepTalkPlayedToday: deepDeckReady, sessions: deepSession ? [deepSession] : [],
     }) });
     deepCommands.push({ pathname, body });
     if (pathname.endsWith("/deep-talk-play")) {
@@ -369,6 +369,7 @@ try {
   nhiPage.once("dialog", (dialog) => dialog.accept());
   await nhiPage.getByRole("button", { name: "Kết thúc phiên" }).click();
   await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
+  await nhiPage.getByText("Hôm nay đã hết lượt chơi, ngày mai chúng mình chơi lại nhé").waitFor();
   await nhiPage.reload();
   await nhiPage.getByRole("heading", { name: "Cảm ơn hai đứa đã lắng nghe nhau" }).waitFor();
   assert.match(await nhiPage.locator(".deep-talk-summary").textContent(), /Đã chơi1 lá.*Đã bỏ qua1 lá.*Bắt đầu.*Kết thúc/s);

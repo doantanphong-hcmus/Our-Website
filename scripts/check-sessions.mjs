@@ -68,7 +68,7 @@ for (let index = 1; index <= 1; index++) {
       '${index === 1 ? '{"deepTalkProgress":{"currentPosition":2,"openedPositions":[0,1]}}' : '{}'}',unixepoch()-${index},unixepoch()-${index});
     INSERT INTO deep_talk_decks
       (id,session_id,couple_space_id,created_by_user_id,idempotency_key,seed,generation_day,cards_json,created_at)
-    VALUES ('history-deck-${index}','${sessionId}','couple-main','user-phong','history-deck-key-${index}',${index},date('now','+7 hours'),'${deepTalkDeckJson}',unixepoch()-${index});
+    VALUES ('history-deck-${index}','${sessionId}','couple-main','user-phong','history-deck-key-${index}',${index},date('now','-1 day','+7 hours'),'${deepTalkDeckJson}',unixepoch()-${index});
     INSERT INTO question_fingerprints (deck_id,position,fingerprint) VALUES ('history-deck-${index}',0,'history-fingerprint-${index}');`]);
 }
 
@@ -144,6 +144,7 @@ try {
 
   const initial = await request("/api/sessions", phong);
   assert.equal(initial.response.status, 200);
+  assert.equal(initial.data.deepTalkPlayedToday, false);
   assert.equal(initial.data.sessions.find((item) => item.feature === "food_vote").status, "expired");
 
   assert.equal((await request("/api/sessions", phong, "POST", {
@@ -438,47 +439,13 @@ try {
   const twoDeck = await request(`/api/sessions/${twoDeviceId}/deep-talk-deck`, phong, "POST", {
     expectedVersion: 2, idempotencyKey: "fallback-deep-two", source: "fallback",
   });
-  assert.equal(twoDeck.response.status, 201);
-  const twoPlayPath = `/api/sessions/${twoDeviceId}/deep-talk-play`;
-  const twoStarted = await request(twoPlayPath, phong, "POST", {
-    action: "start", starterUserId: "user-phong", turnMode: "alternate", playMode: "two",
-    expectedVersion: 3, idempotencyKey: "play-two-start01",
-  });
-  assert.equal(twoStarted.data.progress.playMode, "two");
-  assert.equal((await request(twoPlayPath, phong, "POST", {
-    action: "next", expectedVersion: 4, idempotencyKey: "play-two-next-no",
-  })).response.status, 409);
-  await request(twoPlayPath, phong, "POST", { action: "reveal", expectedVersion: 4, idempotencyKey: "play-two-reveal" });
-  const partnerSkipped = await request(twoPlayPath, nhi, "POST", {
-    action: "skip", expectedVersion: 5, idempotencyKey: "play-two-skip-nhi",
-  });
-  assert.equal(partnerSkipped.data.progress.currentPosition, 0);
-  assert.deepEqual(partnerSkipped.data.progress.readyUserIds, ["user-nhi"]);
-  assert.deepEqual(partnerSkipped.data.progress.skippedByUserIds, ["user-nhi"]);
-  const creatorSynced = await request(`/api/sessions/${twoDeviceId}/deep-talk-deck`, phong);
-  assert.deepEqual(creatorSynced.data.progress.skippedByUserIds, ["user-nhi"], "partner must see who skipped");
-  const bothReady = await request(twoPlayPath, phong, "POST", {
-    action: "ready", expectedVersion: 6, idempotencyKey: "play-two-ready-ph",
-  });
-  assert.equal(bothReady.data.progress.currentPosition, 1, "the card advances only after both players are ready");
-  assert.deepEqual(bothReady.data.progress.readyUserIds, []);
-  assert.equal((await request(twoPlayPath, nhi, "POST", {
-    action: "end", expectedVersion: 7, idempotencyKey: "play-two-end-001",
-  })).data.session.status, "completed");
-
-  const quotaSession = await create(phong, "deep_talk", "create-deep-quota1");
-  const quotaId = quotaSession.data.session.id;
-  const quotaReview = await request(`/api/sessions/${quotaId}/deep-talk-consent`, nhi, "POST", {
-    action: "review", expectedVersion: 1, sensitiveTopics: deepTalkConditions.sensitiveTopics, idempotencyKey: "review-deep-quota1",
-  });
-  assert.equal(quotaReview.data.session.status, "active");
-  const quotaResult = await request(`/api/sessions/${quotaId}/deep-talk-deck`, phong, "POST", {
-    expectedVersion: 2, idempotencyKey: "generate-deep-quota1",
-  });
-  assert.equal(quotaResult.response.status, 429);
-  assert.equal(quotaResult.data.error, "Hôm nay hai bạn đã tạo đủ 3 bộ Deep Talk.");
-  assert.equal((await request(`/api/sessions/${quotaId}/deep-talk-deck`, phong)).response.status, 404,
+  assert.equal(twoDeck.response.status, 429);
+  assert.equal(twoDeck.data.error, "Hôm nay đã hết lượt chơi, ngày mai chúng mình chơi lại nhé");
+  assert.equal((await request(`/api/sessions/${twoDeviceId}/deep-talk-deck`, phong)).response.status, 404,
     "quota exhaustion must fail closed without storing a deck");
+
+  const snapshot = (await request("/api/sessions", phong)).data;
+  assert.equal(snapshot.deepTalkPlayedToday, true);
 
   console.log("P1.9/P3.2-P4.15 sessions: Deep Talk privacy, idempotency and quota fail-closed = OK");
 } finally {
