@@ -416,21 +416,18 @@ button:disabled {
 }
 
 .brand {
-  display: inline-grid;
+  display: inline-flex;
   place-items: center;
-  min-inline-size: 2.75rem;
-  min-block-size: 2.75rem;
-  color: var(--color-shared);
-  font-size: 1.15rem;
-  font-weight: 800;
+  inline-size: 3.25rem;
+  block-size: 3.25rem;
   text-decoration: none;
-  letter-spacing: -0.08em;
 }
 
-.brand span {
-  margin-inline: 0.08em;
-  color: var(--color-user-one);
-  font-weight: 500;
+.brand img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
 }
 
 .avatar-menu {
