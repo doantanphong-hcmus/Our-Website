@@ -792,7 +792,7 @@ main {
   position: relative;
   display: grid;
   gap: var(--space-1);
-  min-block-size: 8rem;
+  min-block-size: 13rem;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
@@ -818,7 +818,11 @@ main {
   opacity: 0;
 }
 
-.food-style-options span { font-size: 1.75rem; }
+.food-style-options img {
+  inline-size: 100%;
+  block-size: 6.5rem;
+  object-fit: contain;
+}
 .food-style-options small { color: var(--color-text-muted); font-weight: 500; }
 
 .food-filters {

@@ -47,7 +47,7 @@ try {
   const activities = page.getByRole("navigation", { name: "Hoạt động chính" });
   await activities.waitFor();
   assert.equal(await activities.getByRole("link").count(), 3);
-  assert.equal(await activities.locator("svg").count(), 3);
+  assert.equal(await activities.locator("img").count(), 3);
   assert.equal(await activities.locator("small").count(), 0);
   await page.getByRole("heading", { name: "Phiên đang diễn ra" }).waitFor();
   assert.match(await page.locator(".session-card").textContent(), /Xé Túi Mù.*Chờ người còn lại.*Phong/s);

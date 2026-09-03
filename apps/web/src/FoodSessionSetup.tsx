@@ -360,7 +360,7 @@ export function FoodSessionSetup({ user }: { user: User }) {
           {foodCatalog.foodStyles.map((style) => (
             <label key={style.id}>
               <input type="radio" name="foodStyle" value={style.id} checked={foodStyle === style.id} onChange={() => { setFoodStyle(style.id as FoodConditions["foodStyle"]); setCategory("any"); }} />
-              <span aria-hidden="true">{style.id === "full_meal" ? "🍲" : "🍢"}</span>
+              <img src={style.id === "full_meal" ? "/food-style-full-meal.png" : "/food-style-snack.png"} alt="" />
               <strong>{style.label}</strong>
               <small>{style.id === "full_meal" ? "Cơm, món nước, lẩu và món chính" : "Món nhẹ, đồ chiên và tráng miệng"}</small>
             </label>
