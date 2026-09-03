@@ -57,6 +57,10 @@ try {
   await nhiPage.getByRole("button", { name: "Mở món quà dành cho Nhi" }).click();
   const giftDialog = nhiPage.getByRole("dialog", { name: "Bức thư dành cho Nhi" });
   await giftDialog.waitFor();
+  await giftDialog.getByText("From: Phong").waitFor();
+  await giftDialog.getByText("To: Nhi").waitFor();
+  assert.equal(await giftDialog.getByText("Nhi à", { exact: false }).count(), 0);
+  await giftDialog.getByRole("button", { name: "Mở phong bì dành cho Nhi" }).click();
   assert.match(await nhiPage.locator("audio").getAttribute("src"), /gift-letter\.mp3$/);
   await giftDialog.getByText("Nhi à", { exact: false }).waitFor();
   assert.equal(await nhiPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);

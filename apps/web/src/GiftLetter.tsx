@@ -9,27 +9,29 @@ Phong`;
 
 export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
   const [open, setOpen] = useState(false);
+  const [unsealed, setUnsealed] = useState(false);
   const [visible, setVisible] = useState(0);
   const audio = useRef<HTMLAudioElement>(null);
   const giftButton = useRef<HTMLButtonElement>(null);
+  const envelopeButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    closeButton.current?.focus();
+    envelopeButton.current?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
       if (event.key === "Tab") {
         event.preventDefault();
-        closeButton.current?.focus();
+        (unsealed ? closeButton : envelopeButton).current?.focus();
       }
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [open]);
+  }, [open, unsealed]);
 
   useEffect(() => {
-    if (!open) return setVisible(0);
+    if (!open || !unsealed) return setVisible(0);
     if (reducedMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setVisible(letter.length);
     let interval = 0;
     const delay = window.setTimeout(() => {
@@ -39,16 +41,21 @@ export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
           return count;
         }
         return count + 1;
-      }), 36);
-    }, 1_150);
+      }), 70);
+    }, 2_500);
     return () => {
       window.clearTimeout(delay);
       window.clearInterval(interval);
     };
-  }, [open, reducedMotion]);
+  }, [open, reducedMotion, unsealed]);
 
   function show() {
     setOpen(true);
+    setUnsealed(false);
+  }
+
+  function unseal() {
+    setUnsealed(true);
     if (audio.current) {
       audio.current.currentTime = 0;
       void audio.current.play().catch(() => {});
@@ -75,13 +82,26 @@ export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
       <section className="gift-letter-dialog" role="dialog" aria-modal="true" aria-labelledby="gift-letter-title">
         <button ref={closeButton} className="gift-letter-close" type="button" aria-label="Đóng bức thư" onClick={close}>×</button>
         <h2 className="sr-only" id="gift-letter-title">Bức thư dành cho Nhi</h2>
-        <div className="gift-letter-stage">
-          <div className="airmail-envelope" aria-hidden="true"><span /></div>
-          <article className="gift-letter-paper">
+        <div className={`gift-letter-stage${unsealed ? " is-unsealed" : ""}`}>
+          {unsealed && <article className="gift-letter-paper">
             <span className="gift-letter-paper__to">Gửi Nhi</span>
             <p aria-hidden="true">{letter.slice(0, visible)}<i className="gift-letter-caret" /></p>
             <p className="sr-only">{letter}</p>
-          </article>
+          </article>}
+          <button ref={envelopeButton} className="airmail-envelope" type="button" aria-label="Mở phong bì dành cho Nhi" onClick={unseal} disabled={unsealed}>
+            <span className="airmail-envelope__flap" aria-hidden="true" />
+            <span className="airmail-envelope__face" aria-hidden="true" />
+            <span className="airmail-envelope__from" aria-hidden="true"><b>From:</b> Phong</span>
+            <span className="airmail-envelope__to" aria-hidden="true"><b>To:</b> Nhi</span>
+            <span className="airmail-envelope__stamp" aria-hidden="true">
+              <svg viewBox="0 0 64 64">
+                <rect x="3" y="3" width="58" height="58" rx="3" />
+                <path d="M20 18c5-8 20-8 25 0 5 9 2 26-4 30-5 4-14 4-19 0-7-5-8-21-2-30Z" />
+                <path d="M23 18l-4-5m23 5 4-5M25 33c4 4 10 4 14 0" />
+                <circle cx="26" cy="27" r="1.5" /><circle cx="38" cy="27" r="1.5" />
+              </svg>
+            </span>
+          </button>
         </div>
       </section>
     </div>}
