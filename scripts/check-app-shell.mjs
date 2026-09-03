@@ -40,6 +40,9 @@ async function main() {
     assert.equal(await nav.locator("svg").count(), 5);
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
 
+    await page.goto(new URL("/di-dau/xe-tui-mu", baseUrl).href);
+    assert.equal(await page.getByRole("heading", { level: 1 }).textContent(), "Coming soon ... em bé hãy đợi anh");
+
     await page.locator("summary[aria-label='Mở menu tài khoản']").click();
     await page.getByText("Chế độ tối").click();
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");

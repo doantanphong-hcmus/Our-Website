@@ -23,18 +23,8 @@ try {
     return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: { id: crypto.randomUUID(), status: "pending" } }) });
   });
   await phongPage.getByRole("link", { name: "Xé Túi Mù" }).first().click();
-  await phongPage.getByRole("heading", { name: "Hôm nay hai đứa muốn đi thế nào?" }).waitFor();
-  await phongPage.getByLabel("Khoảng cách").selectOption("custom");
-  await phongPage.getByLabel("Khoảng cách tối đa (km)").fill("12.5");
-  await phongPage.getByLabel("Mức bất ngờ").selectOption("bold");
+  await phongPage.getByRole("heading", { name: "Coming soon ... em bé hãy đợi anh" }).waitFor();
   await assertA11y(phongPage);
-  await phongPage.getByRole("button", { name: "Gửi người kia xác nhận" }).click();
-  await phongPage.getByText("Đã ghi nhận và đang đồng bộ điều kiện").waitFor();
-  for (let attempt = 0; attempt < 40 && !createCommand; attempt++) await network.delay(50);
-  assert.equal(createCommand.feature, "blind_bag");
-  assert.equal(createCommand.conditions.customDistanceKm, 12.5);
-  assert.equal(createCommand.conditions.surprise, "bold");
-  assert.match(createCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
   createCommand = null;
