@@ -62,6 +62,8 @@ try {
   assert.equal(await giftDialog.getByText("Nhi à", { exact: false }).count(), 0);
   await giftDialog.getByRole("button", { name: "Mở phong bì dành cho Nhi" }).click();
   assert.match(await nhiPage.locator("audio").getAttribute("src"), /gift-letter\.mp3$/);
+  assert.equal(await nhiPage.locator("audio").evaluate((audio) => audio.loop), false);
+  assert.equal(await nhiPage.locator("audio").evaluate((audio) => audio.volume), 0.28);
   const typedLetter = giftDialog.locator(".gift-letter-paper p[aria-hidden='true']");
   assert.equal(await typedLetter.textContent(), "");
   await typedLetter.getByText("Nhi à", { exact: false }).waitFor();

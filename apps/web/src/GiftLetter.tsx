@@ -57,6 +57,7 @@ export function GiftLetter() {
     setUnsealed(true);
     if (audio.current) {
       audio.current.currentTime = 0;
+      audio.current.volume = 0.28;
       void audio.current.play().catch(() => {});
     }
   }
@@ -76,7 +77,7 @@ export function GiftLetter() {
         <path className="gift-button__ribbon" d="M20 16h8v27h-8z" />
       </svg>
     </button>
-    <audio ref={audio} src="/gift-letter.mp3" preload="none" loop />
+    <audio ref={audio} src="/gift-letter.mp3" preload="none" />
     {open && <div className="gift-letter-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
       <section className="gift-letter-dialog" role="dialog" aria-modal="true" aria-labelledby="gift-letter-title">
         <button ref={closeButton} className="gift-letter-close" type="button" aria-label="Đóng bức thư" onClick={close}>×</button>
