@@ -428,7 +428,7 @@ export function App({ user, onUserChange, onLogout }: {
       <header className="top-bar">
         <div className="top-bar__brand">
           <AppLink path="/" className="brand" aria-label="Về trang chủ"><img src="/favicon.png" alt="" /></AppLink>
-          {user.username.toLocaleLowerCase() === "nhi" && <GiftLetter reducedMotion={user.preferences.reducedMotion} />}
+          {user.username.toLocaleLowerCase() === "nhi" && <GiftLetter />}
         </div>
         <details className="avatar-menu">
           <summary aria-label="Mở menu tài khoản" style={{ background: user.color }}><span aria-hidden="true">{(user.nickname ?? user.displayName).slice(0, 2).toUpperCase()}</span></summary>

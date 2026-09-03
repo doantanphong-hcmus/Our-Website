@@ -7,7 +7,7 @@ const letter = `Nhi à,
 Thương em,
 Phong`;
 
-export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
+export function GiftLetter() {
   const [open, setOpen] = useState(false);
   const [unsealed, setUnsealed] = useState(false);
   const [visible, setVisible] = useState(0);
@@ -32,7 +32,6 @@ export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
 
   useEffect(() => {
     if (!open || !unsealed) return setVisible(0);
-    if (reducedMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setVisible(letter.length);
     let interval = 0;
     const delay = window.setTimeout(() => {
       interval = window.setInterval(() => setVisible((count) => {
@@ -47,7 +46,7 @@ export function GiftLetter({ reducedMotion }: { reducedMotion: boolean }) {
       window.clearTimeout(delay);
       window.clearInterval(interval);
     };
-  }, [open, reducedMotion, unsealed]);
+  }, [open, unsealed]);
 
   function show() {
     setOpen(true);
