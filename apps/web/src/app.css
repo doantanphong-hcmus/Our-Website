@@ -460,26 +460,66 @@ button:disabled {
   color: #392b3e;
   box-shadow: 0 1.2rem 2.5rem rgb(0 0 0 / 30%);
   overflow: auto;
+  scroll-behavior: smooth;
   transform: translateY(38%) scale(0.72);
   transform-origin: 50% 100%;
   opacity: 0;
   animation: letter-pull 1.65s 0.65s cubic-bezier(.2,.8,.2,1) forwards;
 }
 
-.gift-letter-paper__to {
-  display: block;
-  margin-block-end: var(--space-4);
-  color: #b53f5a;
-  font: 700 1rem/1.2 "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
-}
-
 .gift-letter-paper p {
-  min-block-size: 12rem;
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: normal;
   font: 600 clamp(1.05rem, 3.6vw, 1.35rem)/1.75 "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
 }
+
+.gift-letter-signature {
+  inline-size: min(100%, 15rem);
+  margin: var(--space-3) auto 0;
+  opacity: 0;
+}
+
+.gift-letter-signature svg {
+  display: block;
+  inline-size: 100%;
+  overflow: visible;
+}
+
+.gift-letter-signature.is-signing { opacity: 1; }
+
+.gift-letter-signature__stroke {
+  fill: none;
+  stroke: #d4364e;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.is-signing .gift-letter-signature__stroke { animation: signature-ink var(--ink-duration) var(--ink-delay) linear forwards; }
+.stroke-one { --ink-duration: 1.6s; --ink-delay: 0s; }
+.stroke-two { --ink-duration: 0.75s; --ink-delay: 1.55s; }
+.stroke-three { --ink-duration: 1s; --ink-delay: 2.2s; }
+.stroke-four { --ink-duration: 1.45s; --ink-delay: 3.15s; }
+
+.gift-letter-signature__quill {
+  opacity: 0;
+  filter: drop-shadow(0 0.15rem 0.12rem rgb(57 43 62 / 20%));
+}
+
+.gift-letter-signature__quill path {
+  fill: #f0dfc5;
+  stroke: #8f2942;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.gift-letter-signature__quill path:nth-child(2) { fill: none; }
+.gift-letter-signature__quill path:last-child { fill: #d4364e; }
+.is-signing .gift-letter-signature__quill { animation: quill-write 4.8s ease-in-out forwards; }
 
 .gift-letter-caret {
   display: inline-block;
@@ -498,6 +538,16 @@ button:disabled {
 @keyframes envelope-lower { to { opacity: 0; transform: translate(-50%, 42%) scale(0.82); } }
 @keyframes letter-pull { to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes letter-caret { 50% { opacity: 0; } }
+@keyframes signature-ink { to { stroke-dashoffset: 0; } }
+@keyframes quill-write {
+  0% { opacity: 1; transform: translate(70px, 108px) rotate(-22deg); }
+  20% { transform: translate(108px, 24px) rotate(12deg); }
+  39% { transform: translate(92px, 143px) rotate(-8deg); }
+  61% { transform: translate(167px, 57px) rotate(14deg); }
+  78% { transform: translate(24px, 132px) rotate(-26deg); }
+  94% { opacity: 1; transform: translate(218px, 101px) rotate(5deg); }
+  100% { opacity: 0; transform: translate(224px, 96px) rotate(12deg); }
+}
 
 .offline-queue-notice {
   display: flex;
