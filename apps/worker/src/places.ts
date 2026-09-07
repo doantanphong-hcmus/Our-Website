@@ -1,5 +1,5 @@
 export type Place = {
-  provider: "geoapify";
+  provider: "geoapify" | "curated";
   providerId: string;
   name: string | null;
   type: string | null;
@@ -11,8 +11,30 @@ export type Place = {
   openingHours: string | null;
   rating: number | null;
   reviewCount: number | null;
+  reviewSummary: string | null;
   photoUrl: string | null;
   website: string | null;
+  sourceUrl: string | null;
+  verifiedAt: string | null;
+};
+
+export type CuratedPlace = {
+  id: string;
+  name: string;
+  type: string;
+  categories: string[];
+  address: string;
+  latitude: number;
+  longitude: number;
+  openingHours?: string | null;
+  rating: number;
+  reviewCount: number;
+  reviewSummary: string;
+  photoUrl: string;
+  website?: string | null;
+  sourceUrl: string;
+  verifiedAt: string;
+  approved: true;
 };
 
 export const PLACES_ATTRIBUTION = {
@@ -65,6 +87,18 @@ function httpsUrl(value: unknown): string | null {
   }
 }
 
+function photoUrl(value: unknown): string | null {
+  const candidate = text(value);
+  return candidate?.startsWith("/") ? candidate : httpsUrl(candidate);
+}
+
+function verifiedDate(value: unknown): string | null {
+  const candidate = text(value);
+  if (!candidate || !/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return null;
+  const date = new Date(`${candidate}T00:00:00Z`);
+  return Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== candidate ? null : candidate;
+}
+
 function distanceKm(origin: { latitude: number; longitude: number }, place: { latitude: number; longitude: number }): number {
   const radians = (degrees: number) => degrees * Math.PI / 180;
   const latitude = radians(place.latitude - origin.latitude);
@@ -101,8 +135,78 @@ export function normalizeGeoapifyPlace(feature: Feature, origin?: { latitude: nu
     openingHours: text(properties.opening_hours),
     rating: number(properties.rating),
     reviewCount: number(properties.review_count) ?? number(properties.reviews_count),
+    reviewSummary: null,
     photoUrl: httpsUrl(media.image),
     website: httpsUrl(properties.website),
+    sourceUrl: null,
+    verifiedAt: null,
+  };
+}
+
+export function normalizeCuratedPlace(input: CuratedPlace, origin?: { latitude: number; longitude: number }): Place | null {
+  const providerId = text(input.id);
+  const name = text(input.name);
+  const type = text(input.type);
+  const address = text(input.address);
+  const rating = number(input.rating);
+  const reviewCount = number(input.reviewCount);
+  const reviewSummary = text(input.reviewSummary);
+  const image = photoUrl(input.photoUrl);
+  const sourceUrl = httpsUrl(input.sourceUrl);
+  const verifiedAt = verifiedDate(input.verifiedAt);
+  const latitude = number(input.latitude);
+  const longitude = number(input.longitude);
+  if (input.approved !== true || !providerId || !name || !type || !address || !reviewSummary || !image || !sourceUrl || !verifiedAt
+    || latitude === null || latitude < -90 || latitude > 90 || longitude === null || longitude < -180 || longitude > 180
+    || rating === null || rating < 0 || rating > 5 || reviewCount === null || !Number.isInteger(reviewCount) || reviewCount < 1) return null;
+  const categories = Array.isArray(input.categories)
+    ? [...new Set(input.categories.map(text).filter((value): value is string => value !== null))].sort()
+    : [];
+  if (!categories.length) return null;
+  const place = { latitude, longitude };
+  return {
+    provider: "curated",
+    providerId,
+    name,
+    type,
+    categories,
+    address,
+    latitude,
+    longitude,
+    distanceKm: origin ? distanceKm(origin, place) : null,
+    openingHours: text(input.openingHours),
+    rating,
+    reviewCount,
+    reviewSummary,
+    photoUrl: image,
+    website: httpsUrl(input.website),
+    sourceUrl,
+    verifiedAt,
+  };
+}
+
+export function createCuratedPlaces(catalog: CuratedPlace[]) {
+  const places = catalog.map((place) => normalizeCuratedPlace(place)).filter((place): place is Place => place !== null);
+  const byId = new Map(places.map((place) => [place.providerId, place]));
+  return {
+    async search(input: Search): Promise<Place[]> {
+      const limit = input.limit ?? 20;
+      validateSearch(input, limit);
+      const wanted = new Set(input.categories);
+      const origin = { latitude: input.latitude, longitude: input.longitude };
+      return places
+        .map((place) => ({ ...place, distanceKm: distanceKm(origin, place) }))
+        .filter((place) => place.distanceKm! * 1_000 <= input.radiusMeters && place.categories.some((category) => wanted.has(category)))
+        .sort((a, b) => a.distanceKm! - b.distanceKm!)
+        .slice(0, limit);
+    },
+    async detail(providerId: string): Promise<Place | null> {
+      if (!providerId.trim() || providerId.length > 500) throw new RangeError("Invalid place ID.");
+      return byId.get(providerId) ?? null;
+    },
+    async photo(providerId: string): Promise<string | null> {
+      return byId.get(providerId)?.photoUrl ?? null;
+    },
   };
 }
 
@@ -120,6 +224,16 @@ function collection(value: unknown): Feature[] {
     throw new PlacesProviderError("Geoapify returned malformed data.");
   }
   return (value as { features: Feature[] }).features;
+}
+
+function validateSearch(input: Search, limit: number): void {
+  if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90
+    || !Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180
+    || !Number.isInteger(input.radiusMeters) || input.radiusMeters < 100 || input.radiusMeters > 50_000
+    || !Number.isInteger(limit) || limit < 1 || limit > 20
+    || !input.categories.length || input.categories.some((category) => !/^[a-z0-9_.]+$/.test(category))) {
+    throw new RangeError("Invalid Places search.");
+  }
 }
 
 export function createGeoapifyPlaces({ apiKey, reserveRequest, cache, fetcher = fetch }: AdapterOptions) {
@@ -143,13 +257,7 @@ export function createGeoapifyPlaces({ apiKey, reserveRequest, cache, fetcher = 
 
   async function search(input: Search): Promise<Place[]> {
     const limit = input.limit ?? 20;
-    if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90
-      || !Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180
-      || !Number.isInteger(input.radiusMeters) || input.radiusMeters < 100 || input.radiusMeters > 50_000
-      || !Number.isInteger(limit) || limit < 1 || limit > 20
-      || !input.categories.length || input.categories.some((category) => !/^[a-z0-9_.]+$/.test(category))) {
-      throw new RangeError("Invalid Places search.");
-    }
+    validateSearch(input, limit);
     const origin = { latitude: input.latitude, longitude: input.longitude };
     const location = `${input.longitude},${input.latitude}`;
     const parameters = new URLSearchParams({

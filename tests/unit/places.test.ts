@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGeoapifyPlaces, normalizeGeoapifyPlace, PlacesProviderError } from "../../apps/worker/src/places";
+import { createCuratedPlaces, createGeoapifyPlaces, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -10,6 +10,25 @@ const feature = {
     formatted: "1 Nguyễn Huệ, TP.HCM",
     categories: ["catering.restaurant", "catering"],
   },
+};
+
+const curated: CuratedPlace = {
+  id: "museum-1",
+  name: "Bảo tàng thú vị",
+  type: "museum",
+  categories: ["tourism.museum", "entertainment"],
+  address: "1 Đường Mới, TP.HCM",
+  latitude: 10.777,
+  longitude: 106.701,
+  openingHours: "Tu-Su 09:00-18:00",
+  rating: 4.7,
+  reviewCount: 321,
+  reviewSummary: "Không gian khác lạ, nhiều góc đáng khám phá và được khách ghé thăm đánh giá tích cực.",
+  photoUrl: "/places/museum-1.webp",
+  website: "https://example.com/museum",
+  sourceUrl: "https://maps.example.com/museum-1",
+  verifiedAt: "2026-09-07",
+  approved: true,
 };
 
 function memoryCache() {
@@ -78,5 +97,40 @@ describe("Geoapify Places adapter", () => {
     expect(reserveRequest).not.toHaveBeenCalled();
     await expect(places.detail("place-12345678")).rejects.toBeInstanceOf(PlacesProviderError);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("curated Places adapter", () => {
+  it("only accepts approved places with sourced display facts", () => {
+    expect(normalizeCuratedPlace(curated, { latitude: 10.7769, longitude: 106.7009 })).toMatchObject({
+      provider: "curated",
+      providerId: "museum-1",
+      rating: 4.7,
+      reviewCount: 321,
+      photoUrl: "/places/museum-1.webp",
+      sourceUrl: "https://maps.example.com/museum-1",
+      verifiedAt: "2026-09-07",
+      distanceKm: 0.02,
+    });
+    expect(normalizeCuratedPlace({ ...curated, approved: false } as unknown as CuratedPlace)).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, photoUrl: "" })).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, rating: 6 })).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, sourceUrl: "http://example.com" })).toBeNull();
+  });
+
+  it("searches locally by category and distance, with detail and photo", async () => {
+    const places = createCuratedPlaces([
+      curated,
+      { ...curated, id: "far-away", latitude: 11.5, photoUrl: "https://images.example.com/far.webp" },
+    ]);
+    const results = await places.search({
+      latitude: 10.7769,
+      longitude: 106.7009,
+      radiusMeters: 5_000,
+      categories: ["tourism.museum"],
+    });
+    expect(results.map((place) => place.providerId)).toEqual(["museum-1"]);
+    expect((await places.detail("museum-1"))?.reviewSummary).toBe(curated.reviewSummary);
+    expect(await places.photo("museum-1")).toBe("/places/museum-1.webp");
   });
 });

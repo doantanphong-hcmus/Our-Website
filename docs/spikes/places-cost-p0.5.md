@@ -10,10 +10,10 @@ Do not enable Google Places or any provider that requires a billing account.
 Do not collect, display, or rank by provider price level; hiding it is an
 intentional product decision that preserves the Blind Bag surprise.
 
-The first production candidate is Geoapify Places on its Free plan. It does
-not require a credit card and currently includes 3,000 credits per day. A
-Places response costs one credit per 20 returned places. The account and key
-must be owner-controlled before production.
+The production source is a small, owner-approved catalog stored with the app.
+This keeps selection predictable, removes per-play lookup cost, and lets every
+result meet the product requirement before it can be shown. Geoapify remains
+an optional future discovery adapter and is disabled by default.
 
 Photon remains a reproducible development spike only. Its public demo has no
 production availability guarantee.
@@ -27,14 +27,17 @@ Provider data is normalized without inventing missing values:
 | Provider ID, name, type, address, coordinates | Required candidate data |
 | Distance | Calculated by the server from coordinates |
 | Opening hours | Optional; `null` means unknown, not closed |
-| Rating and review count | Optional; `null` means unknown, not zero |
-| Photo | Optional; owner-uploaded visit photos are the reliable fallback |
+| Rating and review count | Required for curated places and copied from the linked source |
+| Short review summary | Required, factual, and traceable to the linked source |
+| Photo | Required; project-owned or HTTPS-hosted |
+| Source and verification date | Required for curated places |
 | Price level | Deliberately omitted |
 
-Selection uses only known data. An unknown opening time must never become
-"closed", and a missing rating must never reduce a candidate's score. Before
-departure, the result asks the users to verify current opening information via
-the external map link.
+Only entries with `approved: true` and all required display facts pass the
+curated adapter. AI may turn those facts into a playful "lời mở túi", but must
+not invent or alter the place, rating, review count, review meaning, or safety
+claim. Before departure, the result asks users to verify current opening
+information via the source link.
 
 ## Hard limits
 
@@ -54,12 +57,12 @@ failure loop cannot create unbounded traffic.
 
 ## Fail-closed behavior
 
-When the counter is exhausted or the provider is unavailable:
+If optional remote discovery is enabled and unavailable:
 
 1. Do not call another paid provider.
 2. Return `PLACE_PROVIDER_QUOTA_EXHAUSTED` or `PLACE_PROVIDER_UNAVAILABLE`.
 3. Preserve the session settings.
-4. Allow manual place/address entry and previously stored places.
+4. Continue serving the approved local catalog.
 5. Never weaken allergy, safety, or distance exclusions.
 
 ## Key and operations controls
@@ -78,13 +81,14 @@ When the counter is exhausted or the provider is unavailable:
 - [x] Price level is absent from the provider contract and ranking.
 - [x] Missing fields remain nullable and do not become false facts.
 - [x] App limits and fail-closed behavior are defined.
-- [x] Manual/stored-place fallback is defined.
-- [ ] Owner-controlled Geoapify account and restricted key exist.
-- [ ] Live coverage is repeated in the real usage area.
-- [ ] Attribution and current free-plan terms are checked before production.
+- [x] Approved local-catalog fallback is defined.
+- [x] Production does not depend on a remote Places request.
+- [x] Curated entries fail closed when photo/rating/review/source evidence is missing.
+- [ ] Owner-approved place content has been entered and reviewed.
+- [ ] If Geoapify is enabled later, attribution and current terms are rechecked.
 
-The unchecked items are deployment prerequisites, not blockers for building
-the provider-neutral backend contract.
+The unchecked content item belongs to candidate onboarding, not the P2.4
+adapter contract. No real-world rating or review is fabricated in fixtures.
 
 ## References
 
