@@ -15,7 +15,7 @@ const password = "session check password";
 const pepper = "test-only-pepper-at-least-thirty-two-bytes";
 const env = { ...process.env, CI: "1", NO_COLOR: "1", XDG_CONFIG_HOME: state, WRANGLER_LOG: "error" };
 const blindBagConditions = {
-  distance: "under_3", budget: "any",
+  distance: "under_3", budget: "any", origin: { kind: "address", address: "Chợ Bến Thành, Quận 1" },
 };
 const foodConditions = {
   foodStyle: "snack", meal: "late", category: "snack",
@@ -153,6 +153,12 @@ try {
     feature: "blind_bag", idempotencyKey: "bad-custom-distance", conditions: { ...blindBagConditions, distance: "custom", customDistanceKm: 0 },
   })).response.status, 400);
   assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "bad-origin-coordinates", conditions: { ...blindBagConditions, origin: { kind: "current", latitude: 91, longitude: 106.7, accuracyMeters: 20 } },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "bad-origin-address", conditions: { ...blindBagConditions, origin: { kind: "address", address: "  x  " } },
+  })).response.status, 400);
+  assert.equal((await request("/api/sessions", phong, "POST", {
     feature: "food_vote", idempotencyKey: "bad-food-style-01", conditions: { ...foodConditions, foodStyle: "restaurant" },
   })).response.status, 400);
   assert.equal((await request("/api/sessions", phong, "POST", {
@@ -192,7 +198,11 @@ try {
   assert.equal(completed.response.status, 200);
   assert.equal(completed.data.session.status, "completed");
 
-  const declinedSession = await create(nhi, "blind_bag", "create-decline-001");
+  const declinedSession = await request("/api/sessions", nhi, "POST", {
+    feature: "blind_bag", idempotencyKey: "create-decline-001",
+    conditions: { ...blindBagConditions, origin: { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 } },
+  });
+  assert.equal(declinedSession.response.status, 201);
   const declined = await act(phong, declinedSession.data.session.id, "decline", 1, "decline-blind-001");
   assert.equal(declined.data.session.status, "declined");
 

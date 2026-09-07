@@ -115,11 +115,24 @@ function blindBagPayload(value: unknown): string | null {
   if (input.distance === "custom"
     && (typeof input.customDistanceKm !== "number" || !Number.isFinite(input.customDistanceKm)
       || input.customDistanceKm < 1 || input.customDistanceKm > 100)) return null;
+  if (!input.origin || typeof input.origin !== "object" || Array.isArray(input.origin)) return null;
+  const originInput = input.origin as Record<string, unknown>;
+  const address = typeof originInput.address === "string" ? originInput.address.trim() : "";
+  const current = originInput.kind === "current"
+    && typeof originInput.latitude === "number" && Number.isFinite(originInput.latitude) && originInput.latitude >= -90 && originInput.latitude <= 90
+    && typeof originInput.longitude === "number" && Number.isFinite(originInput.longitude) && originInput.longitude >= -180 && originInput.longitude <= 180
+    && typeof originInput.accuracyMeters === "number" && Number.isFinite(originInput.accuracyMeters) && originInput.accuracyMeters >= 0 && originInput.accuracyMeters <= 100_000;
+  const manual = originInput.kind === "address" && address.length >= 5 && address.length <= 200;
+  if (!current && !manual) return null;
+  const origin = current
+    ? { kind: "current", latitude: originInput.latitude, longitude: originInput.longitude, accuracyMeters: originInput.accuracyMeters }
+    : { kind: "address", address };
   return JSON.stringify({
     conditions: {
       distance: input.distance,
       ...(input.distance === "custom" ? { customDistanceKm: input.customDistanceKm } : {}),
       budget: input.budget,
+      origin,
     },
   });
 }

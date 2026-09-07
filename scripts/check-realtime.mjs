@@ -149,7 +149,7 @@ try {
   let started = performance.now();
   const created = await api(first.page, "/api/sessions", {
     feature: "blind_bag", idempotencyKey: "p110-create-001",
-    conditions: { distance: "under_3", budget: "any" },
+    conditions: { distance: "under_3", budget: "any", origin: { kind: "address", address: "Chợ Bến Thành, Quận 1" } },
   });
   assert.equal(created.status, 201);
   const sessionId = created.data.session.id;

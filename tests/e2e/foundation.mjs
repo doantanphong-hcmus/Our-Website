@@ -25,6 +25,13 @@ try {
   });
   await phongPage.getByRole("link", { name: "Xé Túi Mù" }).first().click();
   await phongPage.getByRole("heading", { name: "Hai đứa muốn đi xa và chi bao nhiêu?" }).waitFor();
+  await phongPage.evaluate(() => Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: { getCurrentPosition: (_success, error) => error({ code: 1, message: "denied" }) },
+  }));
+  await phongPage.getByRole("button", { name: "Dùng vị trí hiện tại" }).click();
+  await phongPage.getByText("Không lấy được vị trí. Mình nhập địa chỉ nhé.").waitFor();
+  await phongPage.getByLabel("Địa chỉ xuất phát").fill("Chợ Bến Thành, Quận 1");
   await phongPage.getByLabel("Khoảng cách").selectOption("custom");
   await phongPage.getByLabel("Khoảng cách tối đa (km)").fill("12.5");
   await phongPage.getByLabel("Ngân sách cho hai người").selectOption("under_200k");
@@ -37,7 +44,10 @@ try {
   await phongPage.getByRole("button", { name: "Gửi người kia xác nhận" }).click();
   for (let attempt = 0; attempt < 40 && !createCommand; attempt++) await network.delay(50);
   assert.equal(createCommand.feature, "blind_bag");
-  assert.deepEqual(createCommand.conditions, { distance: "custom", customDistanceKm: 12.5, budget: "under_200k" });
+  assert.deepEqual(createCommand.conditions, {
+    distance: "custom", customDistanceKm: 12.5, budget: "under_200k",
+    origin: { kind: "address", address: "Chợ Bến Thành, Quận 1" },
+  });
   assert.match(createCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
@@ -446,7 +456,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1/P3.2-P4.15 E2E: Deep Talk consent, fallback, two-device play and private review = OK");
+  console.log("P1.14/P2.1-P2.2/P3.2-P4.15 E2E: location fallback, Deep Talk consent, two-device play and private review = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {
