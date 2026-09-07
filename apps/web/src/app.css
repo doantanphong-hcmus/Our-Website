@@ -1053,6 +1053,34 @@ main {
   font-size: var(--font-small);
 }
 
+.blind-bag-summary {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-4);
+}
+
+.blind-bag-summary div {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+}
+
+.blind-bag-summary :where(dt, dd) { margin: 0; }
+.blind-bag-summary dt { color: var(--color-text-muted); font-size: var(--font-small); }
+.blind-bag-summary dd { margin-block-start: var(--space-1); font-weight: 750; }
+
+.blind-bag-review-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.blind-bag-review-actions button { min-block-size: 3rem; }
+
+@media (max-width: 30rem) {
+  .blind-bag-review-actions { grid-template-columns: 1fr; }
+}
+
 .food-style-options {
   display: grid;
   grid-template-columns: 1fr 1fr;

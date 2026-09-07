@@ -51,6 +51,40 @@ try {
   assert.match(createCommand.idempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(await phongPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
 
+  const reviewContext = await browser.newContext({ viewport: { width: 360, height: 800 } });
+  const reviewPage = await reviewContext.newPage();
+  const reviewSession = {
+    id: "00000000-0000-4000-8000-000000000023", feature: "blind_bag", status: "pending",
+    createdByUserId: phong.id, version: 1, createdAt: 1_788_000_000,
+    conditions: { distance: "under_3", budget: "under_200k", origin: { kind: "address", address: "Chợ Bến Thành, Quận 1" } },
+    confirmation: { revision: 1, confirmedUserIds: [phong.id] },
+  };
+  let reviewCommand;
+  let reviewPath;
+  await reviewPage.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: nhi }) }));
+  await reviewPage.route("**/api/sessions**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 1, sessions: [reviewSession] }) });
+    reviewPath = new URL(route.request().url()).pathname;
+    reviewCommand = route.request().postDataJSON();
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: reviewSession }) });
+  });
+  await reviewPage.goto(`${server.url}/di-dau/xe-tui-mu`);
+  await reviewPage.getByRole("heading", { name: "Một lời mời đang chờ mình" }).waitFor();
+  await reviewPage.getByText("Chợ Bến Thành, Quận 1").waitFor();
+  assert.equal(await reviewPage.getByRole("button", { name: "Đồng ý" }).count(), 1);
+  assert.equal(await reviewPage.getByRole("button", { name: "Từ chối" }).count(), 1);
+  await reviewPage.getByRole("button", { name: "Đề nghị sửa" }).click();
+  await reviewPage.getByLabel("Ngân sách cho hai người").selectOption("free_low");
+  await reviewPage.getByRole("button", { name: "Gửi lại để xác nhận" }).click();
+  for (let attempt = 0; attempt < 40 && !reviewCommand; attempt++) await network.delay(50);
+  assert.equal(reviewPath, `/api/sessions/${reviewSession.id}/blind-bag-confirmation`);
+  assert.equal(reviewCommand.action, "revise");
+  assert.equal(reviewCommand.expectedVersion, 1);
+  assert.equal(reviewCommand.conditions.budget, "free_low");
+  await assertA11y(reviewPage);
+  assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+  await reviewContext.close();
+
   createCommand = null;
   await phongPage.getByRole("link", { name: "Ăn gì", exact: true }).click();
   await phongPage.getByRole("heading", { name: "Hôm nay mình muốn ăn kiểu nào?" }).waitFor();
@@ -456,7 +490,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1-P2.2/P3.2-P4.15 E2E: location fallback, Deep Talk consent, two-device play and private review = OK");
+  console.log("P1.14/P2.1-P2.3/P3.2-P4.15 E2E: location fallback, revision confirmation and private two-device play = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

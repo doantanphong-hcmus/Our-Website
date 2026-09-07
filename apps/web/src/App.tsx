@@ -454,7 +454,7 @@ export function App({ user, onUserChange, onLogout }: {
         ) : route?.path === "/doi-mat-khau" ? (
           <ChangePassword onChanged={onUserChange} />
         ) : route?.path === "/di-dau/xe-tui-mu" ? (
-          <BlindBagForm />
+          <BlindBagForm user={user} />
         ) : route?.path === "/an-gi" ? (
           <FoodSessionSetup user={user} />
         ) : route?.path === "/deep-talk" ? (
