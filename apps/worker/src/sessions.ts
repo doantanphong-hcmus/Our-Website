@@ -20,6 +20,7 @@ export type FoodMatch = { dishId: string; alternatives: string[] };
 type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhausted: true };
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
+type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
 type TopicState = "unset" | "allow" | "deny";
 type DeepTalkConditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
 type DeepTalkConsent = { stage: "final_confirmation" | "ready"; revision: number; confirmedUserIds: string[]; changed: boolean };
@@ -90,8 +91,23 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+function storedBlindBagConfirmation(resultJson: string | null): BlindBagConfirmation | null {
+  try {
+    const value = (JSON.parse(resultJson ?? "{}") as { blindBagConfirmation?: unknown }).blindBagConfirmation;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const { revision, confirmedUserIds } = value as Record<string, unknown>;
+    return Number.isInteger(revision) && Number(revision) >= 1 && Array.isArray(confirmedUserIds)
+      && confirmedUserIds.every((id) => typeof id === "string")
+      ? { revision: Number(revision), confirmedUserIds: [...new Set(confirmedUserIds as string[])] }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function publicSession(row: SessionRow) {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+  const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
   return {
     id: row.id,
     feature: row.feature,
@@ -99,6 +115,7 @@ function publicSession(row: SessionRow) {
     createdByUserId: row.created_by_user_id,
     version: row.version,
     ...payload,
+    ...(confirmation ? { confirmation } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -652,6 +669,65 @@ async function deepTalkConsent(request: Request, env: SessionEnv, userId: string
   return json(state(updated!), 201);
 }
 
+async function blindBagConfirmation(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "blind_bag" || current.status !== "pending") return json({ error: "Phiên Xé Túi Mù không còn chờ xác nhận." }, 409);
+  const conditions = (JSON.parse(current.payload_json) as { conditions?: unknown }).conditions;
+  const confirmation = storedBlindBagConfirmation(current.result_json)
+    ?? { revision: 1, confirmedUserIds: [current.created_by_user_id] };
+  if (request.method === "GET") return json({ session: publicSession(current) });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const input = await body(request);
+  const action = input?.action;
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!['confirm', 'revise'].includes(String(action)) || !Number.isInteger(expectedVersion)
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh xác nhận Xé Túi Mù không hợp lệ." }, 400);
+  }
+  const nextPayload = action === "revise" ? blindBagPayload(input?.conditions) : current.payload_json;
+  if (!nextPayload) return json({ error: "Điều kiện Xé Túi Mù không hợp lệ." }, 400);
+  const inputJson = JSON.stringify(action === "revise" ? { action, conditions: JSON.parse(nextPayload).conditions } : { action });
+  const previous = await env.DB.prepare(`SELECT session_id, actor_user_id, action, input_json FROM activity_session_events
+    WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
+    .first<{ session_id: string; actor_user_id: string; action: string; input_json: string }>();
+  if (previous) {
+    const replay = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+    return previous.session_id === sessionId && previous.actor_user_id === userId && previous.action === action
+      && previous.input_json === inputJson && replay
+      ? json({ session: publicSession(replay), duplicate: true })
+      : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  }
+  if (action === "revise" && nextPayload === current.payload_json) return json({ error: "Chưa có thay đổi nào để gửi lại." }, 400);
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
+
+  let nextConfirmation: BlindBagConfirmation;
+  if (action === "revise") {
+    nextConfirmation = { revision: confirmation.revision + 1, confirmedUserIds: [userId] };
+  } else {
+    if (confirmation.confirmedUserIds.includes(userId)) return json({ error: "Mình đã xác nhận bản này rồi." }, 409);
+    nextConfirmation = { ...confirmation, confirmedUserIds: [...confirmation.confirmedUserIds, userId] };
+  }
+  const nextStatus: Status = nextConfirmation.confirmedUserIds.length >= 2 ? "active" : "pending";
+  const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}), blindBagConfirmation: nextConfirmation };
+  const now = Math.floor(Date.now() / 1000);
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE activity_sessions SET status = ?, version = version + 1, payload_json = ?, result_json = ?,
+      expires_at = ?, updated_at = ? WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'pending'`)
+      .bind(nextStatus, nextPayload, JSON.stringify(result), nextStatus === "active" ? null : current.expires_at,
+        now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version, input_json)
+      SELECT ?, ?, ?, ?, ?, 'pending', ?, ?, ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, action, nextStatus, current.version + 1, inputJson),
+  ]);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json({ session: publicSession(updated!) }, 201);
+}
+
 function publicDeepTalkDeck(row: DeepTalkDeckRow) {
   return { id: row.id, sessionId: row.session_id, cardCount: 20, createdAt: row.created_at };
 }
@@ -988,12 +1064,14 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
 
   const now = Math.floor(Date.now() / 1000);
   const id = crypto.randomUUID();
+  const resultJson = feature === "blind_bag"
+    ? JSON.stringify({ blindBagConfirmation: { revision: 1, confirmedUserIds: [userId] } }) : null;
   try {
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO activity_sessions
-        (id, couple_space_id, feature, status, created_by_user_id, version, idempotency_key, payload_json, expires_at, created_at, updated_at)
-        VALUES (?, ?, ?, 'pending', ?, 1, ?, ?, ?, ?, ?)`)
-        .bind(id, spaceId, feature, userId, idempotencyKey, payloadJson, now + 24 * 60 * 60, now, now),
+        (id, couple_space_id, feature, status, created_by_user_id, version, idempotency_key, payload_json, result_json, expires_at, created_at, updated_at)
+        VALUES (?, ?, ?, 'pending', ?, 1, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, spaceId, feature, userId, idempotencyKey, payloadJson, resultJson, now + 24 * 60 * 60, now, now),
       env.DB.prepare(`INSERT INTO activity_session_events
         (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version)
         VALUES (?, ?, ?, ?, 'create', 'none', 'pending', 1)`)
@@ -1011,9 +1089,11 @@ async function createSession(request: Request, env: SessionEnv, userId: string, 
 
 function transition(row: SessionRow, action: Action, actorId: string): Status | null {
   if (row.status === "pending" && actorId !== row.created_by_user_id) {
-    if (action === "join" && row.feature !== "deep_talk") return "active";
-    if (action === "decline") return "declined";
+    if (action === "join" && row.feature === "food_vote") return "active";
+    if (action === "decline" && row.feature !== "blind_bag") return "declined";
   }
+  if (row.status === "pending" && row.feature === "blind_bag" && action === "decline"
+    && !storedBlindBagConfirmation(row.result_json)?.confirmedUserIds.includes(actorId)) return "declined";
   if (action === "cancel" && (row.status === "active" || (row.status === "pending" && actorId === row.created_by_user_id))) return "cancelled";
   if (action === "complete" && row.status === "active" && row.feature !== "food_vote") return "completed";
   return null;
@@ -1102,6 +1182,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "deep-talk-consent") {
     return deepTalkConsent(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "blind-bag-confirmation") {
+    return blindBagConfirmation(request, env, userId, spaceId, sessionId);
   }
   if (parts.length === 4 && parts[3] === "deep-talk-deck") {
     return deepTalkDeck(request, env, userId, spaceId, sessionId);

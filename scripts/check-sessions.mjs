@@ -176,6 +176,7 @@ try {
   assert.equal(created.response.status, 201);
   assert.equal(created.data.session.status, "pending");
   assert.deepEqual(created.data.session.conditions, blindBagConditions);
+  assert.deepEqual(created.data.session.confirmation, { revision: 1, confirmedUserIds: ["user-phong"] });
   const sessionId = created.data.session.id;
   const replayCreate = await create(phong, "blind_bag", "create-blind-001");
   assert.equal(replayCreate.response.status, 200);
@@ -187,14 +188,30 @@ try {
   assert.equal((await create(nhi, "blind_bag", "create-blind-002")).response.status, 409);
   assert.equal((await act(phong, sessionId, "join", 1, "join-blind-owner")).response.status, 409);
 
-  const joined = await act(nhi, sessionId, "join", 1, "join-blind-001");
-  assert.equal(joined.response.status, 200);
-  assert.equal(joined.data.session.status, "active");
-  assert.equal(joined.data.session.version, 2);
-  assert.equal((await act(nhi, sessionId, "join", 1, "join-blind-001")).data.duplicate, true);
-  assert.equal((await act(phong, sessionId, "cancel", 2, "join-blind-001")).response.status, 409);
-  assert.equal((await act(phong, sessionId, "cancel", 1, "cancel-stale-001")).response.status, 409);
-  const completed = await act(phong, sessionId, "complete", 2, "complete-blind-001");
+  const confirmationPath = `/api/sessions/${sessionId}/blind-bag-confirmation`;
+  assert.equal((await request(confirmationPath, nhi, "POST", {
+    action: "revise", expectedVersion: 1, conditions: blindBagConditions, idempotencyKey: "revise-blind-same",
+  })).response.status, 400);
+  const revisedConditions = { ...blindBagConditions, budget: "under_200k" };
+  const revised = await request(confirmationPath, nhi, "POST", {
+    action: "revise", expectedVersion: 1, conditions: revisedConditions, idempotencyKey: "revise-blind-001",
+  });
+  assert.equal(revised.response.status, 201);
+  assert.equal(revised.data.session.status, "pending");
+  assert.equal(revised.data.session.version, 2);
+  assert.deepEqual(revised.data.session.conditions, revisedConditions);
+  assert.deepEqual(revised.data.session.confirmation, { revision: 2, confirmedUserIds: ["user-nhi"] });
+  assert.equal((await request(confirmationPath, nhi, "POST", {
+    action: "revise", expectedVersion: 1, conditions: revisedConditions, idempotencyKey: "revise-blind-001",
+  })).data.duplicate, true);
+  const confirmed = await request(confirmationPath, phong, "POST", {
+    action: "confirm", expectedVersion: 2, idempotencyKey: "confirm-blind-001",
+  });
+  assert.equal(confirmed.response.status, 201);
+  assert.equal(confirmed.data.session.status, "active");
+  assert.deepEqual(confirmed.data.session.confirmation, { revision: 2, confirmedUserIds: ["user-nhi", "user-phong"] });
+  assert.equal((await act(phong, sessionId, "cancel", 2, "cancel-stale-001")).response.status, 409);
+  const completed = await act(phong, sessionId, "complete", 3, "complete-blind-001");
   assert.equal(completed.response.status, 200);
   assert.equal(completed.data.session.status, "completed");
 

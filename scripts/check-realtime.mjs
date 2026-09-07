@@ -160,8 +160,10 @@ try {
   const broadcastMs = Math.round(performance.now() - started);
   assert.ok(broadcastMs < timeoutMs, `Broadcast took ${broadcastMs}ms`);
 
-  const joined = await api(second.page, `/api/sessions/${sessionId}/join`, { expectedVersion: 1, idempotencyKey: "p110-join-00001" });
-  assert.equal(joined.status, 200);
+  const joined = await api(second.page, `/api/sessions/${sessionId}/blind-bag-confirmation`, {
+    action: "confirm", expectedVersion: 1, idempotencyKey: "p110-confirm-001",
+  });
+  assert.equal(joined.status, 201);
   await Promise.all([
     waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 2)),
     waitFor(second.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 2)),
