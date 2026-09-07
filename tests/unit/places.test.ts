@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCuratedPlaces, createGeoapifyPlaces, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
+import { createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -24,6 +24,7 @@ const curated: CuratedPlace = {
   rating: 4.7,
   reviewCount: 321,
   reviewSummary: "Không gian khác lạ, nhiều góc đáng khám phá và được khách ghé thăm đánh giá tích cực.",
+  budgetTier: "under_200k",
   photoUrl: "/places/museum-1.webp",
   website: "https://example.com/museum",
   sourceUrl: "https://maps.example.com/museum-1",
@@ -116,6 +117,7 @@ describe("curated Places adapter", () => {
     expect(normalizeCuratedPlace({ ...curated, photoUrl: "" })).toBeNull();
     expect(normalizeCuratedPlace({ ...curated, rating: 6 })).toBeNull();
     expect(normalizeCuratedPlace({ ...curated, sourceUrl: "http://example.com" })).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, budgetTier: "unknown" } as unknown as CuratedPlace)).toBeNull();
   });
 
   it("searches locally by category and distance, with detail and photo", async () => {
@@ -132,5 +134,21 @@ describe("curated Places adapter", () => {
     expect(results.map((place) => place.providerId)).toEqual(["museum-1"]);
     expect((await places.detail("museum-1"))?.reviewSummary).toBe(curated.reviewSummary);
     expect(await places.photo("museum-1")).toBe("/places/museum-1.webp");
+  });
+
+  it("filters only complete, unique candidates by distance and budget", () => {
+    const base = normalizeCuratedPlace(curated)!;
+    const nearby = { ...base, providerId: "nearby", distanceKm: 2, budgetTier: "free_low" as const };
+    const matching = { ...base, distanceKm: 4 };
+    const expensive = { ...base, providerId: "expensive", distanceKm: 4, budgetTier: "two_to_five_hundred_k" as const };
+    const incomplete = { ...base, providerId: "incomplete", distanceKm: 4, photoUrl: null };
+    expect(filterPlaceCandidates([nearby, matching, matching, expensive, incomplete], {
+      distance: "three_to_five",
+      budget: "under_200k",
+    }).map((place) => place.providerId)).toEqual(["museum-1"]);
+    expect(filterPlaceCandidates([nearby, matching], { distance: "custom", customDistanceKm: 4, budget: "any" }))
+      .toHaveLength(2);
+    expect(() => filterPlaceCandidates([matching], { distance: "custom", customDistanceKm: 101, budget: "any" }))
+      .toThrow(RangeError);
   });
 });

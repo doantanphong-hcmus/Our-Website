@@ -12,10 +12,18 @@ export type Place = {
   rating: number | null;
   reviewCount: number | null;
   reviewSummary: string | null;
+  budgetTier: PlaceBudget | null;
   photoUrl: string | null;
   website: string | null;
   sourceUrl: string | null;
   verifiedAt: string | null;
+};
+
+export type PlaceBudget = "free_low" | "under_200k" | "two_to_five_hundred_k";
+export type PlaceCandidateConditions = {
+  distance: "under_3" | "three_to_five" | "five_to_ten" | "custom";
+  customDistanceKm?: number;
+  budget: PlaceBudget | "any";
 };
 
 export type CuratedPlace = {
@@ -30,6 +38,7 @@ export type CuratedPlace = {
   rating: number;
   reviewCount: number;
   reviewSummary: string;
+  budgetTier: PlaceBudget;
   photoUrl: string;
   website?: string | null;
   sourceUrl: string;
@@ -136,6 +145,7 @@ export function normalizeGeoapifyPlace(feature: Feature, origin?: { latitude: nu
     rating: number(properties.rating),
     reviewCount: number(properties.review_count) ?? number(properties.reviews_count),
     reviewSummary: null,
+    budgetTier: null,
     photoUrl: httpsUrl(media.image),
     website: httpsUrl(properties.website),
     sourceUrl: null,
@@ -156,7 +166,9 @@ export function normalizeCuratedPlace(input: CuratedPlace, origin?: { latitude: 
   const verifiedAt = verifiedDate(input.verifiedAt);
   const latitude = number(input.latitude);
   const longitude = number(input.longitude);
+  const budgetTier = ["free_low", "under_200k", "two_to_five_hundred_k"].includes(input.budgetTier) ? input.budgetTier : null;
   if (input.approved !== true || !providerId || !name || !type || !address || !reviewSummary || !image || !sourceUrl || !verifiedAt
+    || !budgetTier
     || latitude === null || latitude < -90 || latitude > 90 || longitude === null || longitude < -180 || longitude > 180
     || rating === null || rating < 0 || rating > 5 || reviewCount === null || !Number.isInteger(reviewCount) || reviewCount < 1) return null;
   const categories = Array.isArray(input.categories)
@@ -178,11 +190,40 @@ export function normalizeCuratedPlace(input: CuratedPlace, origin?: { latitude: 
     rating,
     reviewCount,
     reviewSummary,
+    budgetTier,
     photoUrl: image,
     website: httpsUrl(input.website),
     sourceUrl,
     verifiedAt,
   };
+}
+
+export function filterPlaceCandidates(places: Place[], conditions: PlaceCandidateConditions): Place[] {
+  const ranges = { under_3: [0, 3], three_to_five: [3, 5], five_to_ten: [5, 10] } as const;
+  const maximum = conditions.distance === "custom" ? conditions.customDistanceKm : ranges[conditions.distance]?.[1];
+  if (typeof maximum !== "number" || !Number.isFinite(maximum) || maximum < 1 || maximum > 100) {
+    throw new RangeError("Invalid candidate distance.");
+  }
+  const minimum = conditions.distance === "custom" ? 0 : ranges[conditions.distance][0];
+  const budgets: Record<PlaceCandidateConditions["budget"], PlaceBudget[]> = {
+    free_low: ["free_low"],
+    under_200k: ["free_low", "under_200k"],
+    two_to_five_hundred_k: ["two_to_five_hundred_k"],
+    any: ["free_low", "under_200k", "two_to_five_hundred_k"],
+  };
+  const allowedBudgets = budgets[conditions.budget];
+  if (!allowedBudgets) throw new RangeError("Invalid candidate budget.");
+  const seen = new Set<string>();
+  return places.filter((place) => {
+    const key = `${place.provider}:${place.providerId}`;
+    const complete = place.provider === "curated" && place.name && place.address && place.photoUrl && place.sourceUrl
+      && place.verifiedAt && place.reviewSummary && place.rating !== null && place.reviewCount !== null && place.reviewCount > 0
+      && place.distanceKm !== null && place.budgetTier !== null;
+    const outsideRange = place.distanceKm === null || (minimum > 0 && place.distanceKm <= minimum) || place.distanceKm > maximum;
+    if (!complete || seen.has(key) || outsideRange || !allowedBudgets.includes(place.budgetTier!)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function createCuratedPlaces(catalog: CuratedPlace[]) {

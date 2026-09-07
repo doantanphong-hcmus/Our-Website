@@ -29,6 +29,7 @@ Provider data is normalized without inventing missing values:
 | Opening hours | Optional; `null` means unknown, not closed |
 | Rating and review count | Required for curated places and copied from the linked source |
 | Short review summary | Required, factual, and traceable to the linked source |
+| Budget tier | Required estimate for two people; one of the three product tiers |
 | Photo | Required; project-owned or HTTPS-hosted |
 | Source and verification date | Required for curated places |
 | Price level | Deliberately omitted |
@@ -38,6 +39,10 @@ curated adapter. AI may turn those facts into a playful "lời mở túi", but m
 not invent or alter the place, rating, review count, review meaning, or safety
 claim. Before departure, the result asks users to verify current opening
 information via the source link.
+
+Candidate selection only applies the two product filters: distance and budget.
+It rejects incomplete/unapproved records and duplicate provider IDs. Opening
+hours stay informational because the setup no longer asks for a visit time.
 
 ## Hard limits
 
