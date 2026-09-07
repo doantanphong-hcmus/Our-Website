@@ -15,8 +15,7 @@ const password = "session check password";
 const pepper = "test-only-pepper-at-least-thirty-two-bytes";
 const env = { ...process.env, CI: "1", NO_COLOR: "1", XDG_CONFIG_HOME: state, WRANGLER_LOG: "error" };
 const blindBagConditions = {
-  time: "two_three_hours", distance: "under_3", transport: "motorbike", budget: "any",
-  setting: "any", experience: "any", surprise: "gentle",
+  distance: "under_3", budget: "any",
 };
 const foodConditions = {
   foodStyle: "snack", meal: "late", category: "snack",
@@ -176,7 +175,7 @@ try {
   assert.equal(replayCreate.response.status, 200);
   assert.equal(replayCreate.data.duplicate, true);
   assert.equal((await request("/api/sessions", phong, "POST", {
-    feature: "blind_bag", idempotencyKey: "create-blind-001", conditions: { ...blindBagConditions, surprise: "bold" },
+    feature: "blind_bag", idempotencyKey: "create-blind-001", conditions: { ...blindBagConditions, budget: "under_200k" },
   })).response.status, 409);
   assert.equal((await create(phong, "deep_talk", "create-blind-001")).response.status, 409);
   assert.equal((await create(nhi, "blind_bag", "create-blind-002")).response.status, 409);

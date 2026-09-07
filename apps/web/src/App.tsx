@@ -2,6 +2,7 @@ import { useEffect, useState, type AnchorHTMLAttributes, type FormEvent, type Mo
 import { userFrom, type User } from "./user";
 import { discardOfflineCommands, queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 import { EmptyState, ErrorState, LoadingState } from "./uiStates";
+import { BlindBagForm } from "./BlindBagForm";
 import { FoodSessionSetup } from "./FoodSessionSetup";
 import { DeepTalkSetup } from "./DeepTalkSetup";
 import { GiftLetter } from "./GiftLetter";
@@ -452,11 +453,13 @@ export function App({ user, onUserChange, onLogout }: {
           <ProfileSettings user={user} save={saveProfile} />
         ) : route?.path === "/doi-mat-khau" ? (
           <ChangePassword onChanged={onUserChange} />
+        ) : route?.path === "/di-dau/xe-tui-mu" ? (
+          <BlindBagForm />
         ) : route?.path === "/an-gi" ? (
           <FoodSessionSetup user={user} />
         ) : route?.path === "/deep-talk" ? (
           <DeepTalkSetup user={user} />
-        ) : route?.path === "/di-dau" || route?.path === "/di-dau/xe-tui-mu" ? (
+        ) : route?.path === "/di-dau" ? (
           <section className="route-card coming-soon" aria-labelledby="page-title">
             <h1 id="page-title">Coming soon ... em bé hãy đợi anh</h1>
           </section>

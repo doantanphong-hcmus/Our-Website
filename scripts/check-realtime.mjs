@@ -149,10 +149,7 @@ try {
   let started = performance.now();
   const created = await api(first.page, "/api/sessions", {
     feature: "blind_bag", idempotencyKey: "p110-create-001",
-    conditions: {
-      time: "two_three_hours", distance: "under_3", transport: "motorbike", budget: "any",
-      setting: "any", experience: "any", surprise: "gentle",
-    },
+    conditions: { distance: "under_3", budget: "any" },
   });
   assert.equal(created.status, 201);
   const sessionId = created.data.session.id;

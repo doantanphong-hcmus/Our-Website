@@ -71,13 +71,8 @@ const selectSession = `SELECT id, feature, status, created_by_user_id, version,
 const selectDeepTalkDeck = `SELECT id, session_id, created_by_user_id, idempotency_key, seed, cards_json, created_at FROM deep_talk_decks`;
 
 const conditionChoices = {
-  time: ["one_hour", "two_three_hours", "half_day", "any"],
   distance: ["under_3", "three_to_five", "five_to_ten", "custom"],
-  transport: ["walk", "motorbike", "car", "any"],
   budget: ["free_low", "under_200k", "two_to_five_hundred_k", "any"],
-  setting: ["indoor", "outdoor", "any"],
-  experience: ["food", "relax", "art", "books", "play", "explore", "any"],
-  surprise: ["gentle", "adventure", "bold"],
 } as const;
 const foodMeals = ["breakfast", "lunch", "dinner", "late", "any"];
 const foodStyles = new Set<string>(foodCatalog.foodStyles.map((item) => item.id));
@@ -122,14 +117,9 @@ function blindBagPayload(value: unknown): string | null {
       || input.customDistanceKm < 1 || input.customDistanceKm > 100)) return null;
   return JSON.stringify({
     conditions: {
-      time: input.time,
       distance: input.distance,
       ...(input.distance === "custom" ? { customDistanceKm: input.customDistanceKm } : {}),
-      transport: input.transport,
       budget: input.budget,
-      setting: input.setting,
-      experience: input.experience,
-      surprise: input.surprise,
     },
   });
 }
