@@ -1,0 +1,2564 @@
+{
+  "version": 1,
+  "attribution": "© OpenStreetMap contributors, ODbL",
+  "sourceUrl": "https://www.openstreetmap.org/copyright",
+  "origin": {
+    "name": "Đại học Ngân hàng TP.HCM — cơ sở Hoàng Diệu 2",
+    "latitude": 10.85712,
+    "longitude": 106.76084
+  },
+  "radiusKm": 35,
+  "generatedAt": "2026-09-08",
+  "places": [
+    {
+      "id": "osm-way-463548000",
+      "name": "Khu du lịch Suối Tiên",
+      "type": "theme_park",
+      "categories": [
+        "outing.theme_park"
+      ],
+      "address": "120 Xa lộ Hà Nội",
+      "latitude": 10.8619124,
+      "longitude": 106.8037899,
+      "description": "Khu du lịch Suối Tiên là khu vui chơi trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://www.suoitien.com/",
+      "sourceUrl": "https://www.openstreetmap.org/way/463548000",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-relation-17758150",
+      "name": "Bảo tàng Lịch sử Thành phố TP.HCM",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "2 Nguyễn Thị Minh Khai",
+      "latitude": 10.7879621,
+      "longitude": 106.7049183,
+      "description": "Bảo tàng Lịch sử Thành phố TP.HCM là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "http://www.baotanglichsutphcm.com.vn/en-US/sightseeing/policy",
+      "sourceUrl": "https://www.openstreetmap.org/relation/17758150",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-186249226",
+      "name": "Bảo tàng Chứng tích Chiến tranh",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "28 Võ Văn Tần, TP.HCM",
+      "latitude": 10.7793793,
+      "longitude": 106.6921923,
+      "description": "Bảo tàng Chứng tích Chiến tranh là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://www.baotangchungtichchientranh.vn/contact.html",
+      "sourceUrl": "https://www.openstreetmap.org/way/186249226",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-802157425",
+      "name": "Bảo tàng Mỹ thuật Thành phố TP.HCM",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "97A Phó Đức Chính",
+      "latitude": 10.769646,
+      "longitude": 106.6992468,
+      "description": "Bảo tàng Mỹ thuật Thành phố TP.HCM là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "http://baotangmythuattphcm.com.vn",
+      "sourceUrl": "https://www.openstreetmap.org/way/802157425",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1163348358",
+      "name": "The Amazing Bay",
+      "type": "water_park",
+      "categories": [
+        "outing.water_park"
+      ],
+      "address": "Quốc lộ 51, Biên Hòa",
+      "latitude": 10.8748484,
+      "longitude": 106.8703627,
+      "description": "The Amazing Bay là công viên nước trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://theamazingbay.com/",
+      "sourceUrl": "https://www.openstreetmap.org/way/1163348358",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-13336584701",
+      "name": "Quang San Art Museum",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Nguyễn Văn Hưởng",
+      "latitude": 10.8180655,
+      "longitude": 106.7300732,
+      "description": "Quang San Art Museum là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://quangsanartmuseum.com.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/node/13336584701",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-377308558",
+      "name": "Công viên Nước Đầm Sen",
+      "type": "water_park",
+      "categories": [
+        "outing.water_park"
+      ],
+      "address": "3 Đường Hòa Bình, Quận 11, TP.HCM",
+      "latitude": 10.7681618,
+      "longitude": 106.6363442,
+      "description": "Công viên Nước Đầm Sen là công viên nước trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://www.damsenwaterpark.com.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/377308558",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4110078089",
+      "name": "Bảo Tàng FITO",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "41 Hoàng Dư Khương",
+      "latitude": 10.7762825,
+      "longitude": 106.6719677,
+      "description": "Bảo Tàng FITO là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://fitomuseum.com.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/node/4110078089",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-981161888",
+      "name": "Bảo tàng Thành phố Đồng Nai",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "1 Đường Nguyễn Ái Quốc",
+      "latitude": 10.9584601,
+      "longitude": 106.8298077,
+      "description": "Bảo tàng Thành phố Đồng Nai là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://baotangdongnai.com.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/981161888",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12495448277",
+      "name": "Hải Dương Water Park",
+      "type": "water_park",
+      "categories": [
+        "outing.water_park"
+      ],
+      "address": "01 Đường Số 9C, Thị trấn Củ Chi",
+      "latitude": 10.9721598,
+      "longitude": 106.5024865,
+      "description": "🌞🌊 Đến Hải Dương Water Park và tận hưởng thế giới nhà phao nước vui nhộn cho bé và cả gia đình! Thức ăn vặt & đồ uống luôn sẵn sàng! 🍿🥤",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12495448277",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-147614676",
+      "name": "Đại Nam Văn Hiến",
+      "type": "theme_park",
+      "categories": [
+        "outing.theme_park"
+      ],
+      "address": "1765A Đại lộ Bình Dương, Thành phố Thủ Dầu Một",
+      "latitude": 11.0423273,
+      "longitude": 106.6291121,
+      "description": "Đại Nam Văn Hiến là khu vui chơi trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/147614676",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-802105071",
+      "name": "Bảo tàng Thành phố TP.HCM",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Lý Tự Trọng",
+      "latitude": 10.775916,
+      "longitude": 106.6996734,
+      "description": "Bảo tàng Thành phố TP.HCM là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://www.hcmc-museum.edu.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/802105071",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-341504305",
+      "name": "Trụ sở Ủy ban nhân dân Thành phố TP.HCM",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "86 Lê Thánh Tôn, Quận 1, Thành phố TP.HCM",
+      "latitude": 10.7765959,
+      "longitude": 106.7009554,
+      "description": "Trụ sở Ủy ban nhân dân Thành phố TP.HCM là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://vpub.hochiminhcity.gov.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/341504305",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-39514795",
+      "name": "Chợ Bến Thành",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Công trường Quách Thị Trang",
+      "latitude": 10.7725707,
+      "longitude": 106.6980174,
+      "description": "Chợ Bến Thành là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://benthanhmarket.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/39514795",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4131498489",
+      "name": "Bảo Tàng Tư Nhân Đức Minh",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "31 Lê Quý Đôn",
+      "latitude": 10.8408403,
+      "longitude": 106.765554,
+      "description": "Bảo Tàng Tư Nhân Đức Minh là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4131498489",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-11040495502",
+      "name": "Annam Gallery",
+      "type": "gallery",
+      "categories": [
+        "outing.gallery"
+      ],
+      "address": "371/4 Hai Bà Trưng, Xuân Hòa, TP.HCM",
+      "latitude": 10.7900269,
+      "longitude": 106.6888392,
+      "description": "Annam Gallery là không gian nghệ thuật trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/11040495502",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-11343699081",
+      "name": "CBES Mini Museum",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "7 Đường M, Thủ Đức",
+      "latitude": 10.7925945,
+      "longitude": 106.7718011,
+      "description": "CBES Mini Museum là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/11343699081",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12901443422",
+      "name": "Vân Đường Phủ (Nhà cụ Vương Hồng Sển)",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "11 Nguyễn Thiện Thuật",
+      "latitude": 10.8052246,
+      "longitude": 106.6992364,
+      "description": "Vân Đường Phủ (Nhà cụ Vương Hồng Sển) là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12901443422",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-165518961",
+      "name": "Trưng bày Từ Dinh Norodom đến Dinh Độc Lập",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "106 Nguyễn Du",
+      "latitude": 10.7765844,
+      "longitude": 106.6972837,
+      "description": "Trưng bày Từ Dinh Norodom đến Dinh Độc Lập là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/165518961",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-32735038",
+      "name": "Thảo Cầm Viên Sài Gòn",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "2 Nguyễn Bỉnh Khiêm, Quận 1, TP.HCM",
+      "latitude": 10.7878079,
+      "longitude": 106.7064568,
+      "description": "Thảo Cầm Viên Sài Gòn là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": "https://www.saigonzoo.net/",
+      "sourceUrl": "https://www.openstreetmap.org/way/32735038",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-39514793",
+      "name": "Bưu điện Trung tâm Sài Gòn",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "2 Công trường Công xã Paris, TP.HCM",
+      "latitude": 10.7799812,
+      "longitude": 106.7000211,
+      "description": "Bưu điện Trung tâm Sài Gòn là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/39514793",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-801710792",
+      "name": "Nhà hát Thành phố",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "7 Công trường Lam Sơn, Quận 1, Thành phố TP.HCM",
+      "latitude": 10.7767109,
+      "longitude": 106.7032186,
+      "description": "Nhà hát Thành phố là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://saigonconcert.com/",
+      "sourceUrl": "https://www.openstreetmap.org/way/801710792",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-39598493",
+      "name": "Dinh Độc Lập",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "135 Nam Kỳ Khởi Nghĩa, Bến Thành, TP.HCM",
+      "latitude": 10.777017,
+      "longitude": 106.6954031,
+      "description": "Dinh Độc Lập là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/39598493",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10259377070",
+      "name": "Phòng Tranh",
+      "type": "gallery",
+      "categories": [
+        "outing.gallery"
+      ],
+      "address": "219 Đường Nguyễn Văn Hưởng, 2, TP.HCM",
+      "latitude": 10.8101315,
+      "longitude": 106.7312075,
+      "description": "Phòng Tranh là không gian nghệ thuật trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10259377070",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1518080727",
+      "name": "Di tích lưu niệm Chủ tịch TP.HCM",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "5 Đường Châu Văn Liêm",
+      "latitude": 10.7511496,
+      "longitude": 106.6588948,
+      "description": "Di tích lưu niệm Chủ tịch TP.HCM là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1518080727",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1313432455",
+      "name": "Dinh quận Hóc Môn",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "1 Đường Lý Nam Đế",
+      "latitude": 10.8891485,
+      "longitude": 106.5951243,
+      "description": "Dinh quận Hóc Môn là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1313432455",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185709",
+      "name": "Cinestar Bình Dương",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Quảng Trường Sáng Tạo, Dĩ An, Thủ Dầu Một",
+      "latitude": 10.8753824,
+      "longitude": 106.8007055,
+      "description": "Cinestar Bình Dương là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://cinestar.com.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185709",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4131348295",
+      "name": "Tara & Kys Art Gallery",
+      "type": "gallery",
+      "categories": [
+        "outing.gallery"
+      ],
+      "address": "48 Đông Du",
+      "latitude": 10.7764073,
+      "longitude": 106.7048655,
+      "description": "Tara & Kys Art Gallery là không gian nghệ thuật trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4131348295",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-9584833482",
+      "name": "Rạp Phim Beta Cinemas - Trần Quang Khải",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "62 Trần Quang Khải",
+      "latitude": 10.7924801,
+      "longitude": 106.6939783,
+      "description": "Rạp Phim Beta Cinemas - Trần Quang Khải là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://www.betacinemas.vn/beta-imc-tran-quang-khai.htm",
+      "sourceUrl": "https://www.openstreetmap.org/node/9584833482",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-9587419906",
+      "name": "Phòng Trưng Bày Chloe",
+      "type": "gallery",
+      "categories": [
+        "outing.gallery"
+      ],
+      "address": "Chung cư The Horizon, 1 Đường Luther King",
+      "latitude": 10.724045,
+      "longitude": 106.7205674,
+      "description": "Phòng Trưng Bày Chloe là không gian nghệ thuật trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/9587419906",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-2667726990",
+      "name": "Nhà Hát Múa Rối Nước Rồng Vàng",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "55B Nguyễn Thị Minh Khai, TP.HCM",
+      "latitude": 10.7762412,
+      "longitude": 106.6924688,
+      "description": "Nhà Hát Múa Rối Nước Rồng Vàng là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": "https://www.klook.com/en-US/activity/7795-traditional-water-puppet-theater-admission-ticket-ho-chi-minh-city/",
+      "sourceUrl": "https://www.openstreetmap.org/node/2667726990",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-32735046",
+      "name": "Công viên Văn hóa Đầm Sen",
+      "type": "theme_park",
+      "categories": [
+        "outing.theme_park"
+      ],
+      "address": "Ghim OpenStreetMap 10.76433, 106.63853",
+      "latitude": 10.7643335,
+      "longitude": 106.6385329,
+      "description": "Công viên Văn hóa Đầm Sen là khu vui chơi trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/32735046",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-665759768",
+      "name": "Gigamall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "240-242 Phạm Văn Đồng, Thủ Đức, TP.HCM",
+      "latitude": 10.8278719,
+      "longitude": 106.7216284,
+      "description": "Gigamall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/665759768",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-430290607",
+      "name": "Vincom Megamall Thảo Điền",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "159-161 Đường Võ Nguyên Giáp, Thành phố Thủ Đức",
+      "latitude": 10.8023666,
+      "longitude": 106.740878,
+      "description": "Vincom Megamall Thảo Điền là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/430290607",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-879519246",
+      "name": "Phố đi bộ đêm Kỳ đài Quang Trung",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "68 Đường Nguyễn Lâm, 10, TP.HCM",
+      "latitude": 10.7642929,
+      "longitude": 106.6629989,
+      "description": "Khu ẩm thực trong Phố đi bộ -Mua sắm -Ẩm thực - Giải trí",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/879519246",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4596372690",
+      "name": "Trung Tâm Mua Sắm Russian",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "Võ Văn Kiệt, Quận 1, TP.HCM",
+      "latitude": 10.7617399,
+      "longitude": 106.6950862,
+      "description": "Trung Tâm Mua Sắm Russian là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4596372690",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10089399922",
+      "name": "CGV Thao Dien Pearl",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "12 Quốc Hương, 2, Thành phố Thủ Đức",
+      "latitude": 10.8014942,
+      "longitude": 106.7331734,
+      "description": "CGV Thao Dien Pearl là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10089399922",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-556234623",
+      "name": "Vạn Hạnh Mall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "11 Sư Vạn Hạnh, Quận 10",
+      "latitude": 10.770575,
+      "longitude": 106.6695631,
+      "description": "Vạn Hạnh Mall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": "https://vanhanhmall.com/",
+      "sourceUrl": "https://www.openstreetmap.org/way/556234623",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-974020821",
+      "name": "Khu du lịch Sinh thái Vườn Xoài",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "537 Đường Đinh Quang Ân, Thành phố Biên Hòa",
+      "latitude": 10.9189347,
+      "longitude": 106.9333547,
+      "description": "Khu du lịch Sinh thái Vườn Xoài là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": "http://www.vuonxoai.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/way/974020821",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-998927803",
+      "name": "Vincom",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "1096 Đường Phạm Văn Thuận",
+      "latitude": 10.9576282,
+      "longitude": 106.8434304,
+      "description": "Vincom là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/998927803",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-6536295071",
+      "name": "Parkson Hùng Vương",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "126 Hùng Vương, Quận 5, TP.HCM",
+      "latitude": 10.7557757,
+      "longitude": 106.6629025,
+      "description": "Parkson Hùng Vương là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/6536295071",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1226734708",
+      "name": "Parc Mall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "547-549 Tạ Quang Bửu, 8",
+      "latitude": 10.7407319,
+      "longitude": 106.679143,
+      "description": "Parc Mall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1226734708",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-367930334",
+      "name": "Vincom Plaza Thủ Đức",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "216 Võ Văn Ngân",
+      "latitude": 10.8499711,
+      "longitude": 106.7651648,
+      "description": "Vincom Plaza Thủ Đức là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/367930334",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-9545371820",
+      "name": "Galaxy Cinema",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "304A Đường Quang Trung, Gò Vấp",
+      "latitude": 10.8348064,
+      "longitude": 106.6621868,
+      "description": "Galaxy Cinema là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/9545371820",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1153459806",
+      "name": "Sân khấu Kịch 5B",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "5B Đường Võ Văn Tần, Quận 3, TP.HCM",
+      "latitude": 10.7806252,
+      "longitude": 106.694387,
+      "description": "Sân khấu Kịch 5B là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1153459806",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-7018017805",
+      "name": "CGV",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "59-61 Đường Pasteur, Quận 1",
+      "latitude": 10.7747697,
+      "longitude": 106.7007331,
+      "description": "CGV là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/7018017805",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12196463120",
+      "name": "Parc Spring",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Hồ Thị Nhung, Thành phố Thủ Đức, TP.HCM",
+      "latitude": 10.7912739,
+      "longitude": 106.7714492,
+      "description": "Parc Spring là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12196463120",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-262966602",
+      "name": "Kịch Phú Nhuận",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "70-72 Nguyễn Văn Trỗi, Phú Nhuận",
+      "latitude": 10.795552,
+      "longitude": 106.6762431,
+      "description": "Kịch Phú Nhuận là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/262966602",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1167526791",
+      "name": "Khu du lịch Thủy Châu",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "55 Đường tỉnh 743A, Thành phố Dĩ An",
+      "latitude": 10.9012525,
+      "longitude": 106.8192275,
+      "description": "Khu du lịch Thủy Châu là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1167526791",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1042623106",
+      "name": "Mega GS Lý Chính Thắng",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "212 Đường Lý Chính Thắng",
+      "latitude": 10.7806423,
+      "longitude": 106.6823913,
+      "description": "Mega GS Lý Chính Thắng là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1042623106",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-238164361",
+      "name": "Sân khấu 126",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "Đường Cách Mạng Tháng Tám",
+      "latitude": 10.7777136,
+      "longitude": 106.6824228,
+      "description": "Sân khấu 126 là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/238164361",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4216681689",
+      "name": "Nhà Hát \"Hàng Không Mẫu Hạm\"",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "30 Đường Trần Hưng Đạo",
+      "latitude": 10.7674358,
+      "longitude": 106.6945984,
+      "description": "Nhà Hát \"Hàng Không Mẫu Hạm\" là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4216681689",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12647208019",
+      "name": "Hồ Sen Súng",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "28 Đường D9, Thủ Đức",
+      "latitude": 10.8398452,
+      "longitude": 106.8415826,
+      "description": "Hồ Sen Súng là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12647208019",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-465285624",
+      "name": "Cinestar Cinema Quốc Thanh",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "271 Đường Nguyễn Trãi",
+      "latitude": 10.7637838,
+      "longitude": 106.6875001,
+      "description": "Cinestar Cinema Quốc Thanh là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/465285624",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-808022726",
+      "name": "Bảo tàng TP.HCM",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.76825, 106.70681",
+      "latitude": 10.7682509,
+      "longitude": 106.7068074,
+      "description": "Bảo tàng TP.HCM là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/808022726",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-14014006893",
+      "name": "The Commons Thu Thiem",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "33/10 Lương Định Của, Thành phố TP.HCM",
+      "latitude": 10.7822851,
+      "longitude": 106.7133158,
+      "description": "The Commons Thu Thiem là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://creativecommons.vn",
+      "sourceUrl": "https://www.openstreetmap.org/node/14014006893",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-495698506",
+      "name": "Sân khấu kịch Hoàng Thái Thanh",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "139 Bắc Hải, Quận 10, Phường 14",
+      "latitude": 10.7810604,
+      "longitude": 106.6597464,
+      "description": "Sân khấu kịch Hoàng Thái Thanh là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/495698506",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1078097938",
+      "name": "Công viên công cộng Ventura",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Số 40 - CL, Thủ Đức",
+      "latitude": 10.7704165,
+      "longitude": 106.7897236,
+      "description": "Công viên công cộng Ventura là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1078097938",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-504157823",
+      "name": "ÆON MALL Bình Tân",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "1 Đường số 17A, Bình Tân, Thành phố TP.HCM",
+      "latitude": 10.742703,
+      "longitude": 106.6119346,
+      "description": "ÆON MALL Bình Tân là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/504157823",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1536253296",
+      "name": "Rạp Đống Đa",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "890 Đường Trần Hưng Đạo",
+      "latitude": 10.7537592,
+      "longitude": 106.6741121,
+      "description": "Rạp Đống Đa là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1536253296",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-1987338321",
+      "name": "rạp chiếu phim CGV",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "101 Nguyễn Văn Linh",
+      "latitude": 10.7290613,
+      "longitude": 106.7191726,
+      "description": "rạp chiếu phim CGV là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/1987338321",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-421603555",
+      "name": "Rạp phim Galaxy Cinema Tân Bình",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Nguyễn Hồng Đào, Tân Bình, TP.HCM",
+      "latitude": 10.7907448,
+      "longitude": 106.6406649,
+      "description": "Rạp phim Galaxy Cinema Tân Bình là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/421603555",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1524297432",
+      "name": "Nhà hát Nghệ thuật Phương Nam",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "372-374 Đường Trần Phú",
+      "latitude": 10.7536417,
+      "longitude": 106.668771,
+      "description": "Nhà hát Nghệ thuật Phương Nam là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1524297432",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-7018017792",
+      "name": "CGV",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "1058 Đường Nguyễn Văn Linh, Quận 7",
+      "latitude": 10.7301154,
+      "longitude": 106.7041639,
+      "description": "CGV là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/7018017792",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-972604563",
+      "name": "Khu du lịch Bửu Long",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Huỳnh Văn Nghệ, Thành phố Biên Hòa",
+      "latitude": 10.9630001,
+      "longitude": 106.794413,
+      "description": "Khu du lịch Bửu Long là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/972604563",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-377269817",
+      "name": "GO! Go Vap",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "792 Nguyễn Kiệm",
+      "latitude": 10.8255653,
+      "longitude": 106.6802378,
+      "description": "GO! Go Vap là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/377269817",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-605774020",
+      "name": "SALA Shopping Mall Thiso mall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "10 Đ Mai Chí Thọ, Quận 2, Thành phố TP.HCM",
+      "latitude": 10.7720547,
+      "longitude": 106.7219492,
+      "description": "SALA Shopping Mall Thiso mall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/605774020",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4582739275",
+      "name": "CGV",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "1 Đường số 17A, Bình Tân, TP.HCM",
+      "latitude": 10.7433415,
+      "longitude": 106.6131469,
+      "description": "CGV là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4582739275",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-relation-2552505",
+      "name": "Chợ Bình Tây",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "57A Đường Tháp Mười, Quận 6",
+      "latitude": 10.7493311,
+      "longitude": 106.6510683,
+      "description": "Chợ Bình Tây là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://www.chobinhtay.gov.vn/",
+      "sourceUrl": "https://www.openstreetmap.org/relation/2552505",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-821391269",
+      "name": "Công viên Phú Đông Citizen",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "1 Trịnh Phong Đáng, Dĩ An",
+      "latitude": 10.8665902,
+      "longitude": 106.755497,
+      "description": "Công viên Phú Đông Citizen là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/821391269",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-802125677",
+      "name": "Toà Nhà Saigon Centre",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "65 Lê Lợi",
+      "latitude": 10.7732401,
+      "longitude": 106.7008784,
+      "description": "Toà Nhà Saigon Centre là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/802125677",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-1388480068",
+      "name": "Địa Đạo Bến Đình Củ Chi",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "741 Tỉnh lộ 15",
+      "latitude": 11.0630436,
+      "longitude": 106.5291244,
+      "description": "Địa Đạo Bến Đình Củ Chi là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/1388480068",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1152214346",
+      "name": "Pico Plaza",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "20 Cộng Hoà",
+      "latitude": 10.800754,
+      "longitude": 106.6532198,
+      "description": "Pico Plaza là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1152214346",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-289968620",
+      "name": "Trung Tâm Mua Sắm Nowzone",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "235 Nguyễn Văn Cừ",
+      "latitude": 10.7643362,
+      "longitude": 106.6824608,
+      "description": "Trung Tâm Mua Sắm Nowzone là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/289968620",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4223398172",
+      "name": "Khu Du Lịch Bình Qưới",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Bình Quới",
+      "latitude": 10.8294989,
+      "longitude": 106.7392535,
+      "description": "Khu Du Lịch Bình Qưới là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4223398172",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-507538757",
+      "name": "Khu tưởng niệm Bến Nọc",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Lê Văn Việt",
+      "latitude": 10.8486326,
+      "longitude": 106.8039761,
+      "description": "Khu tưởng niệm Bến Nọc là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/507538757",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-188114097",
+      "name": "Crescent Mall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "101 Đường Tôn Dật Tiên, Quận 7, TP.HCM",
+      "latitude": 10.7289866,
+      "longitude": 106.7186882,
+      "description": "Crescent Mall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/188114097",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-686792754",
+      "name": "Centre Mall Phạm Hùng",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "C6/27 Phạm Hùng, Bình Chánh",
+      "latitude": 10.7335931,
+      "longitude": 106.6745624,
+      "description": "Centre Mall Phạm Hùng là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/686792754",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1354146316",
+      "name": "Satra Centre Mall",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "Đường Võ Văn Kiệt, Quận 6, TP.HCM",
+      "latitude": 10.7436804,
+      "longitude": 106.6483499,
+      "description": "Satra Centre Mall là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1354146316",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-842688454",
+      "name": "Công viên Tân Cảng",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Tân Cảng, Bình Thạnh, TP.HCM",
+      "latitude": 10.7988558,
+      "longitude": 106.7211928,
+      "description": "Công viên Tân Cảng là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/842688454",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-530247665",
+      "name": "Công viên Bờ kè Gia Long",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Gia Long",
+      "latitude": 10.8981994,
+      "longitude": 106.7014337,
+      "description": "Công viên Bờ kè Gia Long là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/530247665",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1306372763",
+      "name": "Công viên Lê Hữu Kiều",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Lê Hữu Kiều, TP. Thủ Đức, Phường Bình Trưng Tây",
+      "latitude": 10.7848719,
+      "longitude": 106.7558638,
+      "description": "Công viên Lê Hữu Kiều là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1306372763",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1214273251",
+      "name": "Công viên trung tâm HCA",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Chu Văn An, Bình Thạnh, Phường 12",
+      "latitude": 10.8125677,
+      "longitude": 106.7025268,
+      "description": "Công viên trung tâm HCA là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1214273251",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-130506886",
+      "name": "Công viên Văn hóa Phú Nhuận",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "49 Phan Đăng Lưu",
+      "latitude": 10.8028306,
+      "longitude": 106.6904324,
+      "description": "Công viên Văn hóa Phú Nhuận là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/130506886",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-376923094",
+      "name": "Bảo tàng Lực lượng Vũ trang miền Đông Nam Bộ",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.79937, 106.66599",
+      "latitude": 10.7993714,
+      "longitude": 106.6659894,
+      "description": "Bảo tàng Lực lượng Vũ trang miền Đông Nam Bộ là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/376923094",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-186545011",
+      "name": "Công trình cảnh quan Nhà thi đấu Phan Đình Phùng",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "8 Võ Văn Tần",
+      "latitude": 10.7814918,
+      "longitude": 106.6938718,
+      "description": "Công trình cảnh quan Nhà thi đấu Phan Đình Phùng là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/186545011",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10686251942",
+      "name": "Khu di tích Hố Lang",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Hố lang, Dĩ An",
+      "latitude": 10.9571087,
+      "longitude": 106.7493053,
+      "description": "Khu di tích Hố Lang là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10686251942",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-165491105",
+      "name": "Công viên Thương xá Tax",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "135 Nguyễn Huệ",
+      "latitude": 10.774671,
+      "longitude": 106.7021113,
+      "description": "Công viên Thương xá Tax là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/165491105",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-262963870",
+      "name": "Công viên Làng Hoa Gò Vấp",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Nguyễn Văn Khối, Gò Vấp",
+      "latitude": 10.8418657,
+      "longitude": 106.6560378,
+      "description": "Công viên Làng Hoa Gò Vấp là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/262963870",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1338507840",
+      "name": "Vườn tượng Danh nhân Trấn Biên",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Chu Văn An",
+      "latitude": 10.9621661,
+      "longitude": 106.8016279,
+      "description": "Vườn tượng Danh nhân Trấn Biên là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1338507840",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-769111901",
+      "name": "Quảng trường Thành phố Đồng Nai",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "1 Đường Nguyễn Ái Quốc",
+      "latitude": 10.9582141,
+      "longitude": 106.828654,
+      "description": "Quảng trường Thành phố Đồng Nai là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/769111901",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-961184057",
+      "name": "Công viên Cầu Rạch Ông",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Trần Xuân Soạn, Quận 7, Phường Tân Hưng",
+      "latitude": 10.7515853,
+      "longitude": 106.6929586,
+      "description": "Công viên Cầu Rạch Ông là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/961184057",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1137989915",
+      "name": "Công viên Rạch Tra",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Đặng Thúc Vịnh, Hóc Môn",
+      "latitude": 10.916182,
+      "longitude": 106.6482304,
+      "description": "Công viên Rạch Tra là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1137989915",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-715000260",
+      "name": "Công viên Nguyễn Sỹ Sách",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Nguyễn Sỹ Sách, Tân Bình",
+      "latitude": 10.8211038,
+      "longitude": 106.6370041,
+      "description": "Công viên Nguyễn Sỹ Sách là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/715000260",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4111509589",
+      "name": "Công Viên Ven Sông An Phú Hưng",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Số 40 Tân Quy Đông",
+      "latitude": 10.7362462,
+      "longitude": 106.7099951,
+      "description": "Công Viên Ven Sông An Phú Hưng là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4111509589",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-11056012164",
+      "name": "Công viên Dạ Nam",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "200 Phạm Thế Hiển, 8, TP.HCM",
+      "latitude": 10.7489187,
+      "longitude": 106.6835781,
+      "description": "Công viên Dạ Nam là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/11056012164",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-457601645",
+      "name": "Công viên Tân Phước",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Nguyễn Thị Nhỏ, Tân Bình",
+      "latitude": 10.7748658,
+      "longitude": 106.6527849,
+      "description": "Công viên Tân Phước là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/457601645",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1358149649",
+      "name": "Công viên 310A Hưng Phú",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "310A Hưng Phú, Quận 8, Phường Hưng Phú",
+      "latitude": 10.7488302,
+      "longitude": 106.6761355,
+      "description": "Công viên 310A Hưng Phú là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1358149649",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-456799189",
+      "name": "Công viên Lãnh Binh Thăng",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Đường Lãnh Binh Thăng, Quận 11",
+      "latitude": 10.7632268,
+      "longitude": 106.649898,
+      "description": "Công viên Lãnh Binh Thăng là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/456799189",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1306108989",
+      "name": "Công viên Mỹ Phú",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "22 Đường G",
+      "latitude": 10.7161372,
+      "longitude": 106.7271894,
+      "description": "Công viên Mỹ Phú là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1306108989",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4131725789",
+      "name": "Địa Đạo Phú Thọ Hòa",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Phú Thọ Hoà",
+      "latitude": 10.7842199,
+      "longitude": 106.6312668,
+      "description": "Địa Đạo Phú Thọ Hòa là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4131725789",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-503015601",
+      "name": "Công Viên 158 Phan Anh",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "158 Hẻm 158 Phan Anh, Quận Tân Phú, TP.HCM",
+      "latitude": 10.7632943,
+      "longitude": 106.6251618,
+      "description": "Công Viên 158 Phan Anh là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/503015601",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1023126419",
+      "name": "Công viên giải trí VinWonders Grand Park",
+      "type": "theme_park",
+      "categories": [
+        "outing.theme_park"
+      ],
+      "address": "Ghim OpenStreetMap 10.84209, 106.84560",
+      "latitude": 10.8420891,
+      "longitude": 106.845603,
+      "description": "Công viên giải trí VinWonders Grand Park là khu vui chơi trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1023126419",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1465263824",
+      "name": "Công viên du lịch sinh thái Hóc Môn",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "106 Xuân Thới Thượng 6",
+      "latitude": 10.8586861,
+      "longitude": 106.5818742,
+      "description": "Công viên du lịch sinh thái Hóc Môn là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1465263824",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1491439860",
+      "name": "Thiên đường giải trí Thỏ Trắng",
+      "type": "theme_park",
+      "categories": [
+        "outing.theme_park"
+      ],
+      "address": "Ghim OpenStreetMap 10.78503, 106.66528",
+      "latitude": 10.7850349,
+      "longitude": 106.6652763,
+      "description": "Thiên đường giải trí Thỏ Trắng là khu vui chơi trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1491439860",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1334957452",
+      "name": "Skywalk Climbing",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "168/42a Nguyễn Gia Trí (D2), Bình Thạnh, TP.HCM",
+      "latitude": 10.8058579,
+      "longitude": 106.7179642,
+      "description": "Skywalk Climbing là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://skywalkvn.com",
+      "sourceUrl": "https://www.openstreetmap.org/way/1334957452",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1019040791",
+      "name": "Bảo tàng Phụ nữ Nam Bộ",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.78417, 106.68740",
+      "latitude": 10.7841686,
+      "longitude": 106.687398,
+      "description": "Bảo tàng Phụ nữ Nam Bộ là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1019040791",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4223828694",
+      "name": "Dai Nam Zoo",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Đại lộ Bình Dương",
+      "latitude": 11.0488817,
+      "longitude": 106.6249326,
+      "description": "Dai Nam Zoo là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4223828694",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-197995330",
+      "name": "Bảo tàng Không quân phía Nam",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.80519, 106.66064",
+      "latitude": 10.805192,
+      "longitude": 106.6606383,
+      "description": "Bảo tàng Không quân phía Nam là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/197995330",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-6539155592",
+      "name": "Công Viên Văn Hóa Láng Le Bàu Cò",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Lê Chính Đang, Bình Chánh",
+      "latitude": 10.7781115,
+      "longitude": 106.5160347,
+      "description": "Công Viên Văn Hóa Láng Le Bàu Cò là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/6539155592",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12777641246",
+      "name": "Công viên nước Grand Park",
+      "type": "water_park",
+      "categories": [
+        "outing.water_park"
+      ],
+      "address": "Ghim OpenStreetMap 10.83994, 106.84728",
+      "latitude": 10.839941,
+      "longitude": 106.8472796,
+      "description": "Công viên nước Grand Park là công viên nước trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12777641246",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1023704926",
+      "name": "Nhà Truyền Thống Thủ Đức",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.85098, 106.76021",
+      "latitude": 10.8509752,
+      "longitude": 106.7602131,
+      "description": "Nhà Truyền Thống Thủ Đức là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1023704926",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1139091053",
+      "name": "Bảo tàng Quân đoàn 4",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.88377, 106.74282",
+      "latitude": 10.8837665,
+      "longitude": 106.7428221,
+      "description": "Bảo tàng Quân đoàn 4 là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1139091053",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1518107504",
+      "name": "Bót Dây Thép",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.84433, 106.79346",
+      "latitude": 10.8443318,
+      "longitude": 106.7934593,
+      "description": "Bót Dây Thép là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1518107504",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-1001114513",
+      "name": "Bảo Tàng Địa Chất",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.78500, 106.70768",
+      "latitude": 10.7849957,
+      "longitude": 106.7076753,
+      "description": "Bảo Tàng Địa Chất là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/1001114513",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-2230447361",
+      "name": "Nhà Thiếu Nhi Quận 1",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.78499, 106.69868",
+      "latitude": 10.7849924,
+      "longitude": 106.698682,
+      "description": "Nhà Thiếu Nhi Quận 1 là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/2230447361",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1116582922",
+      "name": "Bảo tàng Tôn Đức Thắng",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.77742, 106.70637",
+      "latitude": 10.7774203,
+      "longitude": 106.7063661,
+      "description": "Bảo tàng Tôn Đức Thắng là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1116582922",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-1770193818",
+      "name": "Phòng Truyền thống Thành Đoàn",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.78207, 106.69771",
+      "latitude": 10.7820744,
+      "longitude": 106.6977069,
+      "description": "Phòng Truyền thống Thành Đoàn là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/1770193818",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4131348092",
+      "name": "Bảo Tàng Áo Dài",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.80975, 106.84976",
+      "latitude": 10.8097524,
+      "longitude": 106.8497582,
+      "description": "Bảo Tàng Áo Dài là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4131348092",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12998390290",
+      "name": "Vertical Academy",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "789 Đường số 1, Quận 2, Thành phố Thủ Đức",
+      "latitude": 10.7976911,
+      "longitude": 106.7348133,
+      "description": "Vertical Academy là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": "https://vertical-academy.com/",
+      "sourceUrl": "https://www.openstreetmap.org/node/12998390290",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-238166771",
+      "name": "Bảo tàng Không quân",
+      "type": "museum",
+      "categories": [
+        "outing.museum"
+      ],
+      "address": "Ghim OpenStreetMap 10.80264, 106.64936",
+      "latitude": 10.8026404,
+      "longitude": 106.6493626,
+      "description": "Bảo tàng Không quân là bảo tàng trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/238166771",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-relation-14939719",
+      "name": "Công viên 23 tháng 9",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Quận 1, TP.HCM",
+      "latitude": 10.7695676,
+      "longitude": 106.6939415,
+      "description": "Công viên 23 tháng 9 là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/relation/14939719",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1357552874",
+      "name": "Hismory",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "36-38 Lê Văn Thiêm",
+      "latitude": 10.7312197,
+      "longitude": 106.7090609,
+      "description": "Hismory là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1357552874",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-4051462331",
+      "name": "Trung tâm Thể dục Thể thao Quận Thủ Đức",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "26 Chương Dương",
+      "latitude": 10.8524837,
+      "longitude": 106.7603301,
+      "description": "Trung tâm Thể dục Thể thao Quận Thủ Đức là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/4051462331",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-362000989",
+      "name": "SC VivoCity",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "Ghim OpenStreetMap 10.72993, 106.70339",
+      "latitude": 10.7299311,
+      "longitude": 106.7033873,
+      "description": "SC VivoCity là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/362000989",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-6514686132",
+      "name": "Trung Tâm Nghệ Thuật Đại Dương The Factory",
+      "type": "arts_centre",
+      "categories": [
+        "outing.arts_centre"
+      ],
+      "address": "Ghim OpenStreetMap 10.80608, 106.74336",
+      "latitude": 10.8060774,
+      "longitude": 106.7433615,
+      "description": "Trung Tâm Nghệ Thuật Đại Dương The Factory là trung tâm nghệ thuật trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/6514686132",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1344367123",
+      "name": "Khu Thể thao Tân An",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "71 Đường Tân An",
+      "latitude": 10.9129463,
+      "longitude": 106.7885424,
+      "description": "Khu Thể thao Tân An là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1344367123",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12141109933",
+      "name": "Nhà văn hóa lao động Thủ Đức",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "245 Đường Nguyễn Duy Trinh, Thủ Đức",
+      "latitude": 10.7877803,
+      "longitude": 106.7637602,
+      "description": "Nhà văn hóa lao động Thủ Đức là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/12141109933",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1056572948",
+      "name": "Công viên Bến Bạch Đằng",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.77823, 106.70763",
+      "latitude": 10.7782279,
+      "longitude": 106.7076346,
+      "description": "Công viên Bến Bạch Đằng là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1056572948",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-32735082",
+      "name": "Công viên Lê Văn Tám",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.78824, 106.69376",
+      "latitude": 10.7882407,
+      "longitude": 106.6937572,
+      "description": "Công viên Lê Văn Tám là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/32735082",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-relation-11084516",
+      "name": "Công viên 30/4",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.77925, 106.69735",
+      "latitude": 10.7792539,
+      "longitude": 106.6973459,
+      "description": "Công viên 30/4 là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/relation/11084516",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-286297477",
+      "name": "Cầu Mống",
+      "type": "attraction",
+      "categories": [
+        "outing.attraction"
+      ],
+      "address": "Ghim OpenStreetMap 10.76807, 106.70367",
+      "latitude": 10.768069,
+      "longitude": 106.7036691,
+      "description": "Cầu Mống là điểm tham quan trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/286297477",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-500888743",
+      "name": "Công viên Tao Đàn",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.77479, 106.69309",
+      "latitude": 10.7747886,
+      "longitude": 106.6930859,
+      "description": "Công viên Tao Đàn là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/500888743",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-relation-17583697",
+      "name": "Công viên Hoàng Văn Thụ",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.80251, 106.66452",
+      "latitude": 10.8025098,
+      "longitude": 106.6645157,
+      "description": "Công viên Hoàng Văn Thụ là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/relation/17583697",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-12908570948",
+      "name": "Cụm công trình Văn hóa",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Thành phố Biên Hòa, Phường Quang Vinh",
+      "latitude": 10.9602922,
+      "longitude": 106.813802,
+      "description": "Cụm công trình Văn hóa là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": "https://sites.google.com/view/quangvinhkhupho10",
+      "sourceUrl": "https://www.openstreetmap.org/node/12908570948",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185713",
+      "name": "Lotte Cinema Moonlight",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.84446, 106.76279",
+      "latitude": 10.8444559,
+      "longitude": 106.7627871,
+      "description": "Lotte Cinema Moonlight là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185713",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185723",
+      "name": "Lotte Cinema Thủ Đức",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.87088, 106.76901",
+      "latitude": 10.8708795,
+      "longitude": 106.7690112,
+      "description": "Lotte Cinema Thủ Đức là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185723",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-142685939",
+      "name": "Nhà thi đấu Quân khu 7",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "202 Hoàng Văn Thụ, Phu Nhuan, TP.HCM",
+      "latitude": 10.8009258,
+      "longitude": 106.6688394,
+      "description": "Nhà thi đấu Quân khu 7 là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/142685939",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185722",
+      "name": "Galaxy Linh Trung",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.86782, 106.77656",
+      "latitude": 10.8678187,
+      "longitude": 106.7765643,
+      "description": "Galaxy Linh Trung là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185722",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-373719795",
+      "name": "Câu lạc bộ thể thao 2 tháng 9",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "9 Phạm Văn Hai, Tân Bình, phường 1",
+      "latitude": 10.7975834,
+      "longitude": 106.6652475,
+      "description": "Câu lạc bộ thể thao 2 tháng 9 là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/373719795",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185711",
+      "name": "BHD Star Lê Văn Việt",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.84504, 106.77873",
+      "latitude": 10.845042,
+      "longitude": 106.7787342,
+      "description": "BHD Star Lê Văn Việt là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185711",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-166552367",
+      "name": "Trung tâm TDTT Quận 4",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "120-122 Khánh Hội",
+      "latitude": 10.7571696,
+      "longitude": 106.7011459,
+      "description": "Trung tâm TDTT Quận 4 là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/166552367",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1308105277",
+      "name": "Nhà thi đấu đa năng Quận 7",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "504-506 Đường Huỳnh Tấn Phát, Quận 7, Phường Bình Thuận",
+      "latitude": 10.7413684,
+      "longitude": 106.7292511,
+      "description": "Nhà thi đấu đa năng Quận 7 là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1308105277",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-982168330",
+      "name": "Nhà thi đấu Thành phố Đồng Nai",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "1626 Đường Nguyễn Ái Quốc",
+      "latitude": 10.9599762,
+      "longitude": 106.8305533,
+      "description": "Nhà thi đấu Thành phố Đồng Nai là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/982168330",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-1221371349",
+      "name": "Câu lạc bộ Bơi lặn Nguyễn Tri Phương",
+      "type": "sports_centre",
+      "categories": [
+        "outing.sports_centre"
+      ],
+      "address": "27 Đồng Nai, Quận 10, Phường 15",
+      "latitude": 10.7812446,
+      "longitude": 106.6610164,
+      "description": "Câu lạc bộ Bơi lặn Nguyễn Tri Phương là trung tâm thể thao trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "under_200k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/1221371349",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-806928814",
+      "name": "Công viên đường số 9",
+      "type": "park",
+      "categories": [
+        "outing.park"
+      ],
+      "address": "Ghim OpenStreetMap 10.85698, 106.76837",
+      "latitude": 10.856979,
+      "longitude": 106.7683715,
+      "description": "Công viên đường số 9 là công viên trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/806928814",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-10294185710",
+      "name": "Lotte Cinema Dĩ An",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.90843, 106.74148",
+      "latitude": 10.9084285,
+      "longitude": 106.741481,
+      "description": "Lotte Cinema Dĩ An là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/10294185710",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-way-806860787",
+      "name": "Chợ Dân Sinh",
+      "type": "mall",
+      "categories": [
+        "outing.mall"
+      ],
+      "address": "Ghim OpenStreetMap 10.76654, 106.69817",
+      "latitude": 10.7665431,
+      "longitude": 106.6981651,
+      "description": "Chợ Dân Sinh là trung tâm mua sắm trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "free_low",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/way/806860787",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-11533134439",
+      "name": "Taste of The Soul",
+      "type": "theatre",
+      "categories": [
+        "outing.theatre"
+      ],
+      "address": "Ghim OpenStreetMap 10.79008, 106.70272",
+      "latitude": 10.7900777,
+      "longitude": 106.7027166,
+      "description": "Taste of The Soul là sân khấu trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/11533134439",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    },
+    {
+      "id": "osm-node-2230333450",
+      "name": "Rạp Phim Cầu Bông",
+      "type": "cinema",
+      "categories": [
+        "outing.cinema"
+      ],
+      "address": "Ghim OpenStreetMap 10.79200, 106.69528",
+      "latitude": 10.7919991,
+      "longitude": 106.695281,
+      "description": "Rạp Phim Cầu Bông là rạp chiếu phim trong khu vực, phù hợp để hai đứa cân nhắc cho một buổi đổi không khí.",
+      "budgetTier": "two_to_five_hundred_k",
+      "website": null,
+      "sourceUrl": "https://www.openstreetmap.org/node/2230333450",
+      "verifiedAt": "2026-09-08",
+      "approved": true
+    }
+  ]
+}

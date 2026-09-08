@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import placeCatalog from "../../content/places.v1.json";
 import { createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
@@ -24,6 +25,7 @@ const curated: CuratedPlace = {
   rating: 4.7,
   reviewCount: 321,
   reviewSummary: "Không gian khác lạ, nhiều góc đáng khám phá và được khách ghé thăm đánh giá tích cực.",
+  description: "Một bảo tàng nhỏ dành cho buổi đổi không khí.",
   budgetTier: "under_200k",
   photoUrl: "/places/museum-1.webp",
   website: "https://example.com/museum",
@@ -114,9 +116,10 @@ describe("curated Places adapter", () => {
       distanceKm: 0.02,
     });
     expect(normalizeCuratedPlace({ ...curated, approved: false } as unknown as CuratedPlace)).toBeNull();
-    expect(normalizeCuratedPlace({ ...curated, photoUrl: "" })).toBeNull();
-    expect(normalizeCuratedPlace({ ...curated, rating: 6 })).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, photoUrl: "" })?.photoUrl).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, rating: 6 })?.rating).toBeNull();
     expect(normalizeCuratedPlace({ ...curated, sourceUrl: "http://example.com" })).toBeNull();
+    expect(normalizeCuratedPlace({ ...curated, description: "" })).toBeNull();
     expect(normalizeCuratedPlace({ ...curated, budgetTier: "unknown" } as unknown as CuratedPlace)).toBeNull();
   });
 
@@ -141,7 +144,7 @@ describe("curated Places adapter", () => {
     const nearby = { ...base, providerId: "nearby", distanceKm: 2, budgetTier: "free_low" as const };
     const matching = { ...base, distanceKm: 4 };
     const expensive = { ...base, providerId: "expensive", distanceKm: 4, budgetTier: "two_to_five_hundred_k" as const };
-    const incomplete = { ...base, providerId: "incomplete", distanceKm: 4, photoUrl: null };
+    const incomplete = { ...base, providerId: "incomplete", distanceKm: 4, description: null };
     expect(filterPlaceCandidates([nearby, matching, matching, expensive, incomplete], {
       distance: "three_to_five",
       budget: "under_200k",
@@ -150,5 +153,16 @@ describe("curated Places adapter", () => {
       .toHaveLength(2);
     expect(() => filterPlaceCandidates([matching], { distance: "custom", customDistanceKm: 101, budget: "any" }))
       .toThrow(RangeError);
+  });
+
+  it("loads 150 approved OSM places inside the 35 km catalog radius", () => {
+    const ids = new Set(placeCatalog.places.map((place) => place.id));
+    const origin = placeCatalog.origin;
+    const normalized = placeCatalog.places.map((place) => normalizeCuratedPlace(place as unknown as CuratedPlace, origin));
+    expect(placeCatalog.places).toHaveLength(150);
+    expect(ids.size).toBe(150);
+    expect(normalized.every((place) => place !== null)).toBe(true);
+    expect(Math.max(...normalized.map((place) => place!.distanceKm!))).toBeLessThanOrEqual(35);
+    expect(placeCatalog.radiusKm).toBe(35);
   });
 });

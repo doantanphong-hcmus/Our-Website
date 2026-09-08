@@ -27,18 +27,16 @@ Provider data is normalized without inventing missing values:
 | Provider ID, name, type, address, coordinates | Required candidate data |
 | Distance | Calculated by the server from coordinates |
 | Opening hours | Optional; `null` means unknown, not closed |
-| Rating and review count | Required for curated places and copied from the linked source |
-| Short review summary | Required, factual, and traceable to the linked source |
+| Description | Required, factual, and derived from source tags when available |
 | Budget tier | Required estimate for two people; one of the three product tiers |
-| Photo | Required; project-owned or HTTPS-hosted |
+| Rating, reviews and photo | Optional and currently omitted to avoid provider cost |
 | Source and verification date | Required for curated places |
 | Price level | Deliberately omitted |
 
-Only entries with `approved: true` and all required display facts pass the
-curated adapter. AI may turn those facts into a playful "lời mở túi", but must
-not invent or alter the place, rating, review count, review meaning, or safety
-claim. Before departure, the result asks users to verify current opening
-information via the source link.
+Only entries with `approved: true`, name, address, description, coordinates,
+budget and source evidence pass the curated adapter. AI may make the wording
+playful, but must not invent or alter facts. Users verify current opening,
+price and suitability through the source link before departure.
 
 Candidate selection only applies the two product filters: distance and budget.
 It rejects incomplete/unapproved records and duplicate provider IDs. Opening

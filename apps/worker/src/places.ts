@@ -12,6 +12,7 @@ export type Place = {
   rating: number | null;
   reviewCount: number | null;
   reviewSummary: string | null;
+  description: string | null;
   budgetTier: PlaceBudget | null;
   photoUrl: string | null;
   website: string | null;
@@ -35,11 +36,12 @@ export type CuratedPlace = {
   latitude: number;
   longitude: number;
   openingHours?: string | null;
-  rating: number;
-  reviewCount: number;
-  reviewSummary: string;
+  rating?: number | null;
+  reviewCount?: number | null;
+  reviewSummary?: string | null;
+  description: string;
   budgetTier: PlaceBudget;
-  photoUrl: string;
+  photoUrl?: string | null;
   website?: string | null;
   sourceUrl: string;
   verifiedAt: string;
@@ -145,6 +147,7 @@ export function normalizeGeoapifyPlace(feature: Feature, origin?: { latitude: nu
     rating: number(properties.rating),
     reviewCount: number(properties.review_count) ?? number(properties.reviews_count),
     reviewSummary: null,
+    description: text(properties.description),
     budgetTier: null,
     photoUrl: httpsUrl(media.image),
     website: httpsUrl(properties.website),
@@ -158,19 +161,21 @@ export function normalizeCuratedPlace(input: CuratedPlace, origin?: { latitude: 
   const name = text(input.name);
   const type = text(input.type);
   const address = text(input.address);
-  const rating = number(input.rating);
-  const reviewCount = number(input.reviewCount);
+  const rawRating = number(input.rating);
+  const rating = rawRating !== null && rawRating >= 0 && rawRating <= 5 ? rawRating : null;
+  const rawReviewCount = number(input.reviewCount);
+  const reviewCount = rawReviewCount !== null && Number.isInteger(rawReviewCount) && rawReviewCount > 0 ? rawReviewCount : null;
   const reviewSummary = text(input.reviewSummary);
+  const description = text(input.description);
   const image = photoUrl(input.photoUrl);
   const sourceUrl = httpsUrl(input.sourceUrl);
   const verifiedAt = verifiedDate(input.verifiedAt);
   const latitude = number(input.latitude);
   const longitude = number(input.longitude);
   const budgetTier = ["free_low", "under_200k", "two_to_five_hundred_k"].includes(input.budgetTier) ? input.budgetTier : null;
-  if (input.approved !== true || !providerId || !name || !type || !address || !reviewSummary || !image || !sourceUrl || !verifiedAt
+  if (input.approved !== true || !providerId || !name || !type || !address || !description || !sourceUrl || !verifiedAt
     || !budgetTier
-    || latitude === null || latitude < -90 || latitude > 90 || longitude === null || longitude < -180 || longitude > 180
-    || rating === null || rating < 0 || rating > 5 || reviewCount === null || !Number.isInteger(reviewCount) || reviewCount < 1) return null;
+    || latitude === null || latitude < -90 || latitude > 90 || longitude === null || longitude < -180 || longitude > 180) return null;
   const categories = Array.isArray(input.categories)
     ? [...new Set(input.categories.map(text).filter((value): value is string => value !== null))].sort()
     : [];
@@ -190,6 +195,7 @@ export function normalizeCuratedPlace(input: CuratedPlace, origin?: { latitude: 
     rating,
     reviewCount,
     reviewSummary,
+    description,
     budgetTier,
     photoUrl: image,
     website: httpsUrl(input.website),
@@ -216,8 +222,8 @@ export function filterPlaceCandidates(places: Place[], conditions: PlaceCandidat
   const seen = new Set<string>();
   return places.filter((place) => {
     const key = `${place.provider}:${place.providerId}`;
-    const complete = place.provider === "curated" && place.name && place.address && place.photoUrl && place.sourceUrl
-      && place.verifiedAt && place.reviewSummary && place.rating !== null && place.reviewCount !== null && place.reviewCount > 0
+    const complete = place.provider === "curated" && place.name && place.address && place.description && place.sourceUrl
+      && place.verifiedAt
       && place.distanceKm !== null && place.budgetTier !== null;
     const outsideRange = place.distanceKm === null || (minimum > 0 && place.distanceKm <= minimum) || place.distanceKm > maximum;
     if (!complete || seen.has(key) || outsideRange || !allowedBudgets.includes(place.budgetTier!)) return false;
