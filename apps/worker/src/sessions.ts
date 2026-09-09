@@ -1,11 +1,19 @@
 import { authenticatedUser } from "./auth";
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import foodCatalog from "../../../content/food.v1.json";
+import placeCatalog from "../../../content/places.v1.json";
 import { buildDeepTalkDeck } from "./deep-talk-generation";
 import { getDeepTalkFallback } from "./deep-talk-fallback";
 import type { DeepTalkAiBinding } from "./deep-talk-ai";
 import { fingerprintDeepTalkQuestion } from "./deep-talk-similarity";
 import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
+import {
+  assessPlaceCandidateSufficiency,
+  normalizeCuratedPlace,
+  type CuratedPlace,
+  type PlaceCandidateConditions,
+  type PlaceCandidateSufficiency,
+} from "./places";
 
 interface SessionEnv {
   DB: D1Database;
@@ -21,6 +29,16 @@ type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhau
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
 type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
+type BlindBagConditions = PlaceCandidateConditions & {
+  origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
+    | { kind: "address"; address: string };
+};
+type BlindBagCandidateSufficiency = PlaceCandidateSufficiency | {
+  count: null;
+  minimum: 3;
+  status: "unresolved";
+  reason: "address_requires_coordinates";
+};
 type TopicState = "unset" | "allow" | "deny";
 type DeepTalkConditions = { level: string; duration: string; sensitiveTopics: Record<string, TopicState> };
 type DeepTalkConsent = { stage: "final_confirmation" | "ready"; revision: number; confirmedUserIds: string[]; changed: boolean };
@@ -105,6 +123,18 @@ function storedBlindBagConfirmation(resultJson: string | null): BlindBagConfirma
   }
 }
 
+function blindBagCandidateSufficiency(payload: Record<string, unknown>): BlindBagCandidateSufficiency {
+  const conditions = payload.conditions as BlindBagConditions;
+  if (conditions.origin.kind === "address") {
+    return { count: null, minimum: 3, status: "unresolved", reason: "address_requires_coordinates" };
+  }
+  const origin = { latitude: conditions.origin.latitude, longitude: conditions.origin.longitude };
+  const places = placeCatalog.places
+    .map((place) => normalizeCuratedPlace(place as unknown as CuratedPlace, origin))
+    .filter((place) => place !== null);
+  return assessPlaceCandidateSufficiency(places, conditions);
+}
+
 function publicSession(row: SessionRow) {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
   const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
@@ -115,6 +145,7 @@ function publicSession(row: SessionRow) {
     createdByUserId: row.created_by_user_id,
     version: row.version,
     ...payload,
+    ...(row.feature === "blind_bag" ? { candidateSufficiency: blindBagCandidateSufficiency(payload) } : {}),
     ...(confirmation ? { confirmation } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,

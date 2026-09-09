@@ -5,6 +5,13 @@ import type { User } from "./user";
 type Position = { latitude: number; longitude: number; accuracyMeters: number };
 type Origin = ({ kind: "current" } & Position) | { kind: "address"; address: string };
 type Conditions = { distance: string; customDistanceKm?: number; budget: string; origin: Origin };
+type CandidateSufficiency = {
+  count: number | null;
+  minimum: 3;
+  status: "sufficient" | "insufficient" | "unresolved";
+  suggestion?: "distance" | "budget" | "either" | "both" | "catalog";
+  reason?: "address_requires_coordinates";
+};
 type BlindBagSession = {
   id: string;
   status: "pending" | "active";
@@ -12,6 +19,7 @@ type BlindBagSession = {
   version: number;
   conditions: Conditions;
   confirmation?: { revision: number; confirmedUserIds: string[] };
+  candidateSufficiency?: CandidateSufficiency;
 };
 
 const distanceLabels: Record<string, string> = { under_3: "Dưới 3 km", three_to_five: "3–5 km", five_to_ten: "5–10 km", custom: "Tùy chỉnh" };
@@ -32,6 +40,23 @@ function Summary({ conditions }: { conditions: Conditions }) {
     <div><dt>Khoảng cách</dt><dd>{distance}</dd></div>
     <div><dt>Ngân sách</dt><dd>{budgetLabels[conditions.budget]}</dd></div>
   </dl>;
+}
+
+function Sufficiency({ value }: { value: CandidateSufficiency }) {
+  if (value.status === "sufficient") {
+    return <p className="blind-bag-sufficiency blind-bag-sufficiency--ready">Có {value.count} địa điểm phù hợp — đủ để mở túi.</p>;
+  }
+  if (value.status === "unresolved") {
+    return <p className="blind-bag-sufficiency">Chưa thể đếm chính xác từ địa chỉ nhập tay. Hãy dùng vị trí hiện tại để kiểm tra trước khi chốt.</p>;
+  }
+  const suggestions = {
+    distance: "nới khoảng cách",
+    budget: "nới ngân sách",
+    either: "nới khoảng cách hoặc ngân sách",
+    both: "nới cả khoảng cách lẫn ngân sách",
+    catalog: "thử một điểm xuất phát khác",
+  } as const;
+  return <p className="blind-bag-sufficiency">Mới có {value.count}/{value.minimum} địa điểm phù hợp. Hãy {suggestions[value.suggestion ?? "catalog"]} rồi gửi lại nhé.</p>;
 }
 
 export function BlindBagForm({ user }: { user: User }) {
@@ -161,6 +186,7 @@ export function BlindBagForm({ user }: { user: User }) {
     <p className="eyebrow">Xé Túi Mù</p>
     <h1 id="page-title">{session.status === "active" ? "Hai đứa đã chốt kèo" : confirmedByMe ? "Chờ người kia xem lại" : "Một lời mời đang chờ mình"}</h1>
     <Summary conditions={session.conditions} />
+    {session.candidateSufficiency && <Sufficiency value={session.candidateSufficiency} />}
     {session.status === "pending" && <div className="blind-bag-review-actions">
       {!confirmedByMe && <button type="button" disabled={pending} onClick={() => void review("confirm")}>Đồng ý</button>}
       <button type="button" className="secondary-button" disabled={pending} onClick={edit}>{confirmedByMe ? "Chỉnh lại" : "Đề nghị sửa"}</button>

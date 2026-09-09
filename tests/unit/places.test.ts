@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import placeCatalog from "../../content/places.v1.json";
-import { createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
+import { assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -153,6 +153,24 @@ describe("curated Places adapter", () => {
       .toHaveLength(2);
     expect(() => filterPlaceCandidates([matching], { distance: "custom", customDistanceKm: 101, budget: "any" }))
       .toThrow(RangeError);
+  });
+
+  it("explains how to reach the three-candidate minimum without changing the filters", () => {
+    const base = normalizeCuratedPlace(curated)!;
+    const places = [
+      { ...base, providerId: "one", distanceKm: 2, budgetTier: "free_low" as const },
+      { ...base, providerId: "two", distanceKm: 2, budgetTier: "under_200k" as const },
+      { ...base, providerId: "three", distanceKm: 2, budgetTier: "under_200k" as const },
+    ];
+    const conditions = { distance: "under_3" as const, budget: "free_low" as const };
+
+    expect(assessPlaceCandidateSufficiency(places, conditions)).toEqual({
+      count: 1, minimum: 3, status: "insufficient", suggestion: "budget",
+    });
+    expect(conditions).toEqual({ distance: "under_3", budget: "free_low" });
+    expect(assessPlaceCandidateSufficiency(places, { ...conditions, budget: "any" })).toEqual({
+      count: 3, minimum: 3, status: "sufficient",
+    });
   });
 
   it("loads 150 approved OSM places inside the 35 km catalog radius", () => {

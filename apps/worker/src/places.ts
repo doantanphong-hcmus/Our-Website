@@ -27,6 +27,13 @@ export type PlaceCandidateConditions = {
   budget: PlaceBudget | "any";
 };
 
+export type PlaceCandidateSufficiency = {
+  count: number;
+  minimum: 3;
+  status: "sufficient" | "insufficient";
+  suggestion?: "distance" | "budget" | "either" | "both" | "catalog";
+};
+
 export type CuratedPlace = {
   id: string;
   name: string;
@@ -230,6 +237,34 @@ export function filterPlaceCandidates(places: Place[], conditions: PlaceCandidat
     seen.add(key);
     return true;
   });
+}
+
+export function assessPlaceCandidateSufficiency(
+  places: Place[], conditions: PlaceCandidateConditions,
+): PlaceCandidateSufficiency {
+  const minimum = 3 as const;
+  const count = filterPlaceCandidates(places, conditions).length;
+  if (count >= minimum) return { count, minimum, status: "sufficient" };
+
+  const byBudget = filterPlaceCandidates(places, { ...conditions, budget: "any" }).length;
+  const byDistance = filterPlaceCandidates(places, {
+    ...conditions, distance: "custom", customDistanceKm: 100,
+  }).length;
+  if (byBudget >= minimum && byDistance >= minimum) {
+    return { count, minimum, status: "insufficient", suggestion: "either" };
+  }
+  if (byBudget >= minimum) return { count, minimum, status: "insufficient", suggestion: "budget" };
+  if (byDistance >= minimum) return { count, minimum, status: "insufficient", suggestion: "distance" };
+
+  const fullyRelaxed = filterPlaceCandidates(places, {
+    distance: "custom", customDistanceKm: 100, budget: "any",
+  }).length;
+  return {
+    count,
+    minimum,
+    status: "insufficient",
+    suggestion: fullyRelaxed >= minimum ? "both" : "catalog",
+  };
 }
 
 export function createCuratedPlaces(catalog: CuratedPlace[]) {
