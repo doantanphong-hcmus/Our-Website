@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import placeCatalog from "../../content/places.v1.json";
-import { assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, type CuratedPlace } from "../../apps/worker/src/places";
+import { assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -171,6 +171,31 @@ describe("curated Places adapter", () => {
     expect(assessPlaceCandidateSufficiency(places, { ...conditions, budget: "any" })).toEqual({
       count: 3, minimum: 3, status: "sufficient",
     });
+  });
+
+  it("randomly favors fresh variety without penalizing missing optional data", () => {
+    const base = normalizeCuratedPlace(curated)!;
+    const candidates = [
+      { ...base, providerId: "recent", type: "museum", distanceKm: 2 },
+      { ...base, providerId: "fresh-rich", type: "park", distanceKm: 2 },
+      { ...base, providerId: "fresh-minimal", type: "park", distanceKm: 2,
+        rating: null, reviewCount: null, reviewSummary: null, photoUrl: null, openingHours: null },
+      { ...base, providerId: "outside-budget", type: "cinema", distanceKm: 2,
+        budgetTier: "two_to_five_hundred_k" as const },
+    ];
+    let seed = 7;
+    const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+    const counts = new Map<string, number>();
+    expect(selectWeightedPlace(candidates.slice(0, 2), { distance: "under_3", budget: "under_200k" }, [], random)).toBeNull();
+    for (let index = 0; index < 4_000; index++) {
+      const selected = selectWeightedPlace(candidates, { distance: "under_3", budget: "under_200k" },
+        [{ providerId: "recent", type: "museum" }], random)!;
+      counts.set(selected.providerId, (counts.get(selected.providerId) ?? 0) + 1);
+    }
+
+    expect(counts.get("outside-budget")).toBeUndefined();
+    expect((counts.get("fresh-rich") ?? 0) + (counts.get("fresh-minimal") ?? 0)).toBeGreaterThan((counts.get("recent") ?? 0) * 5);
+    expect(Math.abs((counts.get("fresh-rich") ?? 0) - (counts.get("fresh-minimal") ?? 0))).toBeLessThan(150);
   });
 
   it("loads 150 approved OSM places inside the 35 km catalog radius", () => {

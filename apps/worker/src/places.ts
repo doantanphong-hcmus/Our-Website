@@ -34,6 +34,8 @@ export type PlaceCandidateSufficiency = {
   suggestion?: "distance" | "budget" | "either" | "both" | "catalog";
 };
 
+export type RecentPlaceAppearance = Pick<Place, "providerId" | "type">;
+
 export type CuratedPlace = {
   id: string;
   name: string;
@@ -265,6 +267,37 @@ export function assessPlaceCandidateSufficiency(
     status: "insufficient",
     suggestion: fullyRelaxed >= minimum ? "both" : "catalog",
   };
+}
+
+export function selectWeightedPlace(
+  places: Place[],
+  conditions: PlaceCandidateConditions,
+  recent: readonly RecentPlaceAppearance[] = [],
+  random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
+): Place | null {
+  const candidates = filterPlaceCandidates(places, conditions);
+  if (candidates.length < 3) return null;
+
+  const typeCounts = new Map<string | null, number>();
+  for (const place of candidates) typeCounts.set(place.type, (typeCounts.get(place.type) ?? 0) + 1);
+  const recentIds = new Set(recent.map((place) => place.providerId));
+  const recentTypes = new Set(recent.map((place) => place.type));
+  const farthest = Math.max(...candidates.map((place) => place.distanceKm!));
+  const weighted = candidates.map((place) => {
+    const rarity = 1 / typeCounts.get(place.type)!;
+    const proximity = farthest ? 1 - place.distanceKm! / farthest : 1;
+    const freshness = recentIds.has(place.providerId) ? 0.25 : recentTypes.has(place.type) ? 0.7 : 1;
+    return { place, weight: (1 + rarity + proximity) * freshness };
+  });
+  const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) throw new RangeError("Invalid random value.");
+  let ticket = value * total;
+  for (const item of weighted) {
+    ticket -= item.weight;
+    if (ticket < 0) return item.place;
+  }
+  return weighted.at(-1)!.place;
 }
 
 export function createCuratedPlaces(catalog: CuratedPlace[]) {
