@@ -219,12 +219,22 @@ describe("curated Places adapter", () => {
       .toEqual(["revisit", "old", "fresh"]);
   });
 
-  it("loads 150 approved OSM places inside the 35 km catalog radius", () => {
+  it("loads 180 approved curated places inside the 35 km catalog radius", () => {
     const ids = new Set(placeCatalog.places.map((place) => place.id));
     const origin = placeCatalog.origin;
     const normalized = placeCatalog.places.map((place) => normalizeCuratedPlace(place as unknown as CuratedPlace, origin));
-    expect(placeCatalog.places).toHaveLength(150);
-    expect(ids.size).toBe(150);
+    const counts = Object.fromEntries(Object.keys({
+      attraction: 0, museum: 0, park: 0, art_space: 0, live_performance: 0, market: 0,
+      theme_park: 0, creative_workshop: 0, interactive_experience: 0, scenic_spot: 0,
+      concept_cafe: 0, unique_food: 0,
+    }).map((type) => [type, placeCatalog.places.filter((place) => place.type === type).length]));
+    expect(placeCatalog.places).toHaveLength(180);
+    expect(ids.size).toBe(180);
+    expect(counts).toEqual({
+      attraction: 15, museum: 10, park: 20, art_space: 15, live_performance: 15, market: 15,
+      theme_park: 15, creative_workshop: 15, interactive_experience: 15, scenic_spot: 15,
+      concept_cafe: 15, unique_food: 15,
+    });
     expect(normalized.every((place) => place !== null)).toBe(true);
     expect(Math.max(...normalized.map((place) => place!.distanceKm!))).toBeLessThanOrEqual(35);
     expect(placeCatalog.radiusKm).toBe(35);

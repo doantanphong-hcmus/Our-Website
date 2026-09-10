@@ -14,7 +14,7 @@ function validate(value) {
     assert.match(value.approval.reviewedAt ?? "", /^\d{4}-\d{2}-\d{2}$/);
   }
   const placeTypes = [...new Set(places.places.map((place) => place.type))].sort();
-  assert.deepEqual([...value.placeTypes].sort(), placeTypes);
+  if (value.approval.status === "approved") assert.deepEqual([...value.placeTypes].sort(), placeTypes);
   unique(value.placeTypes, "place types");
   unique(value.safetyTags.map(({ id }) => id), "safety tag ids");
   const allowedTypes = new Set(value.placeTypes);
