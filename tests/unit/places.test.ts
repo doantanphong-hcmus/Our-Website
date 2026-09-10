@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import placeCatalog from "../../content/places.v1.json";
-import { assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
+import { applyPlaceHistoryPolicy, assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -189,13 +189,34 @@ describe("curated Places adapter", () => {
     expect(selectWeightedPlace(candidates.slice(0, 2), { distance: "under_3", budget: "under_200k" }, [], random)).toBeNull();
     for (let index = 0; index < 4_000; index++) {
       const selected = selectWeightedPlace(candidates, { distance: "under_3", budget: "under_200k" },
-        [{ providerId: "recent", type: "museum" }], random)!;
+        [{ provider: "curated", providerId: "recent", type: "museum" }], random)!;
       counts.set(selected.providerId, (counts.get(selected.providerId) ?? 0) + 1);
     }
 
     expect(counts.get("outside-budget")).toBeUndefined();
     expect((counts.get("fresh-rich") ?? 0) + (counts.get("fresh-minimal") ?? 0)).toBeGreaterThan((counts.get("recent") ?? 0) * 5);
     expect(Math.abs((counts.get("fresh-rich") ?? 0) - (counts.get("fresh-minimal") ?? 0))).toBeLessThan(150);
+  });
+
+  it("blocks 90-day repeats and a fourth same-type result unless revisit is allowed", () => {
+    const now = Date.UTC(2026, 8, 10) / 1_000;
+    const base = normalizeCuratedPlace(curated)!;
+    const places = [
+      { ...base, providerId: "revisit", type: "park" },
+      { ...base, providerId: "museum-new", type: "museum" },
+      { ...base, providerId: "old", type: "garden" },
+      { ...base, providerId: "fresh", type: "cinema" },
+    ];
+    const appearances = [
+      { provider: "curated" as const, providerId: "revisit", type: "park", appearedAt: now - 10 * 86_400 },
+      ...[1, 2, 3].map((days) => ({ provider: "curated" as const, providerId: `museum-${days}`, type: "museum", appearedAt: now - days * 86_400 })),
+      { provider: "curated" as const, providerId: "old", type: "garden", appearedAt: now - 91 * 86_400 },
+    ];
+
+    expect(applyPlaceHistoryPolicy(places, appearances, { now }).map((place) => place.providerId))
+      .toEqual(["old", "fresh"]);
+    expect(applyPlaceHistoryPolicy(places, appearances, { now, allowRevisit: true }).map((place) => place.providerId))
+      .toEqual(["revisit", "old", "fresh"]);
   });
 
   it("loads 150 approved OSM places inside the 35 km catalog radius", () => {

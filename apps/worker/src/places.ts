@@ -34,7 +34,8 @@ export type PlaceCandidateSufficiency = {
   suggestion?: "distance" | "budget" | "either" | "both" | "catalog";
 };
 
-export type RecentPlaceAppearance = Pick<Place, "providerId" | "type">;
+export type RecentPlaceAppearance = Pick<Place, "provider" | "providerId" | "type">;
+export type PlaceAppearance = RecentPlaceAppearance & { appearedAt: number };
 
 export type CuratedPlace = {
   id: string;
@@ -280,13 +281,13 @@ export function selectWeightedPlace(
 
   const typeCounts = new Map<string | null, number>();
   for (const place of candidates) typeCounts.set(place.type, (typeCounts.get(place.type) ?? 0) + 1);
-  const recentIds = new Set(recent.map((place) => place.providerId));
+  const recentIds = new Set(recent.map((place) => `${place.provider}:${place.providerId}`));
   const recentTypes = new Set(recent.map((place) => place.type));
   const farthest = Math.max(...candidates.map((place) => place.distanceKm!));
   const weighted = candidates.map((place) => {
     const rarity = 1 / typeCounts.get(place.type)!;
     const proximity = farthest ? 1 - place.distanceKm! / farthest : 1;
-    const freshness = recentIds.has(place.providerId) ? 0.25 : recentTypes.has(place.type) ? 0.7 : 1;
+    const freshness = recentIds.has(`${place.provider}:${place.providerId}`) ? 0.25 : recentTypes.has(place.type) ? 0.7 : 1;
     return { place, weight: (1 + rarity + proximity) * freshness };
   });
   const total = weighted.reduce((sum, item) => sum + item.weight, 0);
@@ -298,6 +299,23 @@ export function selectWeightedPlace(
     if (ticket < 0) return item.place;
   }
   return weighted.at(-1)!.place;
+}
+
+export function applyPlaceHistoryPolicy(
+  places: Place[],
+  appearances: readonly PlaceAppearance[],
+  { now = Math.floor(Date.now() / 1_000), allowRevisit = false }: { now?: number; allowRevisit?: boolean } = {},
+): Place[] {
+  if (!Number.isFinite(now)) throw new RangeError("Invalid history time.");
+  const cutoff = now - 90 * 24 * 60 * 60;
+  const recent = appearances
+    .filter((item) => Number.isFinite(item.appearedAt) && item.appearedAt >= cutoff && item.appearedAt <= now)
+    .sort((left, right) => right.appearedAt - left.appearedAt);
+  const blocked = new Set(recent.map((item) => `${item.provider}:${item.providerId}`));
+  const repeatedType = recent.length >= 3 && recent[0].type
+    && recent.slice(0, 3).every((item) => item.type === recent[0].type) ? recent[0].type : null;
+  return places.filter((place) => (allowRevisit || !blocked.has(`${place.provider}:${place.providerId}`))
+    && (!repeatedType || place.type !== repeatedType));
 }
 
 export function createCuratedPlaces(catalog: CuratedPlace[]) {
