@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import placeCatalog from "../../content/places.v1.json";
-import { applyPlaceHistoryPolicy, assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
+import challengeCatalog from "../../content/place-challenges.v1.json";
+import { applyPlaceHistoryPolicy, assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectPlaceChallenge, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -238,5 +239,32 @@ describe("curated Places adapter", () => {
     expect(normalized.every((place) => place !== null)).toBe(true);
     expect(Math.max(...normalized.map((place) => place!.distanceKm!))).toBeLessThanOrEqual(35);
     expect(placeCatalog.radiusKm).toBe(35);
+  });
+});
+
+describe("place challenge selector", () => {
+  it("matches the exact place type, excludes five recent turns, respects time/cost, and permits skip", () => {
+    const challenges = challengeCatalog.challenges;
+    const recentChallengeIds = ["park-tree", "park-walk", "park-sounds", "park-cloud", "park-photo", "park-color"];
+    const conditions = { placeType: "park", maxMinutes: 7, maxExtraCostVnd: 0, recentChallengeIds };
+    expect(selectPlaceChallenge(challenges, conditions, () => 0)?.id).toBe("park-color");
+    expect(selectPlaceChallenge(challenges, { ...conditions, maxMinutes: 4 }))
+      .toBeNull();
+    expect(selectPlaceChallenge(challenges, { ...conditions, skip: true })).toBeNull();
+    expect(selectPlaceChallenge(challenges, { ...conditions, placeType: "concept_cafe" })).toBeNull();
+    expect(selectPlaceChallenge(challenges, { ...conditions, placeType: "theme_park", maxMinutes: 20,
+      recentChallengeIds: [], maxExtraCostVnd: 0 }, () => 0.999999)?.placeType).toBe("theme_park");
+    expect(() => selectPlaceChallenge(challenges, { ...conditions, maxExtraCostVnd: -1 })).toThrow(RangeError);
+    expect(() => selectPlaceChallenge(challenges, conditions, () => 1)).toThrow(RangeError);
+  });
+
+  it("does not spend beyond the challenge budget and uses the supplied random draw", () => {
+    const challenges = [
+      { id: "free", placeType: "market", text: "Ngắm một sạp hàng thú vị", estimatedMinutes: 5, maxExtraCostVnd: 0, safetyTags: ["venue_rules"] },
+      { id: "paid", placeType: "market", text: "Cùng thử một món nhỏ", estimatedMinutes: 5, maxExtraCostVnd: 50_000, safetyTags: ["venue_rules"] },
+    ];
+    const conditions = { placeType: "market", maxMinutes: 5, maxExtraCostVnd: 0 };
+    expect(selectPlaceChallenge(challenges, conditions, () => 0.99)?.id).toBe("free");
+    expect(selectPlaceChallenge(challenges, { ...conditions, maxExtraCostVnd: 50_000 }, () => 0.99)?.id).toBe("paid");
   });
 });

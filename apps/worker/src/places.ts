@@ -37,6 +37,23 @@ export type PlaceCandidateSufficiency = {
 export type RecentPlaceAppearance = Pick<Place, "provider" | "providerId" | "type">;
 export type PlaceAppearance = RecentPlaceAppearance & { appearedAt: number };
 
+export type PlaceChallenge = {
+  id: string;
+  placeType: string;
+  text: string;
+  estimatedMinutes: number;
+  maxExtraCostVnd: number;
+  safetyTags: string[];
+};
+
+export type PlaceChallengeConditions = {
+  placeType: string;
+  maxMinutes: number;
+  maxExtraCostVnd: number;
+  recentChallengeIds?: readonly string[]; // newest first
+  skip?: boolean;
+};
+
 export type CuratedPlace = {
   id: string;
   name: string;
@@ -316,6 +333,27 @@ export function applyPlaceHistoryPolicy(
     && recent.slice(0, 3).every((item) => item.type === recent[0].type) ? recent[0].type : null;
   return places.filter((place) => (allowRevisit || !blocked.has(`${place.provider}:${place.providerId}`))
     && (!repeatedType || place.type !== repeatedType));
+}
+
+export function selectPlaceChallenge(
+  challenges: readonly PlaceChallenge[],
+  conditions: PlaceChallengeConditions,
+  random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
+): PlaceChallenge | null {
+  if (!conditions.placeType.trim() || !Number.isFinite(conditions.maxMinutes) || conditions.maxMinutes < 0
+    || !Number.isFinite(conditions.maxExtraCostVnd) || conditions.maxExtraCostVnd < 0) {
+    throw new RangeError("Invalid challenge conditions.");
+  }
+  if (conditions.skip) return null;
+  const recent = new Set(conditions.recentChallengeIds?.slice(0, 5) ?? []);
+  const eligible = challenges.filter((challenge) => challenge.placeType === conditions.placeType
+    && !recent.has(challenge.id)
+    && challenge.estimatedMinutes <= conditions.maxMinutes
+    && challenge.maxExtraCostVnd <= conditions.maxExtraCostVnd);
+  if (!eligible.length) return null;
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) throw new RangeError("Invalid random value.");
+  return eligible[Math.floor(value * eligible.length)];
 }
 
 export function createCuratedPlaces(catalog: CuratedPlace[]) {
