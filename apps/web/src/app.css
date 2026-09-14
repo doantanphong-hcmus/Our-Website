@@ -1089,6 +1089,10 @@ main {
 
 .blind-bag-review-actions button { min-block-size: 3rem; }
 
+.blind-bag-tear { display: grid; gap: var(--space-2); margin-block-start: var(--space-4); }
+.blind-bag-tear progress { inline-size: 100%; block-size: 1rem; accent-color: var(--color-shared); }
+.blind-bag-tear p { margin: 0; }
+
 @media (max-width: 30rem) {
   .blind-bag-review-actions { grid-template-columns: 1fr; }
 }

@@ -8,8 +8,10 @@ import type { DeepTalkAiBinding } from "./deep-talk-ai";
 import { fingerprintDeepTalkQuestion } from "./deep-talk-similarity";
 import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
 import {
+  applyPlaceHistoryPolicy,
   assessPlaceCandidateSufficiency,
   normalizeCuratedPlace,
+  selectWeightedPlace,
   type CuratedPlace,
   type PlaceCandidateConditions,
   type PlaceCandidateSufficiency,
@@ -29,6 +31,7 @@ type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhau
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
 type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
+type BlindBagTear = { readyUserIds: string[]; tornByUserId?: string; progress: number; selectedPlaceId?: string };
 type BlindBagConditions = PlaceCandidateConditions & {
   origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
     | { kind: "address"; address: string };
@@ -123,6 +126,21 @@ function storedBlindBagConfirmation(resultJson: string | null): BlindBagConfirma
   }
 }
 
+function storedBlindBagTear(resultJson: string | null): BlindBagTear {
+  try {
+    const value = (JSON.parse(resultJson ?? "{}") as { blindBagTear?: unknown }).blindBagTear;
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    const tear = value as Record<string, unknown>;
+    if (!Array.isArray(tear.readyUserIds) || !tear.readyUserIds.every((id) => typeof id === "string")
+      || !Number.isInteger(tear.progress) || Number(tear.progress) < 0 || Number(tear.progress) > 100) throw new Error();
+    return { readyUserIds: [...new Set(tear.readyUserIds as string[])], progress: Number(tear.progress),
+      ...(typeof tear.tornByUserId === "string" ? { tornByUserId: tear.tornByUserId } : {}),
+      ...(typeof tear.selectedPlaceId === "string" ? { selectedPlaceId: tear.selectedPlaceId } : {}) };
+  } catch {
+    return { readyUserIds: [], progress: 0 };
+  }
+}
+
 function blindBagCandidateSufficiency(payload: Record<string, unknown>): BlindBagCandidateSufficiency {
   const conditions = payload.conditions as BlindBagConditions;
   if (conditions.origin.kind === "address") {
@@ -138,6 +156,7 @@ function blindBagCandidateSufficiency(payload: Record<string, unknown>): BlindBa
 function publicSession(row: SessionRow) {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
   const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
+  const tear = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTear(row.result_json) : null;
   return {
     id: row.id,
     feature: row.feature,
@@ -147,6 +166,9 @@ function publicSession(row: SessionRow) {
     ...payload,
     ...(row.feature === "blind_bag" ? { candidateSufficiency: blindBagCandidateSufficiency(payload) } : {}),
     ...(confirmation ? { confirmation } : {}),
+    ...(tear ? { tear: { readyUserIds: tear.readyUserIds, progress: tear.progress,
+      phase: tear.tornByUserId ? tear.progress === 100 ? "torn" : "tearing" : "waiting",
+      tornByUserId: tear.tornByUserId ?? null } } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -759,6 +781,81 @@ async function blindBagConfirmation(request: Request, env: SessionEnv, userId: s
   return json({ session: publicSession(updated!) }, 201);
 }
 
+async function blindBagTear(request: Request, env: SessionEnv, userId: string, spaceId: string, sessionId: string): Promise<Response> {
+  const input = request.method === "POST" ? await body(request) : null;
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`).bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "blind_bag" || current.status !== "active") return json({ error: "Túi mù chưa sẵn sàng." }, 409);
+  if (request.method === "GET") return json({ session: publicSession(current) });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const action = input?.action;
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  const progress = input?.progress;
+  if (!["ready", "tear", "tear_progress"].includes(String(action)) || !Number.isInteger(expectedVersion)
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)
+    || (action === "tear_progress" && (!Number.isInteger(progress) || Number(progress) < 1 || Number(progress) > 100))) {
+    return json({ error: "Lệnh xé túi không hợp lệ." }, 400);
+  }
+  const inputJson = JSON.stringify(action === "tear_progress" ? { action, progress } : { action });
+  const previous = await env.DB.prepare(`SELECT session_id, actor_user_id, action, input_json FROM activity_session_events
+    WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
+    .first<{ session_id: string; actor_user_id: string; action: string; input_json: string }>();
+  if (previous) return previous.session_id === sessionId && previous.actor_user_id === userId
+    && previous.action === action && previous.input_json === inputJson
+    ? json({ session: publicSession(current), duplicate: true })
+    : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
+
+  const tear = storedBlindBagTear(current.result_json);
+  if (action === "ready") {
+    if (tear.tornByUserId || tear.readyUserIds.includes(userId)) return json({ error: "Mình đã sẵn sàng rồi." }, 409);
+    tear.readyUserIds.push(userId);
+  } else if (action === "tear") {
+    if (tear.tornByUserId || tear.readyUserIds.length !== 2) return json({ error: "Cần cả hai sẵn sàng trước khi xé." }, 409);
+    const conditions = (JSON.parse(current.payload_json) as { conditions: BlindBagConditions }).conditions;
+    if (conditions.origin.kind !== "current") return json({ error: "Cần vị trí hiện tại để chọn địa điểm chính xác trước khi xé." }, 409);
+    const origin = { latitude: conditions.origin.latitude, longitude: conditions.origin.longitude };
+    const places = placeCatalog.places.map((place) => normalizeCuratedPlace(place as unknown as CuratedPlace, origin))
+      .filter((place) => place !== null);
+    const historyRows = await env.DB.prepare(`SELECT result_json, updated_at FROM activity_sessions
+      WHERE couple_space_id = ? AND feature = 'blind_bag' AND id <> ? AND status IN ('active', 'completed')
+      ORDER BY updated_at DESC LIMIT 100`).bind(spaceId, sessionId)
+      .all<{ result_json: string | null; updated_at: number }>();
+    const byId = new Map(places.map((place) => [place.providerId, place]));
+    const appearances = (historyRows.results ?? []).flatMap((row) => {
+      const id = storedBlindBagTear(row.result_json).selectedPlaceId;
+      const place = id ? byId.get(id) : null;
+      return place ? [{ provider: place.provider, providerId: place.providerId, type: place.type, appearedAt: row.updated_at }] : [];
+    });
+    const eligible = applyPlaceHistoryPolicy(places, appearances);
+    const selected = selectWeightedPlace(eligible, conditions, appearances);
+    if (!selected) return json({ error: "Chưa đủ địa điểm phù hợp để xé. Hai đứa thử nới khoảng cách hoặc ngân sách nhé." }, 409);
+    tear.tornByUserId = userId;
+    tear.selectedPlaceId = selected.providerId;
+  } else {
+    if (tear.tornByUserId !== userId || tear.progress === 100 || Number(progress) <= tear.progress) {
+      return json({ error: "Tiến độ xé không hợp lệ." }, 409);
+    }
+    tear.progress = Number(progress);
+  }
+
+  const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}), blindBagTear: tear };
+  const now = Math.floor(Date.now() / 1000);
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
+      WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+      .bind(JSON.stringify(result), now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version, input_json)
+      SELECT ?, ?, ?, ?, ?, 'active', 'active', ?, ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, action, current.version + 1, inputJson),
+  ]);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json({ session: publicSession(updated!) }, 201);
+}
+
 function publicDeepTalkDeck(row: DeepTalkDeckRow) {
   return { id: row.id, sessionId: row.session_id, cardCount: 20, createdAt: row.created_at };
 }
@@ -1126,7 +1223,8 @@ function transition(row: SessionRow, action: Action, actorId: string): Status | 
   if (row.status === "pending" && row.feature === "blind_bag" && action === "decline"
     && !storedBlindBagConfirmation(row.result_json)?.confirmedUserIds.includes(actorId)) return "declined";
   if (action === "cancel" && (row.status === "active" || (row.status === "pending" && actorId === row.created_by_user_id))) return "cancelled";
-  if (action === "complete" && row.status === "active" && row.feature !== "food_vote") return "completed";
+  if (action === "complete" && row.status === "active" && row.feature !== "food_vote"
+    && (row.feature !== "blind_bag" || storedBlindBagTear(row.result_json).progress === 100)) return "completed";
   return null;
 }
 
@@ -1216,6 +1314,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "blind-bag-confirmation") {
     return blindBagConfirmation(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "blind-bag-tear") {
+    return blindBagTear(request, env, userId, spaceId, sessionId);
   }
   if (parts.length === 4 && parts[3] === "deep-talk-deck") {
     return deepTalkDeck(request, env, userId, spaceId, sessionId);

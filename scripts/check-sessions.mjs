@@ -211,9 +211,50 @@ try {
   assert.equal(confirmed.data.session.status, "active");
   assert.deepEqual(confirmed.data.session.confirmation, { revision: 2, confirmedUserIds: ["user-nhi", "user-phong"] });
   assert.equal((await act(phong, sessionId, "cancel", 2, "cancel-stale-001")).response.status, 409);
-  const completed = await act(phong, sessionId, "complete", 3, "complete-blind-001");
-  assert.equal(completed.response.status, 200);
-  assert.equal(completed.data.session.status, "completed");
+  assert.equal((await act(phong, sessionId, "complete", 3, "complete-blind-too-early")).response.status, 409);
+  const cancelled = await act(phong, sessionId, "cancel", 3, "cancel-blind-001");
+  assert.equal(cancelled.response.status, 200);
+  assert.equal(cancelled.data.session.status, "cancelled");
+
+  const tearConditions = { distance: "under_3", budget: "any",
+    origin: { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 } };
+  const bag = await request("/api/sessions", phong, "POST", {
+    feature: "blind_bag", idempotencyKey: "create-ready-bag", conditions: tearConditions,
+  });
+  assert.equal(bag.response.status, 201);
+  const bagId = bag.data.session.id;
+  const bagPath = `/api/sessions/${bagId}/blind-bag-tear`;
+  assert.equal((await request(bagPath, phong, "POST", { action: "ready", expectedVersion: 1, idempotencyKey: "ready-too-early" })).response.status, 409);
+  const bagConfirmed = await request(`/api/sessions/${bagId}/blind-bag-confirmation`, nhi, "POST", {
+    action: "confirm", expectedVersion: 1, idempotencyKey: "confirm-ready-bag",
+  });
+  assert.equal(bagConfirmed.data.session.status, "active");
+  assert.deepEqual(bagConfirmed.data.session.tear, { readyUserIds: [], progress: 0, phase: "waiting", tornByUserId: null });
+  assert.equal((await request(bagPath, phong, "POST", { action: "tear", expectedVersion: 2, idempotencyKey: "tear-too-early" })).response.status, 409);
+  const firstReady = await request(bagPath, phong, "POST", { action: "ready", expectedVersion: 2, idempotencyKey: "ready-phong-bag" });
+  assert.equal(firstReady.response.status, 201);
+  assert.deepEqual(firstReady.data.session.tear.readyUserIds, ["user-phong"]);
+  assert.equal((await request(bagPath, phong, "POST", { action: "ready", expectedVersion: 3, idempotencyKey: "ready-phong-again" })).response.status, 409);
+  const secondReady = await request(bagPath, nhi, "POST", { action: "ready", expectedVersion: 3, idempotencyKey: "ready-nhi-bag" });
+  assert.deepEqual(secondReady.data.session.tear.readyUserIds, ["user-phong", "user-nhi"]);
+  const torn = await request(bagPath, phong, "POST", { action: "tear", expectedVersion: 4, idempotencyKey: "tear-phong-bag" });
+  assert.equal(torn.response.status, 201);
+  assert.equal(torn.data.session.tear.phase, "tearing");
+  assert.equal(JSON.stringify(torn.data).includes("selectedPlaceId"), false, "place must stay hidden before result card");
+  assert.equal((await request(bagPath, nhi, "POST", { action: "tear_progress", progress: 50, expectedVersion: 5,
+    idempotencyKey: "progress-wrong-user" })).response.status, 409);
+  const halfway = await request(bagPath, phong, "POST", { action: "tear_progress", progress: 50, expectedVersion: 5,
+    idempotencyKey: "progress-halfway" });
+  assert.equal(halfway.data.session.tear.progress, 50);
+  assert.equal((await request(bagPath, phong, "POST", { action: "tear_progress", progress: 50, expectedVersion: 6,
+    idempotencyKey: "progress-backward" })).response.status, 409);
+  const finished = await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
+    idempotencyKey: "progress-finished" });
+  assert.equal(finished.data.session.tear.phase, "torn");
+  assert.equal((await request(bagPath, nhi)).data.session.tear.progress, 100);
+  assert.equal((await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
+    idempotencyKey: "progress-finished" })).data.duplicate, true);
+  assert.equal((await act(phong, bagId, "complete", 7, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",

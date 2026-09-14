@@ -149,7 +149,8 @@ try {
   let started = performance.now();
   const created = await api(first.page, "/api/sessions", {
     feature: "blind_bag", idempotencyKey: "p110-create-001",
-    conditions: { distance: "under_3", budget: "any", origin: { kind: "address", address: "Chợ Bến Thành, Quận 1" } },
+    conditions: { distance: "custom", customDistanceKm: 10, budget: "any",
+      origin: { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 } },
   });
   assert.equal(created.status, 201);
   const sessionId = created.data.session.id;
@@ -169,16 +170,34 @@ try {
     waitFor(second.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 2)),
   ]);
 
+  const tearPath = `/api/sessions/${sessionId}/blind-bag-tear`;
+  assert.equal((await api(first.page, tearPath, { action: "tear", expectedVersion: 2, idempotencyKey: "p211-too-early" })).status, 409);
+  assert.equal((await api(first.page, tearPath, { action: "ready", expectedVersion: 2, idempotencyKey: "p211-ready-phong" })).status, 201);
+  await waitFor(second.page, () => globalThis.p110.events.some((event) => event.eventVersion === 3 && event.session?.tear?.readyUserIds.length === 1));
+  assert.equal((await api(second.page, tearPath, { action: "ready", expectedVersion: 3, idempotencyKey: "p211-ready-nhi" })).status, 201);
+  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.eventVersion === 4 && event.session?.tear?.readyUserIds.length === 2));
+  assert.equal((await api(first.page, tearPath, { action: "tear", expectedVersion: 4, idempotencyKey: "p211-tear" })).status, 201);
+  await waitFor(second.page, () => globalThis.p110.events.some((event) => event.eventVersion === 5 && event.session?.tear?.phase === "tearing"));
+  assert.equal((await api(first.page, tearPath, { action: "tear_progress", progress: 25,
+    expectedVersion: 5, idempotencyKey: "p211-progress-25" })).status, 201);
+  await waitFor(second.page, () => globalThis.p110.events.some((event) => event.eventVersion === 6 && event.session?.tear?.progress === 25));
+
   await second.page.evaluate(() => globalThis.p110.socket.close(1000, "offline"));
-  const completed = await api(first.page, `/api/sessions/${sessionId}/complete`, { expectedVersion: 2, idempotencyKey: "p110-complete-1" });
+  assert.equal((await api(first.page, tearPath, { action: "tear_progress", progress: 100,
+    expectedVersion: 6, idempotencyKey: "p211-progress-100" })).status, 201);
+  const resumed = await connect(second.page, 6);
+  assert.equal(resumed.reconciled, true);
+  assert.equal(resumed.sessions.find((item) => item.id === sessionId).tear.phase, "torn");
+  await second.page.evaluate(() => globalThis.p110.socket.close(1000, "offline"));
+  const completed = await api(first.page, `/api/sessions/${sessionId}/complete`, { expectedVersion: 7, idempotencyKey: "p110-complete-1" });
   assert.equal(completed.status, 200);
-  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 3));
+  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 8));
 
   started = performance.now();
-  const recovered = await connect(second.page, 2);
+  const recovered = await connect(second.page, 7);
   const reconnectMs = Math.round(performance.now() - started);
   assert.ok(reconnectMs < timeoutMs, `Reconnect took ${reconnectMs}ms`);
-  assert.equal(recovered.eventVersion, 3);
+  assert.equal(recovered.eventVersion, 8);
   assert.equal(recovered.reconciled, true);
   assert.equal(recovered.sessions.find((item) => item.id === sessionId).status, "completed");
 
@@ -186,7 +205,7 @@ try {
     globalThis.p110.socket.addEventListener("close", resolve, { once: true });
     globalThis.p110.socket.close(1000, "resync");
   }));
-  const exact = await connect(second.page, 3);
+  const exact = await connect(second.page, 8);
   assert.equal(exact.reconciled, false);
 
   const revokedSocketClosed = second.page.evaluate(() => new Promise((resolve) => {
@@ -199,11 +218,11 @@ try {
     conditions: { foodStyle: "snack", meal: "any", category: "any", allergens: [], exclusions: [] },
   });
   assert.equal(afterLogout.status, 201);
-  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 4));
+  await waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "session.updated" && event.eventVersion === 9));
   const revoked = await revokedSocketClosed;
   assert.ok(revoked.code === 4401 || revoked.readyState === 2 || revoked.readyState === 3, JSON.stringify(revoked));
 
-  console.log(`P1.10/P4.12 realtime: auth/revoke, two-device ready/skip sync, ${broadcastMs}ms broadcast and ${reconnectMs}ms reconnect = OK`);
+  console.log(`P1.10/P2.11/P4.12 realtime: auth/revoke, two-device ready/tear sync, ${broadcastMs}ms broadcast and ${reconnectMs}ms reconnect = OK`);
   await Promise.all([first.context.close(), second.context.close()]);
 } finally {
   await browser?.close().catch(() => {});

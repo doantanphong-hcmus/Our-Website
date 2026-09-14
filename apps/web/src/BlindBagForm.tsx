@@ -19,6 +19,7 @@ type BlindBagSession = {
   version: number;
   conditions: Conditions;
   confirmation?: { revision: number; confirmedUserIds: string[] };
+  tear?: { readyUserIds: string[]; tornByUserId: string | null; progress: number; phase: "waiting" | "tearing" | "torn" };
   candidateSufficiency?: CandidateSufficiency;
 };
 
@@ -97,6 +98,37 @@ export function BlindBagForm({ user }: { user: User }) {
     return () => window.removeEventListener("our:offline-queue", synced);
   }, []);
 
+  useEffect(() => {
+    let stopped = false;
+    let retry = 0;
+    let socket: WebSocket | null = null;
+    const connect = () => {
+      if (stopped || !navigator.onLine || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
+      const url = new URL("/ws", location.href);
+      url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(url);
+      socket.addEventListener("message", ({ data }) => {
+        try {
+          const event = JSON.parse(String(data)) as { type?: string; session?: BlindBagSession & { feature?: string }; sessions?: unknown[] };
+          if (event.type === "session.snapshot") setSession(activeBlindBag(event));
+          if (event.type === "session.updated" && event.session?.feature === "blind_bag") {
+            setSession(["pending", "active"].includes(event.session.status) ? event.session : null);
+          }
+        } catch { /* ignore malformed realtime messages */ }
+      });
+      socket.addEventListener("close", () => { if (!stopped) retry = window.setTimeout(connect, 1_000); });
+    };
+    const online = () => { void loadSession(); connect(); };
+    connect();
+    window.addEventListener("online", online);
+    return () => {
+      stopped = true;
+      window.clearTimeout(retry);
+      window.removeEventListener("online", online);
+      socket?.close();
+    };
+  }, []);
+
   function edit() {
     if (!session) return;
     setDistance(session.conditions.distance);
@@ -157,6 +189,41 @@ export function BlindBagForm({ user }: { user: User }) {
     }
   }
 
+  async function tearCommand(action: "ready" | "tear" | "tear_progress", version: number, progress?: number): Promise<BlindBagSession> {
+    const response = await fetch(`/api/sessions/${session!.id}/blind-bag-tear`, {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, expectedVersion: version, idempotencyKey: crypto.randomUUID(), ...(progress === undefined ? {} : { progress }) }),
+    });
+    const data = await response.json() as { session?: BlindBagSession; error?: string };
+    if (!response.ok) {
+      if (data.session) setSession(data.session);
+      throw new Error(data.error ?? "Không đồng bộ được túi mù.");
+    }
+    setSession(data.session!);
+    return data.session!;
+  }
+
+  async function readyOrTear(action: "ready" | "tear") {
+    if (!session) return;
+    setPending(true);
+    setError("");
+    try {
+      let current = action === "tear" && session.tear?.phase === "tearing"
+        ? session : await tearCommand(action, session.version);
+      if (action === "tear") {
+        for (const progress of [25, 50, 75, 100]) {
+          if (progress <= (current.tear?.progress ?? 0)) continue;
+          await new Promise((resolve) => window.setTimeout(resolve, 350));
+          current = await tearCommand("tear_progress", current.version, progress);
+        }
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không đồng bộ được túi mù.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   function locate() {
     setLocating(true);
     setError("");
@@ -192,7 +259,20 @@ export function BlindBagForm({ user }: { user: User }) {
       <button type="button" className="secondary-button" disabled={pending} onClick={edit}>{confirmedByMe ? "Chỉnh lại" : "Đề nghị sửa"}</button>
       {!confirmedByMe && <button type="button" className="text-button" disabled={pending} onClick={() => void review("decline")}>Từ chối</button>}
     </div>}
-    {session.status === "active" && <p>Túi mù đang chuẩn bị những địa điểm phù hợp.</p>}
+    {session.status === "active" && <div className="blind-bag-tear">
+      {session.tear?.phase === "torn" ? <p>Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.</p>
+        : session.tear?.phase === "tearing" ? <>
+          <p>{session.tear.tornByUserId === user.id ? "Mình đang xé túi…" : "Người kia đang xé túi…"}</p>
+          <progress max="100" value={session.tear.progress} aria-label="Tiến độ xé túi" />
+          <p role="status">{session.tear.progress}%</p>
+          {session.tear.tornByUserId === user.id && <button type="button" disabled={pending} onClick={() => void readyOrTear("tear")}>Tiếp tục xé</button>}
+        </> : <>
+          <p>{session.tear?.readyUserIds.length ?? 0}/2 người đã sẵn sàng.</p>
+          {!session.tear?.readyUserIds.includes(user.id) && <button type="button" disabled={pending} onClick={() => void readyOrTear("ready")}>Mình sẵn sàng</button>}
+          {session.tear?.readyUserIds.length === 2 && <button type="button" disabled={pending || session.conditions.origin.kind !== "current"} onClick={() => void readyOrTear("tear")}>Xé túi mù</button>}
+          {session.tear?.readyUserIds.length === 2 && session.conditions.origin.kind !== "current" && <p>Cần chọn vị trí hiện tại để xác định khoảng cách trước khi xé.</p>}
+        </>}
+    </div>}
     <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
   </section>;
 

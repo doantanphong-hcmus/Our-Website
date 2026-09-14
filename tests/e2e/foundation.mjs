@@ -66,6 +66,15 @@ try {
     if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 1, sessions: [reviewSession] }) });
     reviewPath = new URL(route.request().url()).pathname;
     reviewCommand = route.request().postDataJSON();
+    if (reviewPath.endsWith("/blind-bag-tear")) {
+      if (reviewCommand.action === "ready") reviewSession.tear.readyUserIds.push(nhi.id);
+      if (reviewCommand.action === "tear") { reviewSession.tear.tornByUserId = nhi.id; reviewSession.tear.phase = "tearing"; }
+      if (reviewCommand.action === "tear_progress") {
+        reviewSession.tear.progress = reviewCommand.progress;
+        if (reviewCommand.progress === 100) reviewSession.tear.phase = "torn";
+      }
+      reviewSession.version++;
+    }
     return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: reviewSession }) });
   });
   await reviewPage.goto(`${server.url}/di-dau/xe-tui-mu`);
@@ -82,6 +91,17 @@ try {
   assert.equal(reviewCommand.expectedVersion, 1);
   assert.equal(reviewCommand.conditions.budget, "free_low");
   await assertA11y(reviewPage);
+  assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+  reviewSession.status = "active";
+  reviewSession.version = 2;
+  reviewSession.conditions.origin = { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 };
+  reviewSession.tear = { readyUserIds: [phong.id], tornByUserId: null, progress: 0, phase: "waiting" };
+  await reviewPage.reload();
+  await reviewPage.getByRole("button", { name: "Mình sẵn sàng" }).click();
+  await reviewPage.getByText("2/2 người đã sẵn sàng.").waitFor();
+  await reviewPage.getByRole("button", { name: "Xé túi mù" }).click();
+  await reviewPage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  assert.equal(reviewSession.tear.progress, 100);
   assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
   await reviewContext.close();
 
