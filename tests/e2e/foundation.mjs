@@ -61,6 +61,7 @@ try {
   };
   let reviewCommand;
   let reviewPath;
+  let tearProgressCommands = [];
   await reviewPage.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: nhi }) }));
   await reviewPage.route("**/api/sessions**", async (route) => {
     if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 1, sessions: [reviewSession] }) });
@@ -70,6 +71,7 @@ try {
       if (reviewCommand.action === "ready") reviewSession.tear.readyUserIds.push(nhi.id);
       if (reviewCommand.action === "tear") { reviewSession.tear.tornByUserId = nhi.id; reviewSession.tear.phase = "tearing"; }
       if (reviewCommand.action === "tear_progress") {
+        tearProgressCommands.push(reviewCommand.progress);
         reviewSession.tear.progress = reviewCommand.progress;
         if (reviewCommand.progress === 100) reviewSession.tear.phase = "torn";
       }
@@ -99,10 +101,41 @@ try {
   await reviewPage.reload();
   await reviewPage.getByRole("button", { name: "Mình sẵn sàng" }).click();
   await reviewPage.getByText("2/2 người đã sẵn sàng.").waitFor();
-  await reviewPage.getByRole("button", { name: "Xé túi mù" }).click();
-  await reviewPage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  const tearStage = reviewPage.getByRole("dialog", { name: "Xé Túi Mù" });
+  await tearStage.waitFor();
+  const stageBounds = await tearStage.boundingBox();
+  assert.ok(stageBounds && stageBounds.width >= 359 && stageBounds.height >= 799, "tear stage must cover the phone viewport");
+  const gesture = tearStage.getByRole("button", { name: "Vuốt từ trên xuống để xé túi mù" });
+  const bounds = await gesture.boundingBox();
+  assert.ok(bounds);
+  const x = bounds.x + bounds.width / 2;
+  const y = bounds.y + 12;
+  await reviewPage.mouse.move(x, y);
+  await reviewPage.mouse.down();
+  await reviewPage.mouse.move(x, y + bounds.height * 0.3, { steps: 6 });
+  await reviewPage.mouse.up();
+  assert.equal(reviewCommand.action, "ready", "a short swipe must not tear the bag");
+  const startedTear = Date.now();
+  await reviewPage.mouse.move(x, y);
+  await reviewPage.mouse.down();
+  await reviewPage.mouse.move(x, y + bounds.height * 0.8, { steps: 12 });
+  await reviewPage.mouse.up();
+  await tearStage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  assert.ok(Date.now() - startedTear >= 2_000, "the regular tear should play for about 2–4 seconds");
+  assert.deepEqual(tearProgressCommands, [25, 50, 75, 100]);
   assert.equal(reviewSession.tear.progress, 100);
+  assert.equal(await tearStage.getByText("Điều bất ngờ đang chờ hai đứa").count(), 1);
   assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
+  reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting" };
+  tearProgressCommands = [];
+  await reviewPage.emulateMedia({ reducedMotion: "reduce" });
+  await reviewPage.reload();
+  await tearStage.waitFor();
+  await tearStage.getByRole("button", { name: "Vuốt từ trên xuống để xé túi mù" }).focus();
+  await reviewPage.keyboard.press("Enter");
+  await tearStage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  assert.deepEqual(tearProgressCommands, [100], "reduced motion should skip intermediate animation frames");
+  await assertA11y(reviewPage);
   await reviewContext.close();
 
   createCommand = null;

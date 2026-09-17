@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type PointerEvent } from "react";
 import { queueSessionCommand, type OfflineQueueEventDetail } from "./offlineQueue";
 import type { User } from "./user";
 
@@ -73,6 +73,21 @@ export function BlindBagForm({ user }: { user: User }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [stageDismissed, setStageDismissed] = useState(false);
+  const [dragProgress, setDragProgress] = useState(0);
+  const stage = useRef<HTMLDialogElement>(null);
+  const drag = useRef<{ pointerId: number; startY: number; height: number } | null>(null);
+
+  const readyCount = session?.tear?.readyUserIds.length ?? 0;
+  const showStage = session?.status === "active" && session.conditions.origin.kind === "current" && readyCount === 2 && !stageDismissed;
+
+  useEffect(() => { setStageDismissed(false); }, [session?.id]);
+
+  useEffect(() => {
+    const dialog = stage.current;
+    if (showStage && dialog && !dialog.open) dialog.showModal();
+    if (!showStage && dialog?.open) dialog.close();
+  }, [showStage]);
 
   async function loadSession() {
     try {
@@ -211,9 +226,12 @@ export function BlindBagForm({ user }: { user: User }) {
       let current = action === "tear" && session.tear?.phase === "tearing"
         ? session : await tearCommand(action, session.version);
       if (action === "tear") {
-        for (const progress of [25, 50, 75, 100]) {
+        setDragProgress(0);
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          || document.documentElement.dataset.motion === "reduced";
+        for (const progress of reducedMotion ? [100] : [25, 50, 75, 100]) {
           if (progress <= (current.tear?.progress ?? 0)) continue;
-          await new Promise((resolve) => window.setTimeout(resolve, 350));
+          if (!reducedMotion) await new Promise((resolve) => window.setTimeout(resolve, 550));
           current = await tearCommand("tear_progress", current.version, progress);
         }
       }
@@ -221,6 +239,41 @@ export function BlindBagForm({ user }: { user: User }) {
       setError(reason instanceof Error ? reason.message : "Không đồng bộ được túi mù.");
     } finally {
       setPending(false);
+    }
+  }
+
+  function dragStart(event: PointerEvent<HTMLButtonElement>) {
+    if (pending || session?.tear?.phase !== "waiting") return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (event.clientY > bounds.top + bounds.height * 0.35) return;
+    drag.current = { pointerId: event.pointerId, startY: event.clientY, height: bounds.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function dragMove(event: PointerEvent<HTMLButtonElement>) {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    setDragProgress(Math.max(0, Math.min(100, (event.clientY - drag.current.startY) / drag.current.height * 100)));
+  }
+
+  function dragEnd(event: PointerEvent<HTMLButtonElement>) {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    const distance = event.clientY - drag.current.startY;
+    const longEnough = distance >= drag.current.height * 0.62;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (longEnough) void readyOrTear("tear");
+    else setDragProgress(0);
+  }
+
+  function dragCancel() {
+    drag.current = null;
+    setDragProgress(0);
+  }
+
+  function dragKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
+      event.preventDefault();
+      void readyOrTear("tear");
     }
   }
 
@@ -260,18 +313,35 @@ export function BlindBagForm({ user }: { user: User }) {
       {!confirmedByMe && <button type="button" className="text-button" disabled={pending} onClick={() => void review("decline")}>Từ chối</button>}
     </div>}
     {session.status === "active" && <div className="blind-bag-tear">
-      {session.tear?.phase === "torn" ? <p>Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.</p>
-        : session.tear?.phase === "tearing" ? <>
-          <p>{session.tear.tornByUserId === user.id ? "Mình đang xé túi…" : "Người kia đang xé túi…"}</p>
-          <progress max="100" value={session.tear.progress} aria-label="Tiến độ xé túi" />
-          <p role="status">{session.tear.progress}%</p>
-          {session.tear.tornByUserId === user.id && <button type="button" disabled={pending} onClick={() => void readyOrTear("tear")}>Tiếp tục xé</button>}
-        </> : <>
-          <p>{session.tear?.readyUserIds.length ?? 0}/2 người đã sẵn sàng.</p>
-          {!session.tear?.readyUserIds.includes(user.id) && <button type="button" disabled={pending} onClick={() => void readyOrTear("ready")}>Mình sẵn sàng</button>}
-          {session.tear?.readyUserIds.length === 2 && <button type="button" disabled={pending || session.conditions.origin.kind !== "current"} onClick={() => void readyOrTear("tear")}>Xé túi mù</button>}
-          {session.tear?.readyUserIds.length === 2 && session.conditions.origin.kind !== "current" && <p>Cần chọn vị trí hiện tại để xác định khoảng cách trước khi xé.</p>}
-        </>}
+      <p>{readyCount}/2 người đã sẵn sàng.</p>
+      {!session.tear?.readyUserIds.includes(user.id) && <button type="button" disabled={pending} onClick={() => void readyOrTear("ready")}>Mình sẵn sàng</button>}
+      {readyCount === 2 && session.conditions.origin.kind !== "current" && <p>Cần chọn vị trí hiện tại để xác định khoảng cách trước khi xé.</p>}
+      {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>Xem túi mù</button>}
+      <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
+        <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
+        <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
+          <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
+          <div className="blind-bag-stage__bag">
+            <div className="blind-bag-stage__card" style={{ transform: `translateY(${(100 - (session.tear?.progress ?? 0)) * 0.6}px)`, opacity: session.tear?.phase === "waiting" ? 0 : 1 }} aria-hidden={session.tear?.phase !== "torn"}>
+              <span>✦</span><strong>Điều bất ngờ đang chờ hai đứa</strong><small>Địa điểm sẽ hiện ở bước tiếp theo</small>
+            </div>
+            <div className="blind-bag-stage__piece blind-bag-stage__piece--left" style={{ transform: `translateX(-${(session.tear?.progress ?? 0) * 0.75}px) rotate(-${(session.tear?.progress ?? 0) * 0.07}deg)` }} />
+            <div className="blind-bag-stage__piece blind-bag-stage__piece--right" style={{ transform: `translateX(${(session.tear?.progress ?? 0) * 0.75}px) rotate(${(session.tear?.progress ?? 0) * 0.07}deg)` }} />
+            <span className="blind-bag-stage__seal" style={{ opacity: session.tear?.phase === "waiting" ? 1 : 0 }} aria-hidden="true">?</span>
+            <span className="blind-bag-stage__rip" style={{ opacity: session.tear?.phase === "torn" ? 0 : 1 }} aria-hidden="true" />
+            {session.tear?.phase === "waiting" && <button type="button" className="blind-bag-stage__gesture" disabled={pending || session.conditions.origin.kind !== "current"}
+              aria-describedby="blind-bag-gesture-hint" aria-label="Vuốt từ trên xuống để xé túi mù"
+              onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragCancel} onKeyDown={dragKey} />}
+          </div>
+          <div className="blind-bag-stage__footer" role="status" aria-live="polite">
+            {session.tear?.phase === "waiting" ? <p id="blind-bag-gesture-hint">Vuốt từ mép trên xuống hết đường niêm phong để mở túi.</p>
+              : session.tear?.phase === "tearing" ? <><p>{session.tear.tornByUserId === user.id ? "Mình đang xé túi…" : "Người kia đang xé túi…"}</p>
+                <progress max="100" value={session.tear.progress} aria-label="Tiến độ xé túi" />
+                {session.tear.tornByUserId === user.id && !pending && <button type="button" onClick={() => void readyOrTear("tear")}>Tiếp tục xé</button>}</>
+                : <p>Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.</p>}
+          </div>
+        </div>
+      </dialog>
     </div>}
     <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>
   </section>;
