@@ -73,7 +73,13 @@ try {
       if (reviewCommand.action === "tear_progress") {
         tearProgressCommands.push(reviewCommand.progress);
         reviewSession.tear.progress = reviewCommand.progress;
-        if (reviewCommand.progress === 100) reviewSession.tear.phase = "torn";
+        if (reviewCommand.progress === 100) {
+          reviewSession.tear.phase = "torn";
+          reviewSession.result = { name: "Chợ Bến Thành", type: "market", address: "Quận 1, TP.HCM",
+            description: "Một khu chợ quen thuộc giữa lòng thành phố.", distanceKm: 2.4,
+            latitude: 10.7725, longitude: 106.698, photoUrl: null, rating: null,
+            reviewCount: null, openingHours: null, challenge: "Cùng tìm một món ăn mới." };
+        }
       }
       reviewSession.version++;
     }
@@ -103,6 +109,7 @@ try {
   await reviewPage.getByText("2/2 người đã sẵn sàng.").waitFor();
   const tearStage = reviewPage.getByRole("dialog", { name: "Xé Túi Mù" });
   await tearStage.waitFor();
+  assert.equal(await reviewPage.getByText("Chợ Bến Thành", { exact: true }).count(), 0, "place must stay hidden before tear");
   const stageBounds = await tearStage.boundingBox();
   assert.ok(stageBounds && stageBounds.width >= 359 && stageBounds.height >= 799, "tear stage must cover the phone viewport");
   const gesture = tearStage.getByRole("button", { name: "Vuốt từ trên xuống để xé túi mù" });
@@ -120,20 +127,24 @@ try {
   await reviewPage.mouse.down();
   await reviewPage.mouse.move(x, y + bounds.height * 0.8, { steps: 12 });
   await reviewPage.mouse.up();
-  await tearStage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  await tearStage.getByRole("heading", { name: "Chợ Bến Thành" }).waitFor();
   assert.ok(Date.now() - startedTear >= 2_000, "the regular tear should play for about 2–4 seconds");
   assert.deepEqual(tearProgressCommands, [25, 50, 75, 100]);
   assert.equal(reviewSession.tear.progress, 100);
-  assert.equal(await tearStage.getByText("Điều bất ngờ đang chờ hai đứa").count(), 1);
+  await tearStage.getByText("2,4 km đường chim bay").waitFor();
+  await tearStage.getByText("Cùng tìm một món ăn mới.").waitFor();
+  assert.equal(await tearStage.getByText("Đánh giá").count(), 0, "missing rating must stay hidden");
+  assert.match(await tearStage.getByRole("link", { name: "Mở Google Maps" }).getAttribute("href"), /10\.7725%2C106\.698/);
   assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
   reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting" };
+  delete reviewSession.result;
   tearProgressCommands = [];
   await reviewPage.emulateMedia({ reducedMotion: "reduce" });
   await reviewPage.reload();
   await tearStage.waitFor();
   await tearStage.getByRole("button", { name: "Vuốt từ trên xuống để xé túi mù" }).focus();
   await reviewPage.keyboard.press("Enter");
-  await tearStage.getByText("Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.").waitFor();
+  await tearStage.getByRole("heading", { name: "Chợ Bến Thành" }).waitFor();
   assert.deepEqual(tearProgressCommands, [100], "reduced motion should skip intermediate animation frames");
   await assertA11y(reviewPage);
   await reviewContext.close();

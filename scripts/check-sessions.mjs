@@ -241,6 +241,7 @@ try {
   assert.equal(torn.response.status, 201);
   assert.equal(torn.data.session.tear.phase, "tearing");
   assert.equal(JSON.stringify(torn.data).includes("selectedPlaceId"), false, "place must stay hidden before result card");
+  assert.equal(torn.data.session.result, undefined, "result must stay hidden until tear completes");
   assert.equal((await request(bagPath, nhi, "POST", { action: "tear_progress", progress: 50, expectedVersion: 5,
     idempotencyKey: "progress-wrong-user" })).response.status, 409);
   const halfway = await request(bagPath, phong, "POST", { action: "tear_progress", progress: 50, expectedVersion: 5,
@@ -251,6 +252,10 @@ try {
   const finished = await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
     idempotencyKey: "progress-finished" });
   assert.equal(finished.data.session.tear.phase, "torn");
+  assert.ok(finished.data.session.result?.name && finished.data.session.result?.address);
+  assert.ok(finished.data.session.result?.distanceKm >= 0);
+  assert.equal("price" in finished.data.session.result, false);
+  assert.deepEqual((await request(bagPath, nhi)).data.session.result, finished.data.session.result);
   assert.equal((await request(bagPath, nhi)).data.session.tear.progress, 100);
   assert.equal((await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
     idempotencyKey: "progress-finished" })).data.duplicate, true);

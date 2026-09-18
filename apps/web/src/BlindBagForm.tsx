@@ -20,11 +20,38 @@ type BlindBagSession = {
   conditions: Conditions;
   confirmation?: { revision: number; confirmedUserIds: string[] };
   tear?: { readyUserIds: string[]; tornByUserId: string | null; progress: number; phase: "waiting" | "tearing" | "torn" };
+  result?: { name: string; type: string; address: string; description: string; distanceKm: number;
+    latitude: number; longitude: number; photoUrl: string | null; rating: number | null;
+    reviewCount: number | null; openingHours: string | null; challenge: string | null };
   candidateSufficiency?: CandidateSufficiency;
 };
 
 const distanceLabels: Record<string, string> = { under_3: "Dưới 3 km", three_to_five: "3–5 km", five_to_ten: "5–10 km", custom: "Tùy chỉnh" };
 const budgetLabels: Record<string, string> = { free_low: "Miễn phí hoặc rất thấp", under_200k: "Dưới 200.000 đồng", two_to_five_hundred_k: "200.000–500.000 đồng", any: "Không quan trọng" };
+const placeTypeLabels: Record<string, string> = { attraction: "Điểm tham quan", museum: "Bảo tàng", park: "Công viên", art_space: "Không gian nghệ thuật",
+  live_performance: "Biểu diễn", market: "Khu chợ", theme_park: "Khu vui chơi", creative_workshop: "Workshop sáng tạo",
+  interactive_experience: "Trải nghiệm tương tác", scenic_spot: "Điểm ngắm cảnh", concept_cafe: "Quán cà phê", unique_food: "Ăn uống độc đáo" };
+
+function ResultCard({ result }: { result: NonNullable<BlindBagSession["result"]> }) {
+  const maps = new URL("https://www.google.com/maps/search/");
+  maps.searchParams.set("api", "1");
+  maps.searchParams.set("query", `${result.latitude},${result.longitude}`);
+  return <article className="blind-bag-result">
+    {result.photoUrl && <img src={result.photoUrl} alt={result.name} loading="lazy" />}
+    <p className="eyebrow">Điểm đến của hai đứa</p>
+    <h2>{result.name}</h2>
+    <p className="blind-bag-result__type">{placeTypeLabels[result.type] ?? "Điểm đến"}</p>
+    <p>{result.description}</p>
+    <dl>
+      <div><dt>Địa chỉ</dt><dd>{result.address}</dd></div>
+      <div><dt>Cách điểm xuất phát</dt><dd>{result.distanceKm.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} km đường chim bay</dd></div>
+      {result.openingHours && <div><dt>Giờ mở cửa</dt><dd>{result.openingHours}</dd></div>}
+      {result.rating !== null && <div><dt>Đánh giá</dt><dd>{result.rating}/5{result.reviewCount !== null ? ` · ${result.reviewCount} lượt` : ""}</dd></div>}
+    </dl>
+    {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
+    <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
+  </article>;
+}
 
 function activeBlindBag(payload: unknown): BlindBagSession | null {
   if (!payload || typeof payload !== "object" || !("sessions" in payload) || !Array.isArray(payload.sessions)) return null;
@@ -319,7 +346,7 @@ export function BlindBagForm({ user }: { user: User }) {
       {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>Xem túi mù</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
+        {session.tear?.phase === "torn" && session.result ? <ResultCard result={session.result} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">
             <div className="blind-bag-stage__card" style={{ transform: `translateY(${(100 - (session.tear?.progress ?? 0)) * 0.6}px)`, opacity: session.tear?.phase === "waiting" ? 0 : 1 }} aria-hidden={session.tear?.phase !== "torn"}>
@@ -340,7 +367,7 @@ export function BlindBagForm({ user }: { user: User }) {
                 {session.tear.tornByUserId === user.id && !pending && <button type="button" onClick={() => void readyOrTear("tear")}>Tiếp tục xé</button>}</>
                 : <p>Túi đã mở! Hai đứa cùng chờ xem điều bất ngờ nhé.</p>}
           </div>
-        </div>
+        </div>}
       </dialog>
     </div>}
     <div className="settings-feedback" role={error ? "alert" : "status"} aria-live="polite">{error || message}</div>

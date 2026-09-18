@@ -2,6 +2,7 @@ import { authenticatedUser } from "./auth";
 import deepTalkSpec from "../../../content/deep-talk.v1.json";
 import foodCatalog from "../../../content/food.v1.json";
 import placeCatalog from "../../../content/places.v1.json";
+import placeChallenges from "../../../content/place-challenges.v1.json";
 import { buildDeepTalkDeck } from "./deep-talk-generation";
 import { getDeepTalkFallback } from "./deep-talk-fallback";
 import type { DeepTalkAiBinding } from "./deep-talk-ai";
@@ -11,8 +12,10 @@ import {
   applyPlaceHistoryPolicy,
   assessPlaceCandidateSufficiency,
   normalizeCuratedPlace,
+  selectPlaceChallenge,
   selectWeightedPlace,
   type CuratedPlace,
+  type PlaceChallenge,
   type PlaceCandidateConditions,
   type PlaceCandidateSufficiency,
 } from "./places";
@@ -31,7 +34,7 @@ type FoodFallback = { dishId: string; exhausted: false } | { dishId: null; exhau
 export type FoodVoteChoice = { dishId: string; decision: FoodDecision };
 type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "match" | "proxy"; accepted: boolean };
 type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
-type BlindBagTear = { readyUserIds: string[]; tornByUserId?: string; progress: number; selectedPlaceId?: string };
+type BlindBagTear = { readyUserIds: string[]; tornByUserId?: string; progress: number; selectedPlaceId?: string; selectedChallengeId?: string };
 type BlindBagConditions = PlaceCandidateConditions & {
   origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
     | { kind: "address"; address: string };
@@ -135,7 +138,8 @@ function storedBlindBagTear(resultJson: string | null): BlindBagTear {
       || !Number.isInteger(tear.progress) || Number(tear.progress) < 0 || Number(tear.progress) > 100) throw new Error();
     return { readyUserIds: [...new Set(tear.readyUserIds as string[])], progress: Number(tear.progress),
       ...(typeof tear.tornByUserId === "string" ? { tornByUserId: tear.tornByUserId } : {}),
-      ...(typeof tear.selectedPlaceId === "string" ? { selectedPlaceId: tear.selectedPlaceId } : {}) };
+      ...(typeof tear.selectedPlaceId === "string" ? { selectedPlaceId: tear.selectedPlaceId } : {}),
+      ...(typeof tear.selectedChallengeId === "string" ? { selectedChallengeId: tear.selectedChallengeId } : {}) };
   } catch {
     return { readyUserIds: [], progress: 0 };
   }
@@ -157,6 +161,13 @@ function publicSession(row: SessionRow) {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
   const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
   const tear = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTear(row.result_json) : null;
+  const origin = (payload.conditions as BlindBagConditions | undefined)?.origin;
+  const selected = tear?.progress === 100 && origin?.kind === "current"
+    ? placeCatalog.places.find((place) => place.id === tear.selectedPlaceId) : undefined;
+  const place = selected && origin?.kind === "current"
+    ? normalizeCuratedPlace(selected as CuratedPlace, origin) : null;
+  const challenge = tear?.progress === 100
+    ? placeChallenges.challenges.find((item) => item.id === tear.selectedChallengeId) : undefined;
   return {
     id: row.id,
     feature: row.feature,
@@ -169,6 +180,10 @@ function publicSession(row: SessionRow) {
     ...(tear ? { tear: { readyUserIds: tear.readyUserIds, progress: tear.progress,
       phase: tear.tornByUserId ? tear.progress === 100 ? "torn" : "tearing" : "waiting",
       tornByUserId: tear.tornByUserId ?? null } } : {}),
+    ...(place ? { result: { name: place.name, type: place.type, address: place.address, description: place.description,
+      distanceKm: place.distanceKm, latitude: place.latitude, longitude: place.longitude,
+      photoUrl: place.photoUrl, rating: place.rating, reviewCount: place.reviewCount,
+      openingHours: place.openingHours, challenge: challenge?.text ?? null } } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -833,6 +848,10 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
     if (!selected) return json({ error: "Chưa đủ địa điểm phù hợp để xé. Hai đứa thử nới khoảng cách hoặc ngân sách nhé." }, 409);
     tear.tornByUserId = userId;
     tear.selectedPlaceId = selected.providerId;
+    const challenge = selectPlaceChallenge(placeChallenges.challenges as PlaceChallenge[], {
+      placeType: selected.type ?? "", maxMinutes: 180, maxExtraCostVnd: 0,
+    });
+    if (challenge) tear.selectedChallengeId = challenge.id;
   } else {
     if (tear.tornByUserId !== userId || tear.progress === 100 || Number(progress) <= tear.progress) {
       return json({ error: "Tiến độ xé không hợp lệ." }, 409);

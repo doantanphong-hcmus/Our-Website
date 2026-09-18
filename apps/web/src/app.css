@@ -1259,6 +1259,30 @@ main {
 .blind-bag-stage__footer progress { inline-size: min(100%, 18rem); accent-color: #f0c98a; }
 .blind-bag-stage__footer button { padding: var(--space-3) var(--space-5); background: #f1d6a6; color: #33263a; }
 
+.blind-bag-result {
+  inline-size: min(100%, 38rem);
+  block-size: 100%;
+  margin-inline: auto;
+  padding: max(4.5rem, var(--safe-top)) max(var(--space-5), var(--safe-right)) max(2rem, var(--safe-bottom)) max(var(--space-5), var(--safe-left));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: blind-bag-result-in 450ms ease-out both;
+}
+
+.blind-bag-result img { display: block; inline-size: 100%; max-block-size: 28dvh; object-fit: cover; border-radius: 1.25rem; }
+.blind-bag-result h2 { margin-block: var(--space-2); font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.1; }
+.blind-bag-result__type { color: #ebd0ee; font-weight: 700; }
+.blind-bag-result dl { display: grid; gap: var(--space-3); margin-block: var(--space-6); }
+.blind-bag-result dl div { padding-block: var(--space-3); border-block-start: 1px solid rgb(255 255 255 / 20%); }
+.blind-bag-result dt { color: #dfc5e2; font-size: var(--font-small); }
+.blind-bag-result dd { margin: var(--space-1) 0 0; font-weight: 700; }
+.blind-bag-result__challenge { padding: var(--space-4); border-radius: 1.25rem; background: rgb(255 255 255 / 10%); }
+.blind-bag-result__challenge h3 { margin-block: 0 var(--space-2); }
+.blind-bag-result__challenge p { margin: 0; }
+.blind-bag-result__maps { display: block; margin-block-start: var(--space-5); padding: var(--space-4); border-radius: 1rem; background: #e9cde9; color: #2d2235; text-align: center; font-weight: 800; text-decoration: none; }
+
+@keyframes blind-bag-result-in { from { opacity: 0; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }
+
 @media (max-width: 30rem) {
   .blind-bag-review-actions { grid-template-columns: 1fr; }
 }
