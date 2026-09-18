@@ -135,6 +135,12 @@ try {
   await tearStage.getByText("Cùng tìm một món ăn mới.").waitFor();
   assert.equal(await tearStage.getByText("Đánh giá").count(), 0, "missing rating must stay hidden");
   assert.match(await tearStage.getByRole("link", { name: "Mở Google Maps" }).getAttribute("href"), /10\.7725%2C106\.698/);
+  await tearStage.getByText("Báo có vấn đề").click();
+  await tearStage.getByLabel("Vấn đề ở địa điểm này").selectOption("safety");
+  await tearStage.getByRole("button", { name: "Gửi báo cáo" }).click();
+  await tearStage.getByText("Đã ghi nhận, cảm ơn mình nhé.").waitFor();
+  assert.equal(reviewCommand.action, "report");
+  assert.equal(reviewCommand.reason, "safety");
   assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
   reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting" };
   delete reviewSession.result;

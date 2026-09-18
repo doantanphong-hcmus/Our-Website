@@ -110,6 +110,8 @@ const deepTalkLevels = ["gentle", "understand", "deep", "mixed"];
 const deepTalkDurations = ["15", "30", "60", "unlimited"];
 const deepTalkTopicIds = deepTalkSpec.sensitiveTopics.map((topic) => topic.id);
 const topicStates = new Set<TopicState>(deepTalkSpec.consentStates.map((state) => state.id as TopicState));
+const generalChallengeIds = new Set(["attraction-landmark", "attraction-angle", "attraction-guide", "attraction-symbol",
+  "attraction-postcard", "attraction-memory", "attraction-silence", "attraction-rating"]);
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -807,12 +809,14 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
   const expectedVersion = input?.expectedVersion;
   const idempotencyKey = input?.idempotencyKey;
   const progress = input?.progress;
-  if (!["ready", "tear", "tear_progress"].includes(String(action)) || !Number.isInteger(expectedVersion)
+  if (!["ready", "tear", "tear_progress", "report"].includes(String(action)) || !Number.isInteger(expectedVersion)
     || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)
-    || (action === "tear_progress" && (!Number.isInteger(progress) || Number(progress) < 1 || Number(progress) > 100))) {
+    || (action === "tear_progress" && (!Number.isInteger(progress) || Number(progress) < 1 || Number(progress) > 100))
+    || (action === "report" && !["safety", "incorrect", "closed", "other"].includes(String(input?.reason)))) {
     return json({ error: "Lệnh xé túi không hợp lệ." }, 400);
   }
-  const inputJson = JSON.stringify(action === "tear_progress" ? { action, progress } : { action });
+  const inputJson = JSON.stringify(action === "tear_progress" ? { action, progress }
+    : action === "report" ? { action, reason: input?.reason } : { action });
   const previous = await env.DB.prepare(`SELECT session_id, actor_user_id, action, input_json FROM activity_session_events
     WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
     .first<{ session_id: string; actor_user_id: string; action: string; input_json: string }>();
@@ -848,15 +852,21 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
     if (!selected) return json({ error: "Chưa đủ địa điểm phù hợp để xé. Hai đứa thử nới khoảng cách hoặc ngân sách nhé." }, 409);
     tear.tornByUserId = userId;
     tear.selectedPlaceId = selected.providerId;
-    const challenge = selectPlaceChallenge(placeChallenges.challenges as PlaceChallenge[], {
+    const challengePool = placeChallenges.challenges as PlaceChallenge[];
+    const challenge = selectPlaceChallenge(challengePool, {
       placeType: selected.type ?? "", maxMinutes: 180, maxExtraCostVnd: 0,
+    // ponytail: reuse safe, place-agnostic prompts until the new place types get approved challenge pools.
+    }) ?? selectPlaceChallenge(challengePool.filter((item) => generalChallengeIds.has(item.id)), {
+      placeType: "attraction", maxMinutes: 180, maxExtraCostVnd: 0,
     });
     if (challenge) tear.selectedChallengeId = challenge.id;
-  } else {
+  } else if (action === "tear_progress") {
     if (tear.tornByUserId !== userId || tear.progress === 100 || Number(progress) <= tear.progress) {
       return json({ error: "Tiến độ xé không hợp lệ." }, 409);
     }
     tear.progress = Number(progress);
+  } else if (tear.progress !== 100 || !tear.selectedPlaceId) {
+    return json({ error: "Chỉ báo vấn đề sau khi mở túi." }, 409);
   }
 
   const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}), blindBagTear: tear };

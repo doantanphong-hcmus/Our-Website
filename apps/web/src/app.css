@@ -1280,6 +1280,11 @@ main {
 .blind-bag-result__challenge h3 { margin-block: 0 var(--space-2); }
 .blind-bag-result__challenge p { margin: 0; }
 .blind-bag-result__maps { display: block; margin-block-start: var(--space-5); padding: var(--space-4); border-radius: 1rem; background: #e9cde9; color: #2d2235; text-align: center; font-weight: 800; text-decoration: none; }
+.blind-bag-result__report { margin-block-start: var(--space-5); }
+.blind-bag-result__report summary { color: #e9cde9; cursor: pointer; }
+.blind-bag-result__report form { display: grid; gap: var(--space-3); padding-block: var(--space-4); }
+.blind-bag-result__report label { display: grid; gap: var(--space-2); }
+.blind-bag-result__report select { inline-size: 100%; }
 
 @keyframes blind-bag-result-in { from { opacity: 0; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }
 

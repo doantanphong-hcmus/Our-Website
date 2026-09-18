@@ -231,6 +231,8 @@ try {
   assert.equal(bagConfirmed.data.session.status, "active");
   assert.deepEqual(bagConfirmed.data.session.tear, { readyUserIds: [], progress: 0, phase: "waiting", tornByUserId: null });
   assert.equal((await request(bagPath, phong, "POST", { action: "tear", expectedVersion: 2, idempotencyKey: "tear-too-early" })).response.status, 409);
+  assert.equal((await request(bagPath, phong, "POST", { action: "report", reason: "safety", expectedVersion: 2,
+    idempotencyKey: "report-too-early" })).response.status, 409);
   const firstReady = await request(bagPath, phong, "POST", { action: "ready", expectedVersion: 2, idempotencyKey: "ready-phong-bag" });
   assert.equal(firstReady.response.status, 201);
   assert.deepEqual(firstReady.data.session.tear.readyUserIds, ["user-phong"]);
@@ -254,12 +256,19 @@ try {
   assert.equal(finished.data.session.tear.phase, "torn");
   assert.ok(finished.data.session.result?.name && finished.data.session.result?.address);
   assert.ok(finished.data.session.result?.distanceKm >= 0);
+  assert.ok(finished.data.session.result?.challenge, "every selected place needs a safe challenge");
   assert.equal("price" in finished.data.session.result, false);
   assert.deepEqual((await request(bagPath, nhi)).data.session.result, finished.data.session.result);
   assert.equal((await request(bagPath, nhi)).data.session.tear.progress, 100);
   assert.equal((await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
     idempotencyKey: "progress-finished" })).data.duplicate, true);
-  assert.equal((await act(phong, bagId, "complete", 7, "complete-ready-bag")).data.session.status, "completed");
+  assert.equal((await request(bagPath, nhi, "POST", { action: "report", reason: "bogus", expectedVersion: 7,
+    idempotencyKey: "report-invalid-reason" })).response.status, 400);
+  const reported = await request(bagPath, nhi, "POST", { action: "report", reason: "safety", expectedVersion: 7,
+    idempotencyKey: "report-place-safety" });
+  assert.equal(reported.response.status, 201);
+  assert.deepEqual(reported.data.session.result, finished.data.session.result);
+  assert.equal((await act(phong, bagId, "complete", 8, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",
