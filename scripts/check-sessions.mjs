@@ -216,7 +216,7 @@ try {
   assert.equal(cancelled.response.status, 200);
   assert.equal(cancelled.data.session.status, "cancelled");
 
-  const tearConditions = { distance: "under_3", budget: "any",
+  const tearConditions = { distance: "custom", customDistanceKm: 35, budget: "any",
     origin: { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 } };
   const bag = await request("/api/sessions", phong, "POST", {
     feature: "blind_bag", idempotencyKey: "create-ready-bag", conditions: tearConditions,
@@ -229,7 +229,8 @@ try {
     action: "confirm", expectedVersion: 1, idempotencyKey: "confirm-ready-bag",
   });
   assert.equal(bagConfirmed.data.session.status, "active");
-  assert.deepEqual(bagConfirmed.data.session.tear, { readyUserIds: [], progress: 0, phase: "waiting", tornByUserId: null });
+  assert.deepEqual(bagConfirmed.data.session.tear, { readyUserIds: [], progress: 0, phase: "waiting", tornByUserId: null,
+    reroll: { usedByUserIds: [], rejectedByUserIds: [] } });
   assert.equal((await request(bagPath, phong, "POST", { action: "tear", expectedVersion: 2, idempotencyKey: "tear-too-early" })).response.status, 409);
   assert.equal((await request(bagPath, phong, "POST", { action: "report", reason: "safety", expectedVersion: 2,
     idempotencyKey: "report-too-early" })).response.status, 409);
@@ -262,13 +263,35 @@ try {
   assert.equal((await request(bagPath, nhi)).data.session.tear.progress, 100);
   assert.equal((await request(bagPath, phong, "POST", { action: "tear_progress", progress: 100, expectedVersion: 6,
     idempotencyKey: "progress-finished" })).data.duplicate, true);
-  assert.equal((await request(bagPath, nhi, "POST", { action: "report", reason: "bogus", expectedVersion: 7,
+  const firstRejected = await request(bagPath, phong, "POST", { action: "reroll", reason: "reject", expectedVersion: 7,
+    idempotencyKey: "reject-first-place" });
+  assert.deepEqual(firstRejected.data.session.tear.reroll, { usedByUserIds: [], rejectedByUserIds: ["user-phong"] });
+  assert.deepEqual(firstRejected.data.session.result, finished.data.session.result, "one rejection must wait for partner");
+  assert.equal((await request(bagPath, phong, "POST", { action: "reroll", reason: "reject", expectedVersion: 8,
+    idempotencyKey: "reject-first-again" })).response.status, 409);
+  const bothRejected = await request(bagPath, nhi, "POST", { action: "reroll", reason: "reject", expectedVersion: 8,
+    idempotencyKey: "reject-second-place" });
+  assert.notEqual(bothRejected.data.session.result.name, finished.data.session.result.name);
+  assert.deepEqual(bothRejected.data.session.tear.reroll, { usedByUserIds: [], rejectedByUserIds: [] });
+  const personalReroll = await request(bagPath, phong, "POST", { action: "reroll", reason: "change", expectedVersion: 9,
+    idempotencyKey: "reroll-phong-once" });
+  assert.notEqual(personalReroll.data.session.result.name, bothRejected.data.session.result.name);
+  assert.deepEqual(personalReroll.data.session.tear.reroll.usedByUserIds, ["user-phong"]);
+  assert.equal((await request(bagPath, phong, "POST", { action: "reroll", reason: "change", expectedVersion: 10,
+    idempotencyKey: "reroll-phong-twice" })).response.status, 409);
+  const safetyReroll = await request(bagPath, nhi, "POST", { action: "reroll", reason: "safety", expectedVersion: 10,
+    idempotencyKey: "reroll-safety-free" });
+  assert.notEqual(safetyReroll.data.session.result.name, personalReroll.data.session.result.name);
+  assert.deepEqual(safetyReroll.data.session.tear.reroll.usedByUserIds, ["user-phong"], "safety reroll must be free");
+  assert.equal(new Set([finished.data.session.result.name, bothRejected.data.session.result.name,
+    personalReroll.data.session.result.name, safetyReroll.data.session.result.name]).size, 4, "rerolls must not repeat in-session");
+  assert.equal((await request(bagPath, nhi, "POST", { action: "report", reason: "bogus", expectedVersion: 11,
     idempotencyKey: "report-invalid-reason" })).response.status, 400);
-  const reported = await request(bagPath, nhi, "POST", { action: "report", reason: "safety", expectedVersion: 7,
+  const reported = await request(bagPath, nhi, "POST", { action: "report", reason: "safety", expectedVersion: 11,
     idempotencyKey: "report-place-safety" });
   assert.equal(reported.response.status, 201);
-  assert.deepEqual(reported.data.session.result, finished.data.session.result);
-  assert.equal((await act(phong, bagId, "complete", 8, "complete-ready-bag")).data.session.status, "completed");
+  assert.deepEqual(reported.data.session.result, safetyReroll.data.session.result);
+  assert.equal((await act(phong, bagId, "complete", 12, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",

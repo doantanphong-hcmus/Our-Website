@@ -81,6 +81,11 @@ try {
             reviewCount: null, openingHours: null, challenge: "Cùng tìm một món ăn mới." };
         }
       }
+      if (reviewCommand.action === "reroll") {
+        reviewSession.tear.reroll.rejectedByUserIds = [];
+        if (reviewCommand.reason === "change") reviewSession.tear.reroll.usedByUserIds.push(nhi.id);
+        reviewSession.result = { ...reviewSession.result, name: "Điểm đến mới", address: "Một địa chỉ khác, TP.HCM" };
+      }
       reviewSession.version++;
     }
     return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: reviewSession }) });
@@ -103,7 +108,8 @@ try {
   reviewSession.status = "active";
   reviewSession.version = 2;
   reviewSession.conditions.origin = { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 };
-  reviewSession.tear = { readyUserIds: [phong.id], tornByUserId: null, progress: 0, phase: "waiting" };
+  reviewSession.tear = { readyUserIds: [phong.id], tornByUserId: null, progress: 0, phase: "waiting",
+    reroll: { usedByUserIds: [], rejectedByUserIds: [] } };
   await reviewPage.reload();
   await reviewPage.getByRole("button", { name: "Mình sẵn sàng" }).click();
   await reviewPage.getByText("2/2 người đã sẵn sàng.").waitFor();
@@ -138,11 +144,16 @@ try {
   await tearStage.getByText("Báo có vấn đề").click();
   await tearStage.getByLabel("Vấn đề ở địa điểm này").selectOption("safety");
   await tearStage.getByRole("button", { name: "Gửi báo cáo" }).click();
-  await tearStage.getByText("Đã ghi nhận, cảm ơn mình nhé.").waitFor();
-  assert.equal(reviewCommand.action, "report");
+  await tearStage.getByRole("heading", { name: "Điểm đến mới" }).waitFor();
+  assert.equal(reviewCommand.action, "reroll");
   assert.equal(reviewCommand.reason, "safety");
+  assert.deepEqual(reviewSession.tear.reroll.usedByUserIds, [], "safety reroll must not consume personal turn");
+  await tearStage.getByRole("button", { name: "Dùng lượt đổi của mình" }).click();
+  await tearStage.getByRole("button", { name: "Mình đã dùng lượt đổi" }).waitFor();
+  assert.deepEqual(reviewSession.tear.reroll.usedByUserIds, [nhi.id]);
   assert.equal(await reviewPage.locator("body").evaluate((body) => body.scrollWidth <= innerWidth), true);
-  reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting" };
+  reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting",
+    reroll: { usedByUserIds: [], rejectedByUserIds: [] } };
   delete reviewSession.result;
   tearProgressCommands = [];
   await reviewPage.emulateMedia({ reducedMotion: "reduce" });

@@ -19,7 +19,8 @@ type BlindBagSession = {
   version: number;
   conditions: Conditions;
   confirmation?: { revision: number; confirmedUserIds: string[] };
-  tear?: { readyUserIds: string[]; tornByUserId: string | null; progress: number; phase: "waiting" | "tearing" | "torn" };
+  tear?: { readyUserIds: string[]; tornByUserId: string | null; progress: number; phase: "waiting" | "tearing" | "torn";
+    reroll: { usedByUserIds: string[]; rejectedByUserIds: string[] } };
   result?: { name: string; type: string; address: string; description: string; distanceKm: number;
     latitude: number; longitude: number; photoUrl: string | null; rating: number | null;
     reviewCount: number | null; openingHours: string | null; challenge: string | null };
@@ -32,9 +33,12 @@ const placeTypeLabels: Record<string, string> = { attraction: "Điểm tham quan
   live_performance: "Biểu diễn", market: "Khu chợ", theme_park: "Khu vui chơi", creative_workshop: "Workshop sáng tạo",
   interactive_experience: "Trải nghiệm tương tác", scenic_spot: "Điểm ngắm cảnh", concept_cafe: "Quán cà phê", unique_food: "Ăn uống độc đáo" };
 
-function ResultCard({ result, onReport }: { result: NonNullable<BlindBagSession["result"]>; onReport: (reason: string) => Promise<void> }) {
+function ResultCard({ result, userId, reroll, onReport, onReroll }: { result: NonNullable<BlindBagSession["result"]>;
+  userId: string; reroll: NonNullable<BlindBagSession["tear"]>["reroll"];
+  onReport: (reason: string) => Promise<void>; onReroll: (reason: "change" | "reject") => Promise<void> }) {
   const [reportStatus, setReportStatus] = useState("");
   const [reporting, setReporting] = useState(false);
+  const [rerolling, setRerolling] = useState(false);
   const maps = new URL("https://www.google.com/maps/search/");
   maps.searchParams.set("api", "1");
   maps.searchParams.set("query", `${result.latitude},${result.longitude}`);
@@ -52,7 +56,17 @@ function ResultCard({ result, onReport }: { result: NonNullable<BlindBagSession[
     </dl>
     {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
     <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
+    <div className="blind-bag-result__reroll">
+      <button type="button" disabled={rerolling || reroll.usedByUserIds.includes(userId)} onClick={async () => {
+        setRerolling(true); try { await onReroll("change"); } catch (error) { setReportStatus(error instanceof Error ? error.message : "Chưa đổi được địa điểm."); } finally { setRerolling(false); }
+      }}>{reroll.usedByUserIds.includes(userId) ? "Mình đã dùng lượt đổi" : "Dùng lượt đổi của mình"}</button>
+      <button type="button" className="secondary-button" disabled={rerolling || reroll.rejectedByUserIds.includes(userId)} onClick={async () => {
+        setRerolling(true); try { await onReroll("reject"); setReportStatus("Đã báo người kia. Nếu cả hai cùng không muốn đi, địa điểm sẽ được đổi miễn phí."); }
+        catch (error) { setReportStatus(error instanceof Error ? error.message : "Chưa gửi được lựa chọn."); } finally { setRerolling(false); }
+      }}>{reroll.rejectedByUserIds.includes(userId) ? "Đang chờ người kia" : "Mình không muốn đi chỗ này"}</button>
+    </div>
     <details className="blind-bag-result__report"><summary>Báo có vấn đề</summary>
+      <p>Lỗi an toàn, đóng cửa hoặc thông tin sai sẽ được đổi miễn phí.</p>
       <form onSubmit={async (event) => {
         event.preventDefault();
         setReporting(true);
@@ -248,7 +262,7 @@ export function BlindBagForm({ user }: { user: User }) {
     }
   }
 
-  async function tearCommand(action: "ready" | "tear" | "tear_progress" | "report", version: number, progress?: number, reason?: string): Promise<BlindBagSession> {
+  async function tearCommand(action: "ready" | "tear" | "tear_progress" | "report" | "reroll", version: number, progress?: number, reason?: string): Promise<BlindBagSession> {
     const response = await fetch(`/api/sessions/${session!.id}/blind-bag-tear`, {
       method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, expectedVersion: version, idempotencyKey: crypto.randomUUID(), ...(progress === undefined ? {} : { progress }), ...(reason ? { reason } : {}) }),
@@ -260,6 +274,13 @@ export function BlindBagForm({ user }: { user: User }) {
     }
     setSession(data.session!);
     return data.session!;
+  }
+
+  async function reportPlace(reason: string) {
+    if (!session) return;
+    const reported = await tearCommand("report", session.version, undefined, reason);
+    const freeReason = reason === "safety" ? "safety" : ["incorrect", "closed"].includes(reason) ? "incorrect" : null;
+    if (freeReason) await tearCommand("reroll", reported.version, undefined, freeReason);
   }
 
   async function readyOrTear(action: "ready" | "tear") {
@@ -363,7 +384,8 @@ export function BlindBagForm({ user }: { user: User }) {
       {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>Xem túi mù</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        {session.tear?.phase === "torn" && session.result ? <ResultCard result={session.result} onReport={async (reason) => { await tearCommand("report", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
+        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} result={session.result} userId={user.id} reroll={session.tear.reroll}
+          onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">
             <div className="blind-bag-stage__card" style={{ transform: `translateY(${(100 - (session.tear?.progress ?? 0)) * 0.6}px)`, opacity: session.tear?.phase === "waiting" ? 0 : 1 }} aria-hidden={session.tear?.phase !== "torn"}>
