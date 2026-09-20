@@ -117,7 +117,19 @@ try {
   await waitFor(() => requests.length === 5, "Deep Talk ready action was not flushed");
   assert.equal(requests[4].action, "ready");
 
-  console.log("P1.11/P3.11/P4.12 offline queue: Deep Talk ready retry, stable idempotency, backoff and isolation = OK");
+  await context.setOffline(true);
+  await page.evaluate(async () => {
+    const queue = await import("/src/offlineQueue.ts");
+    await queue.queueSessionCommand("/api/sessions/00000000-0000-4000-8000-000000000412/blind-bag-tear", {
+      action: "accept", expectedVersion: 12,
+    });
+  });
+  await context.setOffline(false);
+  await page.evaluate(async () => (await import("/src/offlineQueue.ts")).startOfflineQueue("user-phong"));
+  await waitFor(() => requests.length === 6, "Blind Bag accept action was not resumed after offline");
+  assert.equal(requests[5].action, "accept");
+
+  console.log("P1.11/P2.15/P3.11/P4.12 offline queue: retry, resume, stable idempotency, backoff and isolation = OK");
   await context.close();
 } finally {
   await browser?.close().catch(() => {});

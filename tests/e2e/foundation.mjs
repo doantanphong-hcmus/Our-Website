@@ -86,6 +86,9 @@ try {
         if (reviewCommand.reason === "change") reviewSession.tear.reroll.usedByUserIds.push(nhi.id);
         reviewSession.result = { ...reviewSession.result, name: "Điểm đến mới", address: "Một địa chỉ khác, TP.HCM" };
       }
+      if (reviewCommand.action === "accept") reviewSession.travel = {
+        state: "traveling", acceptedByUserId: nhi.id, acceptedAt: 1_788_000_120,
+      };
       reviewSession.version++;
     }
     return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ session: reviewSession }) });
@@ -155,6 +158,7 @@ try {
   reviewSession.tear = { readyUserIds: [phong.id, nhi.id], tornByUserId: null, progress: 0, phase: "waiting",
     reroll: { usedByUserIds: [], rejectedByUserIds: [] } };
   delete reviewSession.result;
+  delete reviewSession.travel;
   tearProgressCommands = [];
   await reviewPage.emulateMedia({ reducedMotion: "reduce" });
   await reviewPage.reload();
@@ -163,6 +167,15 @@ try {
   await reviewPage.keyboard.press("Enter");
   await tearStage.getByRole("heading", { name: "Chợ Bến Thành" }).waitFor();
   assert.deepEqual(tearProgressCommands, [100], "reduced motion should skip intermediate animation frames");
+  await tearStage.getByRole("button", { name: "Nhận kèo" }).click();
+  await tearStage.getByText("Hai đứa đang trên đường đến điểm hẹn.").waitFor();
+  assert.equal(reviewCommand.action, "accept");
+  await reviewPage.reload();
+  await tearStage.getByText("Hai đứa đang trên đường đến điểm hẹn.").waitFor();
+  assert.equal(await tearStage.getByRole("button", { name: "Dùng lượt đổi của mình" }).count(), 0);
+  await tearStage.getByRole("button", { name: "Đóng màn xé túi" }).click();
+  await reviewPage.getByRole("heading", { name: "Hai đứa đang trên đường" }).waitFor();
+  await reviewPage.getByRole("button", { name: "Xem điểm đến" }).waitFor();
   await assertA11y(reviewPage);
   await reviewContext.close();
 

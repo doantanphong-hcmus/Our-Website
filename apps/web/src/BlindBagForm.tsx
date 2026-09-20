@@ -24,6 +24,7 @@ type BlindBagSession = {
   result?: { name: string; type: string; address: string; description: string; distanceKm: number;
     latitude: number; longitude: number; photoUrl: string | null; rating: number | null;
     reviewCount: number | null; openingHours: string | null; challenge: string | null };
+  travel?: { state: "traveling"; acceptedByUserId: string; acceptedAt: number };
   candidateSufficiency?: CandidateSufficiency;
 };
 
@@ -33,12 +34,23 @@ const placeTypeLabels: Record<string, string> = { attraction: "Điểm tham quan
   live_performance: "Biểu diễn", market: "Khu chợ", theme_park: "Khu vui chơi", creative_workshop: "Workshop sáng tạo",
   interactive_experience: "Trải nghiệm tương tác", scenic_spot: "Điểm ngắm cảnh", concept_cafe: "Quán cà phê", unique_food: "Ăn uống độc đáo" };
 
-function ResultCard({ result, userId, reroll, onReport, onReroll }: { result: NonNullable<BlindBagSession["result"]>;
+function ResultCard({ result, userId, reroll, travel, onAccept, onReport, onReroll }: { result: NonNullable<BlindBagSession["result"]>;
   userId: string; reroll: NonNullable<BlindBagSession["tear"]>["reroll"];
+  travel?: BlindBagSession["travel"]; onAccept: () => Promise<void>;
   onReport: (reason: string) => Promise<void>; onReroll: (reason: "change" | "reject") => Promise<void> }) {
   const [reportStatus, setReportStatus] = useState("");
   const [reporting, setReporting] = useState(false);
   const [rerolling, setRerolling] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  useEffect(() => {
+    if (travel) { setAccepting(false); setReportStatus(""); }
+    const synced = (event: Event) => {
+      const status = (event as CustomEvent<OfflineQueueEventDetail>).detail.status;
+      if (status === "conflict" || status === "failed") setAccepting(false);
+    };
+    window.addEventListener("our:offline-queue", synced);
+    return () => window.removeEventListener("our:offline-queue", synced);
+  }, [travel]);
   const maps = new URL("https://www.google.com/maps/search/");
   maps.searchParams.set("api", "1");
   maps.searchParams.set("query", `${result.latitude},${result.longitude}`);
@@ -47,6 +59,7 @@ function ResultCard({ result, userId, reroll, onReport, onReroll }: { result: No
     <p className="eyebrow">Điểm đến của hai đứa</p>
     <h2>{result.name}</h2>
     <p className="blind-bag-result__type">{placeTypeLabels[result.type] ?? "Điểm đến"}</p>
+    {travel && <div className="blind-bag-result__travel" role="status"><strong>Đã nhận kèo!</strong><span>Hai đứa đang trên đường đến điểm hẹn.</span></div>}
     <p>{result.description}</p>
     <dl>
       <div><dt>Địa chỉ</dt><dd>{result.address}</dd></div>
@@ -56,6 +69,11 @@ function ResultCard({ result, userId, reroll, onReport, onReroll }: { result: No
     </dl>
     {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
     <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
+    {!travel && <><button type="button" className="blind-bag-result__accept" disabled={accepting} onClick={async () => {
+      setAccepting(true);
+      try { await onAccept(); setReportStatus(navigator.onLine ? "Đang xác nhận kèo…" : "Đã lưu. Kèo sẽ được xác nhận khi có mạng."); }
+      catch (error) { setAccepting(false); setReportStatus(error instanceof Error ? error.message : "Chưa nhận được kèo."); }
+    }}>{accepting ? "Đang lưu kèo…" : "Nhận kèo"}</button>
     <div className="blind-bag-result__reroll">
       <button type="button" disabled={rerolling || reroll.usedByUserIds.includes(userId)} onClick={async () => {
         setRerolling(true); try { await onReroll("change"); } catch (error) { setReportStatus(error instanceof Error ? error.message : "Chưa đổi được địa điểm."); } finally { setRerolling(false); }
@@ -79,8 +97,8 @@ function ResultCard({ result, userId, reroll, onReport, onReroll }: { result: No
         </label>
         <button type="submit" disabled={reporting}>Gửi báo cáo</button>
       </form>
-      {reportStatus && <p role="status">{reportStatus}</p>}
-    </details>
+    </details></>}
+    {reportStatus && <p role="status">{reportStatus}</p>}
   </article>;
 }
 
@@ -283,6 +301,14 @@ export function BlindBagForm({ user }: { user: User }) {
     if (freeReason) await tearCommand("reroll", reported.version, undefined, freeReason);
   }
 
+  async function acceptPlace() {
+    if (!session) return;
+    setError("");
+    await queueSessionCommand(`/api/sessions/${session.id}/blind-bag-tear`, {
+      action: "accept", expectedVersion: session.version,
+    });
+  }
+
   async function readyOrTear(action: "ready" | "tear") {
     if (!session) return;
     setPending(true);
@@ -369,7 +395,7 @@ export function BlindBagForm({ user }: { user: User }) {
   const confirmedByMe = confirmedUserIds.includes(user.id);
   if (session && !editing) return <section className="blind-bag-form" aria-labelledby="page-title">
     <p className="eyebrow">Xé Túi Mù</p>
-    <h1 id="page-title">{session.status === "active" ? "Hai đứa đã chốt kèo" : confirmedByMe ? "Chờ người kia xem lại" : "Một lời mời đang chờ mình"}</h1>
+    <h1 id="page-title">{session.status === "active" ? session.travel ? "Hai đứa đang trên đường" : "Hai đứa đã chốt kèo" : confirmedByMe ? "Chờ người kia xem lại" : "Một lời mời đang chờ mình"}</h1>
     <Summary conditions={session.conditions} />
     {session.candidateSufficiency && <Sufficiency value={session.candidateSufficiency} />}
     {session.status === "pending" && <div className="blind-bag-review-actions">
@@ -378,14 +404,16 @@ export function BlindBagForm({ user }: { user: User }) {
       {!confirmedByMe && <button type="button" className="text-button" disabled={pending} onClick={() => void review("decline")}>Từ chối</button>}
     </div>}
     {session.status === "active" && <div className="blind-bag-tear">
-      <p>{readyCount}/2 người đã sẵn sàng.</p>
-      {!session.tear?.readyUserIds.includes(user.id) && <button type="button" disabled={pending} onClick={() => void readyOrTear("ready")}>Mình sẵn sàng</button>}
-      {readyCount === 2 && session.conditions.origin.kind !== "current" && <p>Cần chọn vị trí hiện tại để xác định khoảng cách trước khi xé.</p>}
-      {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>Xem túi mù</button>}
+      {session.travel ? <p>Kèo đã được lưu. Hai đứa có thể quay lại xem điểm đến bất cứ lúc nào.</p> : <>
+        <p>{readyCount}/2 người đã sẵn sàng.</p>
+        {!session.tear?.readyUserIds.includes(user.id) && <button type="button" disabled={pending} onClick={() => void readyOrTear("ready")}>Mình sẵn sàng</button>}
+        {readyCount === 2 && session.conditions.origin.kind !== "current" && <p>Cần chọn vị trí hiện tại để xác định khoảng cách trước khi xé.</p>}
+      </>}
+      {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>{session.travel ? "Xem điểm đến" : "Xem túi mù"}</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} result={session.result} userId={user.id} reroll={session.tear.reroll}
-          onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
+        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel}
+          onAccept={acceptPlace} onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">
             <div className="blind-bag-stage__card" style={{ transform: `translateY(${(100 - (session.tear?.progress ?? 0)) * 0.6}px)`, opacity: session.tear?.phase === "waiting" ? 0 : 1 }} aria-hidden={session.tear?.phase !== "torn"}>

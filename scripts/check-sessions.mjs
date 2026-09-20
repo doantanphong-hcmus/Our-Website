@@ -291,7 +291,18 @@ try {
     idempotencyKey: "report-place-safety" });
   assert.equal(reported.response.status, 201);
   assert.deepEqual(reported.data.session.result, safetyReroll.data.session.result);
-  assert.equal((await act(phong, bagId, "complete", 12, "complete-ready-bag")).data.session.status, "completed");
+  const accepted = await request(bagPath, nhi, "POST", { action: "accept", expectedVersion: 12,
+    idempotencyKey: "accept-blind-bag" });
+  assert.equal(accepted.response.status, 201);
+  assert.equal(accepted.data.session.travel.state, "traveling");
+  assert.equal(accepted.data.session.travel.acceptedByUserId, "user-nhi");
+  assert.deepEqual((await request(bagPath, phong)).data.session.travel, accepted.data.session.travel,
+    "both users must resume the same travel state");
+  assert.equal((await request(bagPath, nhi, "POST", { action: "accept", expectedVersion: 12,
+    idempotencyKey: "accept-blind-bag" })).data.duplicate, true);
+  assert.equal((await request(bagPath, phong, "POST", { action: "reroll", reason: "change", expectedVersion: 13,
+    idempotencyKey: "reroll-after-accept" })).response.status, 409);
+  assert.equal((await act(phong, bagId, "complete", 13, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",

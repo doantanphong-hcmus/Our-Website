@@ -36,6 +36,7 @@ type FoodFinal = { dishId: string; foodStyle: string; mode: "dish"; source: "mat
 type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
 type BlindBagTear = { readyUserIds: string[]; tornByUserId?: string; progress: number; selectedPlaceId?: string;
   selectedChallengeId?: string; seenPlaceIds: string[]; rerollUsedByUserIds: string[]; rejectedByUserIds: string[] };
+type BlindBagTravel = { state: "traveling"; acceptedByUserId: string; acceptedAt: number };
 type BlindBagConditions = PlaceCandidateConditions & {
   origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
     | { kind: "address"; address: string };
@@ -154,6 +155,15 @@ function storedBlindBagTear(resultJson: string | null): BlindBagTear {
   }
 }
 
+function storedBlindBagTravel(resultJson: string | null): BlindBagTravel | null {
+  try {
+    const travel = (JSON.parse(resultJson ?? "{}") as { blindBagTravel?: unknown }).blindBagTravel as Record<string, unknown>;
+    return travel?.state === "traveling" && typeof travel.acceptedByUserId === "string"
+      && Number.isInteger(travel.acceptedAt) && Number(travel.acceptedAt) > 0
+      ? { state: "traveling", acceptedByUserId: travel.acceptedByUserId, acceptedAt: Number(travel.acceptedAt) } : null;
+  } catch { return null; }
+}
+
 function blindBagCandidateSufficiency(payload: Record<string, unknown>): BlindBagCandidateSufficiency {
   const conditions = payload.conditions as BlindBagConditions;
   if (conditions.origin.kind === "address") {
@@ -170,6 +180,7 @@ function publicSession(row: SessionRow) {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
   const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
   const tear = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTear(row.result_json) : null;
+  const travel = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTravel(row.result_json) : null;
   const origin = (payload.conditions as BlindBagConditions | undefined)?.origin;
   const selected = tear?.progress === 100 && origin?.kind === "current"
     ? placeCatalog.places.find((place) => place.id === tear.selectedPlaceId) : undefined;
@@ -194,6 +205,7 @@ function publicSession(row: SessionRow) {
       distanceKm: place.distanceKm, latitude: place.latitude, longitude: place.longitude,
       photoUrl: place.photoUrl, rating: place.rating, reviewCount: place.reviewCount,
       openingHours: place.openingHours, challenge: challenge?.text ?? null } } : {}),
+    ...(travel ? { travel } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -847,7 +859,7 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
   const expectedVersion = input?.expectedVersion;
   const idempotencyKey = input?.idempotencyKey;
   const progress = input?.progress;
-  if (!["ready", "tear", "tear_progress", "report", "reroll"].includes(String(action)) || !Number.isInteger(expectedVersion)
+  if (!["ready", "tear", "tear_progress", "report", "reroll", "accept"].includes(String(action)) || !Number.isInteger(expectedVersion)
     || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)
     || (action === "tear_progress" && (!Number.isInteger(progress) || Number(progress) < 1 || Number(progress) > 100))
     || (action === "report" && !["safety", "incorrect", "closed", "other"].includes(String(input?.reason)))
@@ -866,6 +878,7 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
   if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
 
   const tear = storedBlindBagTear(current.result_json);
+  let travel = storedBlindBagTravel(current.result_json);
   if (action === "ready") {
     if (tear.tornByUserId || tear.readyUserIds.includes(userId)) return json({ error: "Mình đã sẵn sàng rồi." }, 409);
     tear.readyUserIds.push(userId);
@@ -886,6 +899,7 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
     tear.progress = Number(progress);
   } else if (action === "reroll") {
     if (tear.progress !== 100 || !tear.selectedPlaceId) return json({ error: "Chỉ đổi địa điểm sau khi mở túi." }, 409);
+    if (travel) return json({ error: "Hai đứa đã nhận kèo này rồi." }, 409);
     const reason = String(input?.reason);
     let shouldReroll = reason !== "reject";
     if (reason === "change") {
@@ -906,11 +920,16 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
       tear.seenPlaceIds.push(selected.placeId);
       tear.rejectedByUserIds = [];
     }
+  } else if (action === "accept") {
+    if (tear.progress !== 100 || !tear.selectedPlaceId) return json({ error: "Chỉ nhận kèo sau khi mở túi." }, 409);
+    if (travel) return json({ error: "Hai đứa đã nhận kèo này rồi." }, 409);
+    travel = { state: "traveling", acceptedByUserId: userId, acceptedAt: Math.floor(Date.now() / 1000) };
   } else if (tear.progress !== 100 || !tear.selectedPlaceId) {
     return json({ error: "Chỉ báo vấn đề sau khi mở túi." }, 409);
   }
 
-  const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}), blindBagTear: tear };
+  const result = { ...(current.result_json ? JSON.parse(current.result_json) as Record<string, unknown> : {}),
+    blindBagTear: tear, ...(travel ? { blindBagTravel: travel } : {}) };
   const now = Math.floor(Date.now() / 1000);
   const results = await env.DB.batch([
     env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
