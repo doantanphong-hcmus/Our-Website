@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import { chromium } from "playwright-core";
 import { nhi, phong } from "../fixtures/users.js";
 import { assertA11y, mockAuthenticated, network, startWeb } from "../helpers/web-harness.mjs";
 
 const server = await startWeb(4180);
+const root = path.resolve(import.meta.dirname, "../..");
 let browser;
 try {
   browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL ?? (process.platform === "win32" ? "msedge" : "chrome"), headless: true });
@@ -62,10 +64,26 @@ try {
   let reviewCommand;
   let reviewPath;
   let tearProgressCommands = [];
+  let mediaUploadAttempts = 0;
+  const uploadedMedia = [];
   await reviewPage.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: nhi }) }));
   await reviewPage.route("**/api/sessions**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (/\/media\/[0-9a-f-]{36}$/i.test(pathname) && route.request().method() === "GET") {
+      return route.fulfill({ status: 200, contentType: "image/jpeg", path: path.join(root, "apps/web/public/couple-empty-state.jpg") });
+    }
+    if (pathname.endsWith("/media")) {
+      if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ media: uploadedMedia }) });
+      mediaUploadAttempts++;
+      await network.delay(250);
+      if (mediaUploadAttempts === 1) return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Mạng đang chập chờn." }) });
+      const item = { id: "00000000-0000-4000-8000-000000000024", url: `${pathname}/00000000-0000-4000-8000-000000000024`,
+        mimeType: "image/jpeg", byteSize: route.request().postDataBuffer().length, width: 1200, height: 800, createdAt: 1_788_000_130 };
+      uploadedMedia.push(item);
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ media: item }) });
+    }
     if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 1, sessions: [reviewSession] }) });
-    reviewPath = new URL(route.request().url()).pathname;
+    reviewPath = pathname;
     reviewCommand = route.request().postDataJSON();
     if (reviewPath.endsWith("/blind-bag-tear")) {
       if (reviewCommand.action === "ready") reviewSession.tear.readyUserIds.push(nhi.id);
@@ -170,8 +188,17 @@ try {
   await tearStage.getByRole("button", { name: "Nhận kèo" }).click();
   await tearStage.getByText("Hai đứa đang trên đường đến điểm hẹn.").waitFor();
   assert.equal(reviewCommand.action, "accept");
+  await tearStage.getByLabel("Chọn từ thư viện").setInputFiles(path.join(root, "apps/web/public/couple-empty-state.jpg"));
+  await tearStage.getByAltText("Ảnh đang chờ gửi").waitFor();
+  await tearStage.getByRole("button", { name: "Gửi ảnh" }).click();
+  await tearStage.getByRole("progressbar", { name: "Tiến độ gửi ảnh" }).waitFor();
+  await tearStage.getByRole("button", { name: "Thử lại" }).waitFor();
+  await tearStage.getByRole("button", { name: "Thử lại" }).click();
+  await tearStage.getByAltText("Ảnh kỷ niệm 1 của chuyến đi").waitFor();
+  assert.equal(mediaUploadAttempts, 2, "failed upload should retain the photo for retry");
   await reviewPage.reload();
   await tearStage.getByText("Hai đứa đang trên đường đến điểm hẹn.").waitFor();
+  await tearStage.getByAltText("Ảnh kỷ niệm 1 của chuyến đi").waitFor();
   assert.equal(await tearStage.getByRole("button", { name: "Dùng lượt đổi của mình" }).count(), 0);
   await tearStage.getByRole("button", { name: "Đóng màn xé túi" }).click();
   await reviewPage.getByRole("heading", { name: "Hai đứa đang trên đường" }).waitFor();
@@ -584,7 +611,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1-P2.3/P3.2-P4.15 E2E: location fallback, revision confirmation and private two-device play = OK");
+  console.log("P1.14/P2.1-P2.3/P2.16/P3.2-P4.15 E2E: private photo preview/retry and two-device play = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {

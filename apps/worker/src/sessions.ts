@@ -22,6 +22,7 @@ import {
 
 interface SessionEnv {
   DB: D1Database;
+  MEDIA: R2Bucket;
   AUTH_PEPPER: string;
   AI?: DeepTalkAiBinding;
 }
@@ -91,11 +92,24 @@ interface DeepTalkDeckRow {
   created_at: number;
 }
 
+interface BlindBagMediaRow {
+  id: string;
+  session_id: string;
+  object_key: string;
+  mime_type: string;
+  byte_size: number;
+  width: number;
+  height: number;
+  created_at: number;
+}
+
 const features = ["blind_bag", "food_vote", "deep_talk"];
 const commandPattern = /^[A-Za-z0-9_-]{8,100}$/;
 const selectSession = `SELECT id, feature, status, created_by_user_id, version,
   payload_json, result_json, expires_at, completed_at, created_at, updated_at FROM activity_sessions`;
 const selectDeepTalkDeck = `SELECT id, session_id, created_by_user_id, idempotency_key, seed, cards_json, created_at FROM deep_talk_decks`;
+const selectBlindBagMedia = `SELECT id, session_id, object_key, mime_type, byte_size, width, height, created_at FROM blind_bag_media`;
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
 
 const conditionChoices = {
   distance: ["under_3", "three_to_five", "five_to_ten", "custom"],
@@ -162,6 +176,95 @@ function storedBlindBagTravel(resultJson: string | null): BlindBagTravel | null 
       && Number.isInteger(travel.acceptedAt) && Number(travel.acceptedAt) > 0
       ? { state: "traveling", acceptedByUserId: travel.acceptedByUserId, acceptedAt: Number(travel.acceptedAt) } : null;
   } catch { return null; }
+}
+
+function mediaView(row: BlindBagMediaRow) {
+  return {
+    id: row.id,
+    url: `/api/sessions/${row.session_id}/media/${row.id}`,
+    mimeType: row.mime_type,
+    byteSize: row.byte_size,
+    width: row.width,
+    height: row.height,
+    createdAt: row.created_at,
+  };
+}
+
+function jpegDimensions(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length < 12 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return null;
+  for (let offset = 2; offset + 8 < bytes.length;) {
+    if (bytes[offset] !== 0xff) { offset++; continue; }
+    const marker = bytes[offset + 1];
+    if (marker === 0xd8 || marker === 0xd9) { offset += 2; continue; }
+    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (length < 2 || offset + length + 2 > bytes.length) return null;
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return { height: (bytes[offset + 5] << 8) | bytes[offset + 6], width: (bytes[offset + 7] << 8) | bytes[offset + 8] };
+    }
+    offset += length + 2;
+  }
+  return null;
+}
+
+async function blindBagMedia(request: Request, env: SessionEnv, userId: string, spaceId: string,
+  sessionId: string): Promise<Response> {
+  const session = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`)
+    .bind(sessionId, spaceId).first<SessionRow>();
+  if (!session || session.feature !== "blind_bag") return json({ error: "Không tìm thấy phiên." }, 404);
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare(`${selectBlindBagMedia} WHERE session_id = ? AND couple_space_id = ? ORDER BY created_at, id`)
+      .bind(sessionId, spaceId).all<BlindBagMediaRow>();
+    return json({ media: (rows.results ?? []).map(mediaView) });
+  }
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (session.status !== "active" || !storedBlindBagTravel(session.result_json)) {
+    return json({ error: "Chỉ gửi ảnh sau khi hai đứa đã nhận kèo." }, 409);
+  }
+  const idempotencyKey = request.headers.get("X-Idempotency-Key") ?? "";
+  if (!commandPattern.test(idempotencyKey)) return json({ error: "Mã lần gửi ảnh không hợp lệ." }, 400);
+  if (request.headers.get("Content-Type")?.split(";", 1)[0].trim().toLowerCase() !== "image/jpeg") {
+    return json({ error: "Ảnh phải có định dạng JPEG." }, 415);
+  }
+  const declaredSize = Number(request.headers.get("Content-Length"));
+  if (Number.isFinite(declaredSize) && declaredSize > MAX_MEDIA_BYTES) return json({ error: "Ảnh không được lớn hơn 5 MB." }, 413);
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (!bytes.length || bytes.length > MAX_MEDIA_BYTES) return json({ error: "Ảnh không được lớn hơn 5 MB." }, 413);
+  const dimensions = jpegDimensions(bytes);
+  if (!dimensions || dimensions.width > 4096 || dimensions.height > 4096) {
+    return json({ error: "Tệp ảnh không hợp lệ hoặc có kích thước điểm ảnh quá lớn." }, 415);
+  }
+  const previous = await env.DB.prepare(`${selectBlindBagMedia} WHERE session_id = ? AND idempotency_key = ?`)
+    .bind(sessionId, idempotencyKey).first<BlindBagMediaRow>();
+  if (previous) return json({ media: mediaView(previous), duplicate: true });
+  const id = crypto.randomUUID();
+  const objectKey = `${spaceId}/${sessionId}/${id}.jpg`;
+  await env.MEDIA.put(objectKey, bytes, { httpMetadata: { contentType: "image/jpeg" } });
+  try {
+    await env.DB.prepare(`INSERT INTO blind_bag_media
+      (id, session_id, couple_space_id, uploaded_by_user_id, idempotency_key, object_key, mime_type, byte_size, width, height)
+      VALUES (?, ?, ?, ?, ?, ?, 'image/jpeg', ?, ?, ?)`)
+      .bind(id, sessionId, spaceId, userId, idempotencyKey, objectKey, bytes.length, dimensions.width, dimensions.height).run();
+  } catch (error) {
+    await env.MEDIA.delete(objectKey);
+    throw error;
+  }
+  const saved = await env.DB.prepare(`${selectBlindBagMedia} WHERE id = ?`).bind(id).first<BlindBagMediaRow>();
+  return json({ media: mediaView(saved!) }, 201);
+}
+
+async function blindBagMediaObject(env: SessionEnv, spaceId: string, sessionId: string, mediaId: string): Promise<Response> {
+  if (!/^[0-9a-f-]{36}$/i.test(mediaId)) return json({ error: "Không tìm thấy ảnh." }, 404);
+  const row = await env.DB.prepare(`${selectBlindBagMedia} WHERE id = ? AND session_id = ? AND couple_space_id = ?`)
+    .bind(mediaId, sessionId, spaceId).first<BlindBagMediaRow>();
+  if (!row) return json({ error: "Không tìm thấy ảnh." }, 404);
+  const object = await env.MEDIA.get(row.object_key);
+  if (!object) return json({ error: "Không tìm thấy ảnh." }, 404);
+  return new Response(object.body, { headers: {
+    "Content-Type": row.mime_type,
+    "Content-Length": String(row.byte_size),
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+  } });
 }
 
 function blindBagCandidateSufficiency(payload: Record<string, unknown>): BlindBagCandidateSufficiency {
@@ -1406,6 +1509,12 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "blind-bag-tear") {
     return blindBagTear(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "media") {
+    return blindBagMedia(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 5 && parts[3] === "media" && request.method === "GET") {
+    return blindBagMediaObject(env, spaceId, sessionId, parts[4]);
   }
   if (parts.length === 4 && parts[3] === "deep-talk-deck") {
     return deepTalkDeck(request, env, userId, spaceId, sessionId);

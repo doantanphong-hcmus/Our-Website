@@ -6,6 +6,7 @@ import type { DeepTalkAiBinding } from "./deep-talk-ai";
 interface Env {
   REALTIME_ROOM: DurableObjectNamespace<RealtimeRoom>;
   DB: D1Database;
+  MEDIA: R2Bucket;
   AUTH_PEPPER: string;
   AI?: DeepTalkAiBinding;
 }

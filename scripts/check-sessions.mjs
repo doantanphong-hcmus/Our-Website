@@ -31,6 +31,7 @@ const foodCatalog = JSON.parse(await readFile(path.join(root, "content", "food.v
 const foodDishById = new Map(foodCatalog.dishes.map((dish) => [dish.id, dish]));
 const deepTalkCards = JSON.parse(await readFile(path.join(root, "content", "deep-talk-fallback.v1.json"), "utf8")).cards;
 const deepTalkDeckJson = JSON.stringify(deepTalkCards).replaceAll("'", "''");
+const samplePhoto = await readFile(path.join(root, "apps", "web", "public", "couple-empty-state.jpg"));
 
 function wranglerCommand(args) {
   const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, env, encoding: "utf8" });
@@ -99,7 +100,21 @@ async function request(pathname, cookie, method = "GET", input) {
     headers: { Cookie: cookie, ...(input ? { "Content-Type": "application/json" } : {}) },
     body: input ? JSON.stringify(input) : undefined,
   });
-  const data = await response.json();
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`${pathname}: ${response.status} ${text}`); }
+  return { response, data };
+}
+
+async function mediaRequest(pathname, cookie, body, idempotencyKey = "upload-private-photo-001") {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "image/jpeg", "X-Idempotency-Key": idempotencyKey },
+    body,
+  });
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`${pathname}: ${response.status} ${text}`); }
   return { response, data };
 }
 
@@ -302,6 +317,31 @@ try {
     idempotencyKey: "accept-blind-bag" })).data.duplicate, true);
   assert.equal((await request(bagPath, phong, "POST", { action: "reroll", reason: "change", expectedVersion: 13,
     idempotencyKey: "reroll-after-accept" })).response.status, 409);
+  const mediaPath = `/api/sessions/${bagId}/media`;
+  assert.equal((await fetch(`${baseUrl}${mediaPath}`)).status, 401, "private media must require login");
+  const wrongMime = await fetch(`${baseUrl}${mediaPath}`, {
+    method: "POST", headers: { Cookie: phong, "Content-Type": "text/plain", "X-Idempotency-Key": "upload-wrong-mime" },
+  });
+  assert.equal(wrongMime.status, 415);
+  const uploaded = await mediaRequest(mediaPath, phong, samplePhoto);
+  assert.equal(uploaded.response.status, 201);
+  assert.match(uploaded.data.media.id, /^[0-9a-f-]{36}$/i);
+  assert.match(uploaded.data.media.url, new RegExp(`${bagId}/media/${uploaded.data.media.id}$`));
+  assert.equal(uploaded.data.media.mimeType, "image/jpeg");
+  assert.equal(uploaded.data.media.byteSize, samplePhoto.length);
+  assert.ok(uploaded.data.media.width > 0 && uploaded.data.media.height > 0);
+  const replayedPhoto = await mediaRequest(mediaPath, phong, samplePhoto);
+  assert.equal(replayedPhoto.response.status, 200);
+  assert.equal(replayedPhoto.data.duplicate, true);
+  assert.equal(replayedPhoto.data.media.id, uploaded.data.media.id, "upload retry must not duplicate media");
+  const partnerMedia = await request(mediaPath, nhi);
+  assert.deepEqual(partnerMedia.data.media, [uploaded.data.media], "both partners must see the same private media");
+  const privatePhoto = await fetch(`${baseUrl}${uploaded.data.media.url}`, { headers: { Cookie: nhi } });
+  assert.equal(privatePhoto.status, 200);
+  assert.equal(privatePhoto.headers.get("content-type"), "image/jpeg");
+  assert.equal(privatePhoto.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(Buffer.from(await privatePhoto.arrayBuffer()), samplePhoto);
+  assert.equal((await request(`${mediaPath}/00000000-0000-4000-8000-000000000099`, phong)).response.status, 404);
   assert.equal((await act(phong, bagId, "complete", 13, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
@@ -562,7 +602,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P3.2-P4.15 sessions: Deep Talk privacy, idempotency and quota fail-closed = OK");
+  console.log("P1.9/P2.16/P3.2-P4.15 sessions: private R2 media, idempotency and privacy = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

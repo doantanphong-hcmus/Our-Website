@@ -28,6 +28,10 @@ const config = {
     database_id: databaseId,
     migrations_dir: "apps/worker/migrations",
   })),
+  r2_buckets: source.r2_buckets.map((bucket) => ({
+    ...bucket,
+    bucket_name: `${bucket.bucket_name}-${environment}`,
+  })),
   assets: {
     directory: "apps/web/dist",
     not_found_handling: "single-page-application",

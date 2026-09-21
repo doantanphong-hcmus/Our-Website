@@ -27,6 +27,7 @@ type BlindBagSession = {
   travel?: { state: "traveling"; acceptedByUserId: string; acceptedAt: number };
   candidateSufficiency?: CandidateSufficiency;
 };
+type PrivateMedia = { id: string; url: string; mimeType: string; byteSize: number; width: number; height: number; createdAt: number };
 
 const distanceLabels: Record<string, string> = { under_3: "Dưới 3 km", three_to_five: "3–5 km", five_to_ten: "5–10 km", custom: "Tùy chỉnh" };
 const budgetLabels: Record<string, string> = { free_low: "Miễn phí hoặc rất thấp", under_200k: "Dưới 200.000 đồng", two_to_five_hundred_k: "200.000–500.000 đồng", any: "Không quan trọng" };
@@ -34,7 +35,123 @@ const placeTypeLabels: Record<string, string> = { attraction: "Điểm tham quan
   live_performance: "Biểu diễn", market: "Khu chợ", theme_park: "Khu vui chơi", creative_workshop: "Workshop sáng tạo",
   interactive_experience: "Trải nghiệm tương tác", scenic_spot: "Điểm ngắm cảnh", concept_cafe: "Quán cà phê", unique_food: "Ăn uống độc đáo" };
 
-function ResultCard({ result, userId, reroll, travel, onAccept, onReport, onReroll }: { result: NonNullable<BlindBagSession["result"]>;
+async function preparePhoto(file: File): Promise<Blob> {
+  if (!file.type.startsWith("image/")) throw new Error("Hãy chọn một tệp ảnh nhé.");
+  if (file.size > 20 * 1024 * 1024) throw new Error("Ảnh gốc không được lớn hơn 20 MB.");
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = sourceUrl;
+    await image.decode();
+    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Thiết bị chưa xử lý được ảnh này.");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob || blob.size > 5 * 1024 * 1024) throw new Error("Không thể thu nhỏ ảnh dưới 5 MB.");
+    return blob;
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("Không đọc được ảnh này.");
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+function sendPhoto(sessionId: string, blob: Blob, idempotencyKey: string, onProgress: (value: number) => void): Promise<PrivateMedia> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `/api/sessions/${sessionId}/media`);
+    request.withCredentials = true;
+    request.setRequestHeader("Content-Type", "image/jpeg");
+    request.setRequestHeader("X-Idempotency-Key", idempotencyKey);
+    request.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
+    request.onerror = () => reject(new Error("Mất kết nối khi gửi ảnh."));
+    request.onload = () => {
+      try {
+        const data = JSON.parse(request.responseText) as { media?: PrivateMedia; error?: string };
+        if (request.status < 200 || request.status >= 300 || !data.media) throw new Error(data.error ?? "Chưa gửi được ảnh.");
+        resolve(data.media);
+      } catch (error) { reject(error instanceof Error ? error : new Error("Chưa gửi được ảnh.")); }
+    };
+    request.send(blob);
+  });
+}
+
+function BlindBagMedia({ sessionId }: { sessionId: string }) {
+  const [media, setMedia] = useState<PrivateMedia[]>([]);
+  const [draft, setDraft] = useState<{ blob: Blob; url: string; uploadId: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/sessions/${sessionId}/media`, { credentials: "same-origin" })
+      .then(async (response) => {
+        const data = await response.json() as { media?: PrivateMedia[]; error?: string };
+        if (!response.ok) throw new Error(data.error);
+        if (active) setMedia(data.media ?? []);
+      })
+      .catch(() => { if (active) setError("Chưa tải được ảnh kỷ niệm."); });
+    return () => { active = false; };
+  }, [sessionId]);
+
+  useEffect(() => () => { if (draft) URL.revokeObjectURL(draft.url); }, [draft]);
+
+  async function choose(file?: File) {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const blob = await preparePhoto(file);
+      setDraft({ blob, url: URL.createObjectURL(blob), uploadId: crypto.randomUUID() });
+      setProgress(0);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không đọc được ảnh này.");
+    } finally { setBusy(false); }
+  }
+
+  async function upload() {
+    if (!draft) return;
+    setBusy(true);
+    setError("");
+    setProgress(0);
+    try {
+      const saved = await sendPhoto(sessionId, draft.blob, draft.uploadId, setProgress);
+      setMedia((current) => current.some((item) => item.id === saved.id) ? current : [...current, saved]);
+      setDraft(null);
+      setProgress(100);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Chưa gửi được ảnh.");
+    } finally { setBusy(false); }
+  }
+
+  return <section className="blind-bag-media" aria-labelledby="blind-bag-media-title">
+    <h3 id="blind-bag-media-title">Ảnh kỷ niệm</h3>
+    {media.length > 0 && <div className="blind-bag-media__gallery">{media.map((item, index) =>
+      <img key={item.id} src={item.url} alt={`Ảnh kỷ niệm ${index + 1} của chuyến đi`} loading="lazy" />)}</div>}
+    {draft ? <div className="blind-bag-media__preview">
+      <img src={draft.url} alt="Ảnh đang chờ gửi" />
+      <div className="blind-bag-media__actions">
+        <button type="button" disabled={busy} onClick={() => void upload()}>{busy ? `Đang gửi ${progress}%` : error ? "Thử lại" : "Gửi ảnh"}</button>
+        <button type="button" className="secondary-button" disabled={busy} onClick={() => { setDraft(null); setError(""); }}>Chọn lại</button>
+      </div>
+      {busy && <progress max="100" value={progress} aria-label="Tiến độ gửi ảnh" />}
+    </div> : <div className="blind-bag-media__pickers">
+      <label className="button">Chụp ảnh<input type="file" accept="image/*" capture="environment" disabled={busy} onChange={(event) => { void choose(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <label className="button secondary-button">Chọn từ thư viện<input type="file" accept="image/*" disabled={busy} onChange={(event) => { void choose(event.target.files?.[0]); event.target.value = ""; }} /></label>
+    </div>}
+    <p className="blind-bag-media__note">Ảnh chỉ hai đứa mình xem được.</p>
+    {error && <p role="alert">{error}</p>}
+  </section>;
+}
+
+function ResultCard({ sessionId, result, userId, reroll, travel, onAccept, onReport, onReroll }: { sessionId: string; result: NonNullable<BlindBagSession["result"]>;
   userId: string; reroll: NonNullable<BlindBagSession["tear"]>["reroll"];
   travel?: BlindBagSession["travel"]; onAccept: () => Promise<void>;
   onReport: (reason: string) => Promise<void>; onReroll: (reason: "change" | "reject") => Promise<void> }) {
@@ -69,6 +186,7 @@ function ResultCard({ result, userId, reroll, travel, onAccept, onReport, onRero
     </dl>
     {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
     <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
+    {travel && <BlindBagMedia sessionId={sessionId} />}
     {!travel && <><button type="button" className="blind-bag-result__accept" disabled={accepting} onClick={async () => {
       setAccepting(true);
       try { await onAccept(); setReportStatus(navigator.onLine ? "Đang xác nhận kèo…" : "Đã lưu. Kèo sẽ được xác nhận khi có mạng."); }
@@ -412,7 +530,7 @@ export function BlindBagForm({ user }: { user: User }) {
       {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>{session.travel ? "Xem điểm đến" : "Xem túi mù"}</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel}
+        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} sessionId={session.id} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel}
           onAccept={acceptPlace} onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">

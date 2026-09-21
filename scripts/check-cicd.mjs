@@ -20,6 +20,7 @@ try {
   const config = JSON.parse(await readFile(output, "utf8"));
   assert.equal(config.name, env.WORKER_NAME);
   assert.equal(config.d1_databases[0].database_id, env.D1_DATABASE_ID);
+  assert.deepEqual(config.r2_buckets, [{ binding: "MEDIA", bucket_name: "our-website-private-media-preview" }]);
   assert.equal(config.assets.not_found_handling, "single-page-application");
   assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/ws", "/health"]);
   assert.deepEqual(config.ai, { binding: "AI" });
