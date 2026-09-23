@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import placeCatalog from "../../content/places.v1.json";
 import challengeCatalog from "../../content/place-challenges.v1.json";
-import { applyPlaceHistoryPolicy, assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectPlaceChallenge, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
+import { applyPlaceHistoryPolicy, assessCheckIn, assessPlaceCandidateSufficiency, createCuratedPlaces, createGeoapifyPlaces, filterPlaceCandidates, normalizeCuratedPlace, normalizeGeoapifyPlace, PlacesProviderError, selectPlaceChallenge, selectWeightedPlace, type CuratedPlace } from "../../apps/worker/src/places";
 
 const feature = {
   type: "Feature",
@@ -266,5 +266,13 @@ describe("place challenge selector", () => {
     const conditions = { placeType: "market", maxMinutes: 5, maxExtraCostVnd: 0 };
     expect(selectPlaceChallenge(challenges, conditions, () => 0.99)?.id).toBe("free");
     expect(selectPlaceChallenge(challenges, { ...conditions, maxExtraCostVnd: 50_000 }, () => 0.99)?.id).toBe("paid");
+  });
+});
+
+describe("check-in GPS uncertainty", () => {
+  it("accepts only a fully inside accuracy circle and separates uncertainty from outside", () => {
+    expect(assessCheckIn(100, 20, 150)).toBe("verified");
+    expect(assessCheckIn(145, 20, 150)).toBe("uncertain");
+    expect(assessCheckIn(180, 20, 150)).toBe("outside");
   });
 });

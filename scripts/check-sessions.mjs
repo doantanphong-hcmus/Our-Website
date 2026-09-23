@@ -319,6 +319,31 @@ try {
     idempotencyKey: "reroll-after-accept" })).response.status, 409);
   const mediaPath = `/api/sessions/${bagId}/media`;
   assert.equal((await fetch(`${baseUrl}${mediaPath}`)).status, 401, "private media must require login");
+  assert.equal((await mediaRequest(mediaPath, phong, Buffer.alloc(0), "upload-before-check-in")).response.status, 409);
+  const checkInPath = `/api/sessions/${bagId}/blind-bag-check-in`;
+  const outside = await request(checkInPath, nhi, "POST", { action: "verify", expectedVersion: 13,
+    idempotencyKey: "check-in-too-far", position: { latitude: 0, longitude: 0, accuracyMeters: 10 } });
+  assert.equal(outside.response.status, 422);
+  const uncertainPosition = { latitude: accepted.data.session.result.latitude, longitude: accepted.data.session.result.longitude,
+    accuracyMeters: 1_000 };
+  const manualRequested = await request(checkInPath, nhi, "POST", { action: "verify", expectedVersion: 13,
+    idempotencyKey: "check-in-uncertain-gps", position: uncertainPosition });
+  assert.equal(manualRequested.response.status, 201);
+  assert.deepEqual(manualRequested.data.session.checkIn, { status: "awaiting_partner", method: "manual",
+    radiusMeters: manualRequested.data.session.checkIn.radiusMeters, startedByUserId: "user-nhi",
+    startedAt: manualRequested.data.session.checkIn.startedAt, confirmedUserIds: ["user-nhi"], manualReason: "gps_uncertain" });
+  assert.ok([150, 300, 500].includes(manualRequested.data.session.checkIn.radiusMeters));
+  assert.equal((await request(checkInPath, nhi, "POST", { action: "verify", expectedVersion: 13,
+    idempotencyKey: "check-in-uncertain-gps", position: uncertainPosition })).data.duplicate, true);
+  assert.equal((await request(checkInPath, nhi, "POST", { action: "confirm", expectedVersion: 14,
+    idempotencyKey: "check-in-self-confirm" })).response.status, 409);
+  const checkedIn = await request(checkInPath, phong, "POST", { action: "confirm", expectedVersion: 14,
+    idempotencyKey: "check-in-partner-confirm" });
+  assert.equal(checkedIn.data.session.checkIn.status, "confirmed");
+  assert.equal(checkedIn.data.session.checkIn.method, "manual");
+  assert.deepEqual(checkedIn.data.session.checkIn.confirmedUserIds, ["user-nhi", "user-phong"]);
+  assert.deepEqual((await request(checkInPath, nhi)).data.session.checkIn, checkedIn.data.session.checkIn,
+    "manual check-in audit must survive reload");
   const wrongMime = await fetch(`${baseUrl}${mediaPath}`, {
     method: "POST", headers: { Cookie: phong, "Content-Type": "text/plain", "X-Idempotency-Key": "upload-wrong-mime" },
   });
@@ -342,7 +367,7 @@ try {
   assert.equal(privatePhoto.headers.get("cache-control"), "private, no-store");
   assert.deepEqual(Buffer.from(await privatePhoto.arrayBuffer()), samplePhoto);
   assert.equal((await request(`${mediaPath}/00000000-0000-4000-8000-000000000099`, phong)).response.status, 404);
-  assert.equal((await act(phong, bagId, "complete", 13, "complete-ready-bag")).data.session.status, "completed");
+  assert.equal((await act(phong, bagId, "complete", 15, "complete-ready-bag")).data.session.status, "completed");
 
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",
@@ -602,7 +627,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16/P3.2-P4.15 sessions: private R2 media, idempotency and privacy = OK");
+  console.log("P1.9/P2.16-P2.17/P3.2-P4.15 sessions: private media, GPS/manual check-in and idempotency = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

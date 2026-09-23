@@ -10,7 +10,9 @@ import { fingerprintDeepTalkQuestion } from "./deep-talk-similarity";
 import type { DeepTalkCard, DeepTalkDeck } from "./deep-talk-validator";
 import {
   applyPlaceHistoryPolicy,
+  assessCheckIn,
   assessPlaceCandidateSufficiency,
+  distanceMeters,
   normalizeCuratedPlace,
   selectPlaceChallenge,
   selectWeightedPlace,
@@ -38,6 +40,9 @@ type BlindBagConfirmation = { revision: number; confirmedUserIds: string[] };
 type BlindBagTear = { readyUserIds: string[]; tornByUserId?: string; progress: number; selectedPlaceId?: string;
   selectedChallengeId?: string; seenPlaceIds: string[]; rerollUsedByUserIds: string[]; rejectedByUserIds: string[] };
 type BlindBagTravel = { state: "traveling"; acceptedByUserId: string; acceptedAt: number };
+type BlindBagCheckIn = { status: "awaiting_partner" | "confirmed"; method: "gps" | "manual"; radiusMeters: number;
+  startedByUserId: string; startedAt: number; confirmedUserIds: string[]; confirmedAt?: number;
+  manualReason?: "gps_unavailable" | "gps_uncertain" };
 type BlindBagConditions = PlaceCandidateConditions & {
   origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
     | { kind: "address"; address: string };
@@ -178,6 +183,29 @@ function storedBlindBagTravel(resultJson: string | null): BlindBagTravel | null 
   } catch { return null; }
 }
 
+function storedBlindBagCheckIn(resultJson: string | null): BlindBagCheckIn | null {
+  try {
+    const value = (JSON.parse(resultJson ?? "{}") as { blindBagCheckIn?: unknown }).blindBagCheckIn as Record<string, unknown>;
+    const confirmedUserIds = Array.isArray(value?.confirmedUserIds) && value.confirmedUserIds.every((id) => typeof id === "string")
+      ? [...new Set(value.confirmedUserIds as string[])] : null;
+    if (!value || !["awaiting_partner", "confirmed"].includes(String(value.status))
+      || !["gps", "manual"].includes(String(value.method)) || !confirmedUserIds
+      || !Number.isInteger(value.radiusMeters) || ![150, 300, 500].includes(Number(value.radiusMeters))
+      || typeof value.startedByUserId !== "string" || !Number.isInteger(value.startedAt)) return null;
+    return { status: value.status as BlindBagCheckIn["status"], method: value.method as BlindBagCheckIn["method"],
+      radiusMeters: Number(value.radiusMeters), startedByUserId: value.startedByUserId, startedAt: Number(value.startedAt), confirmedUserIds,
+      ...(Number.isInteger(value.confirmedAt) ? { confirmedAt: Number(value.confirmedAt) } : {}),
+      ...(["gps_unavailable", "gps_uncertain"].includes(String(value.manualReason))
+        ? { manualReason: value.manualReason as NonNullable<BlindBagCheckIn["manualReason"]> } : {}) };
+  } catch { return null; }
+}
+
+function checkInRadiusMeters(place: { type: string; description?: string | null }): number {
+  const description = place.description?.toLocaleLowerCase("vi") ?? "";
+  if (["park", "theme_park"].includes(place.type) || /công viên|trung tâm mua sắm/.test(description)) return 500;
+  return place.type === "market" ? 300 : 150;
+}
+
 function mediaView(row: BlindBagMediaRow) {
   return {
     id: row.id,
@@ -217,8 +245,8 @@ async function blindBagMedia(request: Request, env: SessionEnv, userId: string, 
     return json({ media: (rows.results ?? []).map(mediaView) });
   }
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (session.status !== "active" || !storedBlindBagTravel(session.result_json)) {
-    return json({ error: "Chỉ gửi ảnh sau khi hai đứa đã nhận kèo." }, 409);
+  if (session.status !== "active" || storedBlindBagCheckIn(session.result_json)?.status !== "confirmed") {
+    return json({ error: "Hai đứa cần check-in trước khi gửi ảnh." }, 409);
   }
   const idempotencyKey = request.headers.get("X-Idempotency-Key") ?? "";
   if (!commandPattern.test(idempotencyKey)) return json({ error: "Mã lần gửi ảnh không hợp lệ." }, 400);
@@ -284,6 +312,7 @@ function publicSession(row: SessionRow) {
   const confirmation = row.feature === "blind_bag" ? storedBlindBagConfirmation(row.result_json) : null;
   const tear = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTear(row.result_json) : null;
   const travel = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTravel(row.result_json) : null;
+  const checkIn = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagCheckIn(row.result_json) : null;
   const origin = (payload.conditions as BlindBagConditions | undefined)?.origin;
   const selected = tear?.progress === 100 && origin?.kind === "current"
     ? placeCatalog.places.find((place) => place.id === tear.selectedPlaceId) : undefined;
@@ -309,6 +338,7 @@ function publicSession(row: SessionRow) {
       photoUrl: place.photoUrl, rating: place.rating, reviewCount: place.reviewCount,
       openingHours: place.openingHours, challenge: challenge?.text ?? null } } : {}),
     ...(travel ? { travel } : {}),
+    ...(checkIn ? { checkIn } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -1048,6 +1078,87 @@ async function blindBagTear(request: Request, env: SessionEnv, userId: string, s
   return json({ session: publicSession(updated!) }, 201);
 }
 
+async function blindBagCheckIn(request: Request, env: SessionEnv, userId: string, spaceId: string,
+  sessionId: string): Promise<Response> {
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`)
+    .bind(sessionId, spaceId).first<SessionRow>();
+  if (!current) return json({ error: "Không tìm thấy phiên." }, 404);
+  if (current.feature !== "blind_bag" || current.status !== "active" || !storedBlindBagTravel(current.result_json)) {
+    return json({ error: "Chỉ check-in sau khi hai đứa đã nhận kèo." }, 409);
+  }
+  if (request.method === "GET") return json({ session: publicSession(current) });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const input = await body(request);
+  const action = input?.action;
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  if (!['verify', 'request_manual', 'confirm'].includes(String(action)) || !Number.isInteger(expectedVersion)
+    || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)) {
+    return json({ error: "Lệnh check-in không hợp lệ." }, 400);
+  }
+  let checkIn = storedBlindBagCheckIn(current.result_json);
+  const fingerprint = () => JSON.stringify({ action, method: checkIn?.method, manualReason: checkIn?.manualReason });
+  const previous = await env.DB.prepare(`SELECT session_id, actor_user_id, action, input_json FROM activity_session_events
+    WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
+    .first<{ session_id: string; actor_user_id: string; action: string; input_json: string }>();
+  if (previous) return previous.session_id === sessionId && previous.actor_user_id === userId
+    && previous.action === "check_in" && previous.input_json === fingerprint()
+    ? json({ session: publicSession(current), duplicate: true })
+    : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
+
+  const tear = storedBlindBagTear(current.result_json);
+  const place = placeCatalog.places.find((item) => item.id === tear.selectedPlaceId);
+  if (!place) return json({ error: "Không tìm thấy địa điểm để check-in." }, 409);
+  const radiusMeters = checkInRadiusMeters(place);
+  const now = Math.floor(Date.now() / 1000);
+  if (action === "confirm") {
+    if (!checkIn || checkIn.status !== "awaiting_partner") return json({ error: "Chưa có lượt check-in cần xác nhận." }, 409);
+    if (checkIn.confirmedUserIds.includes(userId)) return json({ error: "Cần người kia xác nhận lượt check-in này." }, 409);
+    checkIn.confirmedUserIds.push(userId);
+    checkIn.status = "confirmed";
+    checkIn.confirmedAt = now;
+  } else {
+    if (checkIn) return json({ error: "Lượt check-in này đã được bắt đầu." }, 409);
+    let method: BlindBagCheckIn["method"] = "manual";
+    let manualReason: BlindBagCheckIn["manualReason"] = "gps_unavailable";
+    if (action === "verify") {
+      const position = input?.position as Record<string, unknown> | undefined;
+      const valid = position && typeof position.latitude === "number" && Number.isFinite(position.latitude)
+        && position.latitude >= -90 && position.latitude <= 90
+        && typeof position.longitude === "number" && Number.isFinite(position.longitude)
+        && position.longitude >= -180 && position.longitude <= 180
+        && typeof position.accuracyMeters === "number" && Number.isFinite(position.accuracyMeters)
+        && position.accuracyMeters >= 0 && position.accuracyMeters <= 100_000;
+      if (!valid) return json({ error: "Vị trí check-in không hợp lệ." }, 400);
+      const meters = distanceMeters(position as { latitude: number; longitude: number }, place);
+      const assessment = assessCheckIn(meters, Number(position.accuracyMeters), radiusMeters);
+      if (assessment === "outside") {
+        return json({ error: `Thiết bị còn cách điểm hẹn khoảng ${Math.round(meters)} m. Mình đến gần hơn rồi thử lại nhé.` }, 422);
+      }
+      if (assessment === "verified") { method = "gps"; manualReason = undefined; }
+      else manualReason = "gps_uncertain";
+    }
+    checkIn = { status: "awaiting_partner", method, radiusMeters, startedByUserId: userId,
+      startedAt: now, confirmedUserIds: [userId], ...(manualReason ? { manualReason } : {}) };
+  }
+
+  const result = { ...(JSON.parse(current.result_json!) as Record<string, unknown>), blindBagCheckIn: checkIn };
+  const inputJson = fingerprint();
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
+      WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+      .bind(JSON.stringify(result), now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version, input_json)
+      SELECT ?, ?, ?, ?, 'check_in', 'active', 'active', ?, ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, current.version + 1, inputJson),
+  ]);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json({ session: publicSession(updated!) }, 201);
+}
+
 function publicDeepTalkDeck(row: DeepTalkDeckRow) {
   return { id: row.id, sessionId: row.session_id, cardCount: 20, createdAt: row.created_at };
 }
@@ -1509,6 +1620,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "blind-bag-tear") {
     return blindBagTear(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "blind-bag-check-in") {
+    return blindBagCheckIn(request, env, userId, spaceId, sessionId);
   }
   if (parts.length === 4 && parts[3] === "media") {
     return blindBagMedia(request, env, userId, spaceId, sessionId);

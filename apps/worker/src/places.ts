@@ -137,13 +137,22 @@ function verifiedDate(value: unknown): string | null {
   return Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== candidate ? null : candidate;
 }
 
-function distanceKm(origin: { latitude: number; longitude: number }, place: { latitude: number; longitude: number }): number {
+export function distanceMeters(origin: { latitude: number; longitude: number }, place: { latitude: number; longitude: number }): number {
   const radians = (degrees: number) => degrees * Math.PI / 180;
   const latitude = radians(place.latitude - origin.latitude);
   const longitude = radians(place.longitude - origin.longitude);
   const a = Math.sin(latitude / 2) ** 2
     + Math.cos(radians(origin.latitude)) * Math.cos(radians(place.latitude)) * Math.sin(longitude / 2) ** 2;
-  return Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 100) / 100;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function distanceKm(origin: { latitude: number; longitude: number }, place: { latitude: number; longitude: number }): number {
+  return Math.round(distanceMeters(origin, place) / 10) / 100;
+}
+
+export function assessCheckIn(distanceMeters: number, accuracyMeters: number, radiusMeters: number): "verified" | "uncertain" | "outside" {
+  if (distanceMeters - accuracyMeters > radiusMeters) return "outside";
+  return distanceMeters + accuracyMeters <= radiusMeters ? "verified" : "uncertain";
 }
 
 export function normalizeGeoapifyPlace(feature: Feature, origin?: { latitude: number; longitude: number }, fallbackId?: string): Place | null {

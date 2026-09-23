@@ -1289,6 +1289,11 @@ main {
 .blind-bag-result__report form { display: grid; gap: var(--space-3); padding-block: var(--space-4); }
 .blind-bag-result__report label { display: grid; gap: var(--space-2); }
 .blind-bag-result__report select { inline-size: 100%; }
+.blind-bag-check-in { display: grid; gap: var(--space-3); margin-block-start: var(--space-6); padding: var(--space-4); border: 1px solid rgb(241 214 166 / 45%); border-radius: 1rem; background: rgb(241 214 166 / 9%); }
+.blind-bag-check-in h3, .blind-bag-check-in p { margin: 0; }
+.blind-bag-check-in button { min-block-size: 3.25rem; }
+.blind-bag-check-in .secondary-button { background: rgb(255 255 255 / 12%); color: #ebd0ee; }
+.blind-bag-check-in--done strong { color: #f1d6a6; font-size: 1.15rem; }
 .blind-bag-media { display: grid; gap: var(--space-3); margin-block-start: var(--space-6); padding-block-start: var(--space-5); border-block-start: 1px solid rgb(255 255 255 / 20%); }
 .blind-bag-media h3, .blind-bag-media p { margin: 0; }
 .blind-bag-media__gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }

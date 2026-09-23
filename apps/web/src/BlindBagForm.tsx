@@ -25,6 +25,9 @@ type BlindBagSession = {
     latitude: number; longitude: number; photoUrl: string | null; rating: number | null;
     reviewCount: number | null; openingHours: string | null; challenge: string | null };
   travel?: { state: "traveling"; acceptedByUserId: string; acceptedAt: number };
+  checkIn?: { status: "awaiting_partner" | "confirmed"; method: "gps" | "manual"; radiusMeters: number;
+    startedByUserId: string; startedAt: number; confirmedUserIds: string[]; confirmedAt?: number;
+    manualReason?: "gps_unavailable" | "gps_uncertain" };
   candidateSufficiency?: CandidateSufficiency;
 };
 type PrivateMedia = { id: string; url: string; mimeType: string; byteSize: number; width: number; height: number; createdAt: number };
@@ -80,6 +83,68 @@ function sendPhoto(sessionId: string, blob: Blob, idempotencyKey: string, onProg
     };
     request.send(blob);
   });
+}
+
+function BlindBagCheckIn({ sessionId, version, userId, checkIn, onUpdate }: { sessionId: string; version: number; userId: string;
+  checkIn?: BlindBagSession["checkIn"]; onUpdate: (session: BlindBagSession) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [canAskPartner, setCanAskPartner] = useState(false);
+  const [error, setError] = useState("");
+
+  async function command(action: "verify" | "request_manual" | "confirm", position?: Position) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/blind-bag-check-in`, {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, expectedVersion: version, idempotencyKey: crypto.randomUUID(), ...(position ? { position } : {}) }),
+      });
+      const data = await response.json() as { session?: BlindBagSession; error?: string };
+      if (data.session) onUpdate(data.session);
+      if (!response.ok) throw new Error(data.error ?? "Chưa check-in được.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Chưa check-in được.");
+    } finally { setBusy(false); }
+  }
+
+  function verify() {
+    if (!navigator.geolocation) {
+      setCanAskPartner(true);
+      setError("Thiết bị này không lấy được vị trí. Mình nhờ người kia xác nhận nhé.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      void command("verify", { latitude: coords.latitude, longitude: coords.longitude, accuracyMeters: Math.round(coords.accuracy) });
+    }, () => {
+      setBusy(false);
+      setCanAskPartner(true);
+      setError("Không lấy được vị trí chính xác. Mình nhờ người kia xác nhận nhé.");
+    }, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 });
+  }
+
+  if (checkIn?.status === "confirmed") return <section className="blind-bag-check-in blind-bag-check-in--done" role="status">
+    <strong>Hai đứa đã check-in!</strong>
+    <span>{checkIn.method === "gps" ? "Vị trí đã được xác minh." : "Người kia đã xác nhận thủ công."}</span>
+  </section>;
+  if (checkIn) {
+    const mine = checkIn.confirmedUserIds.includes(userId);
+    return <section className="blind-bag-check-in">
+      <h3>Check-in điểm hẹn</h3>
+      <p>{checkIn.method === "manual" ? "GPS chưa đủ chính xác nên cần người kia xác nhận." : "Vị trí đã khớp. Cần người kia xác nhận hai đứa đã tới."}</p>
+      {mine ? <p role="status">Đang chờ người kia xác nhận…</p>
+        : <button type="button" disabled={busy} onClick={() => void command("confirm")}>{busy ? "Đang xác nhận…" : "Xác nhận hai đứa đã tới"}</button>}
+      {error && <p role="alert">{error}</p>}
+    </section>;
+  }
+  return <section className="blind-bag-check-in">
+    <h3>Đã tới nơi?</h3>
+    <p>Kiểm tra vị trí một lần để hai đứa cùng check-in.</p>
+    <button type="button" disabled={busy} onClick={verify}>{busy ? "Đang kiểm tra vị trí…" : "Check-in bằng vị trí hiện tại"}</button>
+    {canAskPartner && <button type="button" className="secondary-button" disabled={busy} onClick={() => void command("request_manual")}>Nhờ người kia xác nhận</button>}
+    {error && <p role="alert">{error}</p>}
+  </section>;
 }
 
 function BlindBagMedia({ sessionId }: { sessionId: string }) {
@@ -151,9 +216,9 @@ function BlindBagMedia({ sessionId }: { sessionId: string }) {
   </section>;
 }
 
-function ResultCard({ sessionId, result, userId, reroll, travel, onAccept, onReport, onReroll }: { sessionId: string; result: NonNullable<BlindBagSession["result"]>;
+function ResultCard({ sessionId, version, result, userId, reroll, travel, checkIn, onUpdate, onAccept, onReport, onReroll }: { sessionId: string; version: number; result: NonNullable<BlindBagSession["result"]>;
   userId: string; reroll: NonNullable<BlindBagSession["tear"]>["reroll"];
-  travel?: BlindBagSession["travel"]; onAccept: () => Promise<void>;
+  travel?: BlindBagSession["travel"]; checkIn?: BlindBagSession["checkIn"]; onUpdate: (session: BlindBagSession) => void; onAccept: () => Promise<void>;
   onReport: (reason: string) => Promise<void>; onReroll: (reason: "change" | "reject") => Promise<void> }) {
   const [reportStatus, setReportStatus] = useState("");
   const [reporting, setReporting] = useState(false);
@@ -186,7 +251,8 @@ function ResultCard({ sessionId, result, userId, reroll, travel, onAccept, onRep
     </dl>
     {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
     <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
-    {travel && <BlindBagMedia sessionId={sessionId} />}
+    {travel && <BlindBagCheckIn sessionId={sessionId} version={version} userId={userId} checkIn={checkIn} onUpdate={onUpdate} />}
+    {checkIn?.status === "confirmed" && <BlindBagMedia sessionId={sessionId} />}
     {!travel && <><button type="button" className="blind-bag-result__accept" disabled={accepting} onClick={async () => {
       setAccepting(true);
       try { await onAccept(); setReportStatus(navigator.onLine ? "Đang xác nhận kèo…" : "Đã lưu. Kèo sẽ được xác nhận khi có mạng."); }
@@ -530,7 +596,7 @@ export function BlindBagForm({ user }: { user: User }) {
       {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>{session.travel ? "Xem điểm đến" : "Xem túi mù"}</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} sessionId={session.id} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel}
+        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} sessionId={session.id} version={session.version} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel} checkIn={session.checkIn} onUpdate={setSession}
           onAccept={acceptPlace} onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">

@@ -66,7 +66,8 @@ try {
   let tearProgressCommands = [];
   let mediaUploadAttempts = 0;
   const uploadedMedia = [];
-  await reviewPage.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: nhi }) }));
+  let reviewUser = nhi;
+  await reviewPage.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: reviewUser }) }));
   await reviewPage.route("**/api/sessions**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (/\/media\/[0-9a-f-]{36}$/i.test(pathname) && route.request().method() === "GET") {
@@ -85,6 +86,16 @@ try {
     if (route.request().method() === "GET") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ eventVersion: 1, sessions: [reviewSession] }) });
     reviewPath = pathname;
     reviewCommand = route.request().postDataJSON();
+    if (reviewPath.endsWith("/blind-bag-check-in")) {
+      if (reviewCommand.action === "verify") reviewSession.checkIn = { status: "awaiting_partner", method: "gps", radiusMeters: 300,
+        startedByUserId: reviewUser.id, startedAt: 1_788_000_125, confirmedUserIds: [reviewUser.id] };
+      if (reviewCommand.action === "confirm") {
+        reviewSession.checkIn.confirmedUserIds.push(reviewUser.id);
+        reviewSession.checkIn.status = "confirmed";
+        reviewSession.checkIn.confirmedAt = 1_788_000_130;
+      }
+      reviewSession.version++;
+    }
     if (reviewPath.endsWith("/blind-bag-tear")) {
       if (reviewCommand.action === "ready") reviewSession.tear.readyUserIds.push(nhi.id);
       if (reviewCommand.action === "tear") { reviewSession.tear.tornByUserId = nhi.id; reviewSession.tear.phase = "tearing"; }
@@ -188,6 +199,19 @@ try {
   await tearStage.getByRole("button", { name: "Nhận kèo" }).click();
   await tearStage.getByText("Hai đứa đang trên đường đến điểm hẹn.").waitFor();
   assert.equal(reviewCommand.action, "accept");
+  assert.equal(await tearStage.getByLabel("Chọn từ thư viện").count(), 0, "photo upload must wait for check-in");
+  await reviewPage.evaluate(() => Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: { getCurrentPosition: (success) => success({ coords: { latitude: 10.7725, longitude: 106.698, accuracy: 12 } }) },
+  }));
+  await tearStage.getByRole("button", { name: "Check-in bằng vị trí hiện tại" }).click();
+  await tearStage.getByText("Vị trí đã khớp. Cần người kia xác nhận hai đứa đã tới.").waitFor();
+  await tearStage.getByText("Đang chờ người kia xác nhận…").waitFor();
+  reviewUser = phong;
+  await reviewPage.reload();
+  await tearStage.getByRole("button", { name: "Xác nhận hai đứa đã tới" }).click();
+  await tearStage.getByText("Hai đứa đã check-in!").waitFor();
+  assert.deepEqual(reviewSession.checkIn.confirmedUserIds, [nhi.id, phong.id]);
   await tearStage.getByLabel("Chọn từ thư viện").setInputFiles(path.join(root, "apps/web/public/couple-empty-state.jpg"));
   await tearStage.getByAltText("Ảnh đang chờ gửi").waitFor();
   await tearStage.getByRole("button", { name: "Gửi ảnh" }).click();
@@ -611,7 +635,7 @@ try {
   assert.equal(await phongPage.getByRole("button", { name: "Thử lại" }).count(), 1);
   await restore();
 
-  console.log("P1.14/P2.1-P2.3/P2.16/P3.2-P4.15 E2E: private photo preview/retry and two-device play = OK");
+  console.log("P1.14/P2.1-P2.3/P2.16-P2.17/P3.2-P4.15 E2E: two-device check-in and private photo retry = OK");
   await phongContext.close();
   await nhiContext.close();
 } finally {
