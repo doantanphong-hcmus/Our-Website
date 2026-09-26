@@ -43,6 +43,16 @@ type BlindBagTravel = { state: "traveling"; acceptedByUserId: string; acceptedAt
 type BlindBagCheckIn = { status: "awaiting_partner" | "confirmed"; method: "gps" | "manual"; radiusMeters: number;
   startedByUserId: string; startedAt: number; confirmedUserIds: string[]; confirmedAt?: number;
   manualReason?: "gps_unavailable" | "gps_uncertain" };
+type BlindBagChallengeOutcome = "completed" | "skipped";
+type BlindBagCompletion = {
+  confirmations: { userId: string; outcome: BlindBagChallengeOutcome }[];
+  challengeOutcome?: BlindBagChallengeOutcome;
+  placeId?: string;
+  visitId?: string;
+  stampId?: string;
+  stampNumber?: number;
+  completedAt?: number;
+};
 type BlindBagConditions = PlaceCandidateConditions & {
   origin: { kind: "current"; latitude: number; longitude: number; accuracyMeters: number }
     | { kind: "address"; address: string };
@@ -200,6 +210,28 @@ function storedBlindBagCheckIn(resultJson: string | null): BlindBagCheckIn | nul
   } catch { return null; }
 }
 
+function storedBlindBagCompletion(resultJson: string | null): BlindBagCompletion {
+  try {
+    const value = (JSON.parse(resultJson ?? "{}") as { blindBagCompletion?: unknown }).blindBagCompletion as Record<string, unknown>;
+    const confirmations = Array.isArray(value?.confirmations) ? value.confirmations.flatMap((item) => {
+      const entry = item as Record<string, unknown>;
+      return typeof entry?.userId === "string" && ["completed", "skipped"].includes(String(entry.outcome))
+        ? [{ userId: entry.userId, outcome: entry.outcome as BlindBagChallengeOutcome }] : [];
+    }) : [];
+    const unique = confirmations.filter((item, index) => confirmations.findIndex((other) => other.userId === item.userId) === index);
+    return {
+      confirmations: unique,
+      ...(["completed", "skipped"].includes(String(value?.challengeOutcome))
+        ? { challengeOutcome: value.challengeOutcome as BlindBagChallengeOutcome } : {}),
+      ...(typeof value?.placeId === "string" ? { placeId: value.placeId } : {}),
+      ...(typeof value?.visitId === "string" ? { visitId: value.visitId } : {}),
+      ...(typeof value?.stampId === "string" ? { stampId: value.stampId } : {}),
+      ...(Number.isInteger(value?.stampNumber) ? { stampNumber: Number(value.stampNumber) } : {}),
+      ...(Number.isInteger(value?.completedAt) ? { completedAt: Number(value.completedAt) } : {}),
+    };
+  } catch { return { confirmations: [] }; }
+}
+
 function checkInRadiusMeters(place: { type: string; description?: string | null }): number {
   const description = place.description?.toLocaleLowerCase("vi") ?? "";
   if (["park", "theme_park"].includes(place.type) || /công viên|trung tâm mua sắm/.test(description)) return 500;
@@ -313,6 +345,7 @@ function publicSession(row: SessionRow) {
   const tear = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTear(row.result_json) : null;
   const travel = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagTravel(row.result_json) : null;
   const checkIn = row.feature === "blind_bag" && row.status === "active" ? storedBlindBagCheckIn(row.result_json) : null;
+  const completion = row.feature === "blind_bag" ? storedBlindBagCompletion(row.result_json) : null;
   const origin = (payload.conditions as BlindBagConditions | undefined)?.origin;
   const selected = tear?.progress === 100 && origin?.kind === "current"
     ? placeCatalog.places.find((place) => place.id === tear.selectedPlaceId) : undefined;
@@ -339,6 +372,14 @@ function publicSession(row: SessionRow) {
       openingHours: place.openingHours, challenge: challenge?.text ?? null } } : {}),
     ...(travel ? { travel } : {}),
     ...(checkIn ? { checkIn } : {}),
+    ...(completion?.confirmations.length || completion?.stampId ? { completion: {
+      confirmedUserIds: completion.confirmations.map((item) => item.userId),
+      ...(completion.challengeOutcome ? { challengeOutcome: completion.challengeOutcome } : {}),
+      ...(completion.visitId ? { visitId: completion.visitId } : {}),
+      ...(completion.stampId ? { stampId: completion.stampId } : {}),
+      ...(completion.stampNumber ? { stampNumber: completion.stampNumber } : {}),
+      ...(completion.completedAt ? { completedAt: completion.completedAt } : {}),
+    } } : {}),
     expiresAt: row.expires_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -1159,6 +1200,121 @@ async function blindBagCheckIn(request: Request, env: SessionEnv, userId: string
   return json({ session: publicSession(updated!) }, 201);
 }
 
+async function blindBagComplete(request: Request, env: SessionEnv, userId: string, spaceId: string,
+  sessionId: string): Promise<Response> {
+  const current = await env.DB.prepare(`${selectSession} WHERE id = ? AND couple_space_id = ?`)
+    .bind(sessionId, spaceId).first<SessionRow>();
+  if (!current || current.feature !== "blind_bag") return json({ error: "Không tìm thấy phiên." }, 404);
+  if (request.method === "GET") return json({ session: publicSession(current) });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const input = await body(request);
+  const expectedVersion = input?.expectedVersion;
+  const idempotencyKey = input?.idempotencyKey;
+  const challengeOutcome = input?.challengeOutcome;
+  if (!Number.isInteger(expectedVersion) || typeof idempotencyKey !== "string" || !commandPattern.test(idempotencyKey)
+    || !["completed", "skipped"].includes(String(challengeOutcome))) {
+    return json({ error: "Lệnh hoàn tất chuyến đi không hợp lệ." }, 400);
+  }
+  const inputJson = JSON.stringify({ challengeOutcome });
+  const previous = await env.DB.prepare(`SELECT session_id, actor_user_id, action, input_json FROM activity_session_events
+    WHERE couple_space_id = ? AND idempotency_key = ?`).bind(spaceId, idempotencyKey)
+    .first<{ session_id: string; actor_user_id: string; action: string; input_json: string }>();
+  if (previous) return previous.session_id === sessionId && previous.actor_user_id === userId
+    && previous.action === "complete" && previous.input_json === inputJson
+    ? json({ session: publicSession(current), duplicate: true })
+    : json({ error: "Idempotency key đã được dùng cho lệnh khác." }, 409);
+  if (current.status !== "active") return json({ error: "Chuyến đi này đã được khép lại." }, 409);
+  if (current.version !== expectedVersion) return json({ error: "Phiên đã thay đổi.", session: publicSession(current) }, 409);
+  const checkIn = storedBlindBagCheckIn(current.result_json);
+  if (checkIn?.status !== "confirmed" || checkIn.confirmedUserIds.length !== 2) {
+    return json({ error: "Cần cả hai check-in trước khi hoàn tất chuyến đi." }, 409);
+  }
+  const media = await env.DB.prepare(`${selectBlindBagMedia} WHERE session_id = ? AND couple_space_id = ? ORDER BY created_at, id`)
+    .bind(sessionId, spaceId).all<BlindBagMediaRow>();
+  const photos = media.results ?? [];
+  if (!photos.length) return json({ error: "Cần ít nhất một ảnh kỷ niệm trước khi hoàn tất." }, 409);
+
+  const completion = storedBlindBagCompletion(current.result_json);
+  if (completion.confirmations.some((item) => item.userId === userId)) {
+    return json({ error: "Mình đã chốt thử thách rồi, hãy chờ người kia nhé." }, 409);
+  }
+  completion.confirmations.push({ userId, outcome: challengeOutcome as BlindBagChallengeOutcome });
+  const now = Math.floor(Date.now() / 1000);
+  const baseResult = JSON.parse(current.result_json ?? "{}") as Record<string, unknown>;
+  if (completion.confirmations.length < 2) {
+    const result = { ...baseResult, blindBagCompletion: completion };
+    const results = await env.DB.batch([
+      env.DB.prepare(`UPDATE activity_sessions SET version = version + 1, result_json = ?, updated_at = ?
+        WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+        .bind(JSON.stringify(result), now, sessionId, spaceId, current.version),
+      env.DB.prepare(`INSERT INTO activity_session_events
+        (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version, input_json)
+        SELECT ?, ?, ?, ?, 'complete', 'active', 'active', ?, ? WHERE changes() = 1`)
+        .bind(idempotencyKey, sessionId, spaceId, userId, current.version + 1, inputJson),
+    ]);
+    if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+    const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+    return json({ session: publicSession(updated!) }, 201);
+  }
+
+  const tear = storedBlindBagTear(current.result_json);
+  const selected = placeCatalog.places.find((item) => item.id === tear.selectedPlaceId) as CuratedPlace | undefined;
+  const challenge = placeChallenges.challenges.find((item) => item.id === tear.selectedChallengeId);
+  if (!selected || !challenge) return json({ error: "Thiếu địa điểm hoặc thử thách để lưu chuyến đi." }, 409);
+  const existingPlace = await env.DB.prepare(`SELECT id FROM places
+    WHERE couple_space_id = ? AND provider = 'curated' AND provider_place_id = ?`)
+    .bind(spaceId, selected.id).first<{ id: string }>();
+  const placeId = existingPlace?.id ?? crypto.randomUUID();
+  const visitId = crypto.randomUUID();
+  const stampId = crypto.randomUUID();
+  const lastStamp = await env.DB.prepare(`SELECT max(sequence_number) AS sequence_number FROM stamps WHERE couple_space_id = ?`)
+    .bind(spaceId).first<{ sequence_number: number | null }>();
+  const stampNumber = (lastStamp?.sequence_number ?? 0) + 1;
+  completion.challengeOutcome = completion.confirmations.every((item) => item.outcome === "completed") ? "completed" : "skipped";
+  Object.assign(completion, { placeId, visitId, stampId, stampNumber, completedAt: now });
+  const resultJson = JSON.stringify({ ...baseResult, blindBagCompletion: completion });
+  const statements = [
+    env.DB.prepare(`UPDATE activity_sessions SET status = 'completed', version = version + 1, result_json = ?,
+      expires_at = NULL, completed_at = ?, updated_at = ?
+      WHERE id = ? AND couple_space_id = ? AND version = ? AND status = 'active'`)
+      .bind(resultJson, now, now, sessionId, spaceId, current.version),
+    env.DB.prepare(`INSERT INTO places
+      (id, couple_space_id, provider, provider_place_id, name, type, address, latitude, longitude,
+       cover_media_id, visit_count, latest_visit_at, created_at, updated_at)
+      VALUES (?, ?, 'curated', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      ON CONFLICT (couple_space_id, provider, provider_place_id) DO UPDATE SET
+        name = excluded.name, type = excluded.type, address = excluded.address,
+        latitude = excluded.latitude, longitude = excluded.longitude, cover_media_id = excluded.cover_media_id,
+        visit_count = places.visit_count + 1, latest_visit_at = excluded.latest_visit_at, updated_at = excluded.updated_at`)
+      .bind(placeId, spaceId, selected.id, selected.name, selected.type, selected.address, selected.latitude,
+        selected.longitude, photos[0].id, now, now, now),
+    env.DB.prepare(`INSERT INTO visits
+      (id, place_id, couple_space_id, session_id, visited_at, source, added_by_user_id, check_in_method,
+       challenge_id, challenge_text, challenge_outcome)
+      VALUES (?, (SELECT id FROM places WHERE couple_space_id = ? AND provider = 'curated' AND provider_place_id = ?),
+        ?, ?, ?, 'blind_bag', ?, ?, ?, ?, ?)`)
+      .bind(visitId, spaceId, selected.id, spaceId, sessionId, now, userId, checkIn.method,
+        challenge.id, challenge.text, completion.challengeOutcome),
+    ...photos.map((photo, index) => env.DB.prepare(`INSERT INTO visit_photos (visit_id, media_id, sort_order) VALUES (?, ?, ?)`)
+      .bind(visitId, photo.id, index)),
+    env.DB.prepare(`INSERT INTO stamps
+      (id, couple_space_id, visit_id, session_id, sequence_number, place_type, place_name, stamped_at,
+       bag_color, photo_media_id, challenge_id, challenge_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'plum', ?, ?, ?)`)
+      .bind(stampId, spaceId, visitId, sessionId, stampNumber, selected.type, selected.name, now,
+        photos[0].id, challenge.id, challenge.text),
+    env.DB.prepare(`INSERT INTO activity_session_events
+      (idempotency_key, session_id, couple_space_id, actor_user_id, action, from_status, to_status, version, input_json)
+      SELECT ?, ?, ?, ?, 'complete', 'active', 'completed', ?, ? WHERE changes() = 1`)
+      .bind(idempotencyKey, sessionId, spaceId, userId, current.version + 1, inputJson),
+  ];
+  const results = await env.DB.batch(statements);
+  if (results[0].meta.changes !== 1) return json({ error: "Phiên đã thay đổi." }, 409);
+  const updated = await env.DB.prepare(`${selectSession} WHERE id = ?`).bind(sessionId).first<SessionRow>();
+  return json({ session: publicSession(updated!) }, 201);
+}
+
 function publicDeepTalkDeck(row: DeepTalkDeckRow) {
   return { id: row.id, sessionId: row.session_id, cardCount: 20, createdAt: row.created_at };
 }
@@ -1526,8 +1682,7 @@ function transition(row: SessionRow, action: Action, actorId: string): Status | 
   if (row.status === "pending" && row.feature === "blind_bag" && action === "decline"
     && !storedBlindBagConfirmation(row.result_json)?.confirmedUserIds.includes(actorId)) return "declined";
   if (action === "cancel" && (row.status === "active" || (row.status === "pending" && actorId === row.created_by_user_id))) return "cancelled";
-  if (action === "complete" && row.status === "active" && row.feature !== "food_vote"
-    && (row.feature !== "blind_bag" || storedBlindBagTear(row.result_json).progress === 100)) return "completed";
+  if (action === "complete" && row.status === "active" && row.feature === "deep_talk") return "completed";
   return null;
 }
 
@@ -1623,6 +1778,9 @@ export async function handleSessions(request: Request, env: SessionEnv): Promise
   }
   if (parts.length === 4 && parts[3] === "blind-bag-check-in") {
     return blindBagCheckIn(request, env, userId, spaceId, sessionId);
+  }
+  if (parts.length === 4 && parts[3] === "blind-bag-complete") {
+    return blindBagComplete(request, env, userId, spaceId, sessionId);
   }
   if (parts.length === 4 && parts[3] === "media") {
     return blindBagMedia(request, env, userId, spaceId, sessionId);

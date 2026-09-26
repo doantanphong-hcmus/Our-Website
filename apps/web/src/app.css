@@ -1306,6 +1306,8 @@ main {
 .blind-bag-media__pickers input { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
 .blind-bag-media progress { inline-size: 100%; accent-color: #f1d6a6; }
 .blind-bag-media__note { color: #dfc5e2; font-size: var(--font-small); }
+.blind-bag-complete { display: grid; gap: var(--space-3); margin-block-start: var(--space-3); padding: var(--space-4); border-radius: 1rem; background: rgb(241 214 166 / 12%); }
+.blind-bag-completed { display: grid; place-content: center; min-block-size: 60dvh; text-align: center; }
 
 @keyframes blind-bag-result-in { from { opacity: 0; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }
 

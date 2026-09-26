@@ -14,7 +14,7 @@ type CandidateSufficiency = {
 };
 type BlindBagSession = {
   id: string;
-  status: "pending" | "active";
+  status: "pending" | "active" | "completed";
   createdByUserId: string;
   version: number;
   conditions: Conditions;
@@ -28,6 +28,8 @@ type BlindBagSession = {
   checkIn?: { status: "awaiting_partner" | "confirmed"; method: "gps" | "manual"; radiusMeters: number;
     startedByUserId: string; startedAt: number; confirmedUserIds: string[]; confirmedAt?: number;
     manualReason?: "gps_unavailable" | "gps_uncertain" };
+  completion?: { confirmedUserIds: string[]; challengeOutcome?: "completed" | "skipped";
+    visitId?: string; stampId?: string; stampNumber?: number; completedAt?: number };
   candidateSufficiency?: CandidateSufficiency;
 };
 type PrivateMedia = { id: string; url: string; mimeType: string; byteSize: number; width: number; height: number; createdAt: number };
@@ -147,7 +149,9 @@ function BlindBagCheckIn({ sessionId, version, userId, checkIn, onUpdate }: { se
   </section>;
 }
 
-function BlindBagMedia({ sessionId }: { sessionId: string }) {
+function BlindBagMedia({ sessionId, version, userId, completion, onUpdate, onCompleted }: { sessionId: string; version: number;
+  userId: string; completion?: BlindBagSession["completion"]; onUpdate: (session: BlindBagSession) => void;
+  onCompleted: (completion: NonNullable<BlindBagSession["completion"]>) => void }) {
   const [media, setMedia] = useState<PrivateMedia[]>([]);
   const [draft, setDraft] = useState<{ blob: Blob; url: string; uploadId: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -196,6 +200,23 @@ function BlindBagMedia({ sessionId }: { sessionId: string }) {
     } finally { setBusy(false); }
   }
 
+  async function complete(challengeOutcome: "completed" | "skipped") {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/blind-bag-complete`, {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeOutcome, expectedVersion: version, idempotencyKey: crypto.randomUUID() }),
+      });
+      const data = await response.json() as { session?: BlindBagSession; error?: string };
+      if (!response.ok || !data.session) throw new Error(data.error ?? "Chưa thể hoàn tất chuyến đi.");
+      if (data.session.status === "completed" && data.session.completion) onCompleted(data.session.completion);
+      else onUpdate(data.session);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Chưa thể hoàn tất chuyến đi.");
+    } finally { setBusy(false); }
+  }
+
   return <section className="blind-bag-media" aria-labelledby="blind-bag-media-title">
     <h3 id="blind-bag-media-title">Ảnh kỷ niệm</h3>
     {media.length > 0 && <div className="blind-bag-media__gallery">{media.map((item, index) =>
@@ -212,13 +233,24 @@ function BlindBagMedia({ sessionId }: { sessionId: string }) {
       <label className="button secondary-button">Chọn từ thư viện<input type="file" accept="image/*" disabled={busy} onChange={(event) => { void choose(event.target.files?.[0]); event.target.value = ""; }} /></label>
     </div>}
     <p className="blind-bag-media__note">Ảnh chỉ hai đứa mình xem được.</p>
+    {media.length > 0 && <div className="blind-bag-complete">
+      <h3>Khép lại chuyến đi</h3>
+      {completion?.confirmedUserIds.includes(userId) ? <p role="status">Đang chờ người kia chốt thử thách…</p> : <>
+        <p>Hai đứa đã làm thử thách nhỏ chứ?</p>
+        <div className="blind-bag-media__actions">
+          <button type="button" disabled={busy} onClick={() => void complete("completed")}>Đã hoàn thành</button>
+          <button type="button" className="secondary-button" disabled={busy} onClick={() => void complete("skipped")}>Bỏ qua thử thách</button>
+        </div>
+      </>}
+    </div>}
     {error && <p role="alert">{error}</p>}
   </section>;
 }
 
-function ResultCard({ sessionId, version, result, userId, reroll, travel, checkIn, onUpdate, onAccept, onReport, onReroll }: { sessionId: string; version: number; result: NonNullable<BlindBagSession["result"]>;
+function ResultCard({ sessionId, version, result, userId, reroll, travel, checkIn, completion, onUpdate, onCompleted, onAccept, onReport, onReroll }: { sessionId: string; version: number; result: NonNullable<BlindBagSession["result"]>;
   userId: string; reroll: NonNullable<BlindBagSession["tear"]>["reroll"];
-  travel?: BlindBagSession["travel"]; checkIn?: BlindBagSession["checkIn"]; onUpdate: (session: BlindBagSession) => void; onAccept: () => Promise<void>;
+  travel?: BlindBagSession["travel"]; checkIn?: BlindBagSession["checkIn"]; completion?: BlindBagSession["completion"];
+  onUpdate: (session: BlindBagSession) => void; onCompleted: (completion: NonNullable<BlindBagSession["completion"]>) => void; onAccept: () => Promise<void>;
   onReport: (reason: string) => Promise<void>; onReroll: (reason: "change" | "reject") => Promise<void> }) {
   const [reportStatus, setReportStatus] = useState("");
   const [reporting, setReporting] = useState(false);
@@ -252,7 +284,8 @@ function ResultCard({ sessionId, version, result, userId, reroll, travel, checkI
     {result.challenge && <section className="blind-bag-result__challenge"><h3>Thử thách nhỏ</h3><p>{result.challenge}</p></section>}
     <a className="button blind-bag-result__maps" href={maps.href} target="_blank" rel="noopener noreferrer">Mở Google Maps</a>
     {travel && <BlindBagCheckIn sessionId={sessionId} version={version} userId={userId} checkIn={checkIn} onUpdate={onUpdate} />}
-    {checkIn?.status === "confirmed" && <BlindBagMedia sessionId={sessionId} />}
+    {checkIn?.status === "confirmed" && <BlindBagMedia sessionId={sessionId} version={version} userId={userId}
+      completion={completion} onUpdate={onUpdate} onCompleted={onCompleted} />}
     {!travel && <><button type="button" className="blind-bag-result__accept" disabled={accepting} onClick={async () => {
       setAccepting(true);
       try { await onAccept(); setReportStatus(navigator.onLine ? "Đang xác nhận kèo…" : "Đã lưu. Kèo sẽ được xác nhận khi có mạng."); }
@@ -322,6 +355,7 @@ function Sufficiency({ value }: { value: CandidateSufficiency }) {
 
 export function BlindBagForm({ user }: { user: User }) {
   const [session, setSession] = useState<BlindBagSession | null | undefined>();
+  const [completed, setCompleted] = useState<NonNullable<BlindBagSession["completion"]> | null>(null);
   const [editing, setEditing] = useState(false);
   const [distance, setDistance] = useState("under_3");
   const [budget, setBudget] = useState("any");
@@ -387,6 +421,7 @@ export function BlindBagForm({ user }: { user: User }) {
           const event = JSON.parse(String(data)) as { type?: string; session?: BlindBagSession & { feature?: string }; sessions?: unknown[] };
           if (event.type === "session.snapshot") setSession(activeBlindBag(event));
           if (event.type === "session.updated" && event.session?.feature === "blind_bag") {
+            if (event.session.status === "completed" && event.session.completion) setCompleted(event.session.completion);
             setSession(["pending", "active"].includes(event.session.status) ? event.session : null);
           }
         } catch { /* ignore malformed realtime messages */ }
@@ -575,6 +610,12 @@ export function BlindBagForm({ user }: { user: User }) {
 
   if (session === undefined) return <section className="blind-bag-form" aria-busy="true"><p>Đang mở túi mù…</p></section>;
 
+  if (completed) return <section className="blind-bag-form blind-bag-completed" role="status" aria-labelledby="page-title">
+    <p className="eyebrow">Xé Túi Mù</p>
+    <h1 id="page-title">Chuyến đi đã được cất vào kỷ niệm</h1>
+    <p>Địa điểm, ảnh và thử thách đã được lưu. Hai đứa vừa nhận con dấu số {completed.stampNumber}.</p>
+  </section>;
+
   const confirmedUserIds = session?.confirmation?.confirmedUserIds ?? (session ? [session.createdByUserId] : []);
   const confirmedByMe = confirmedUserIds.includes(user.id);
   if (session && !editing) return <section className="blind-bag-form" aria-labelledby="page-title">
@@ -596,7 +637,8 @@ export function BlindBagForm({ user }: { user: User }) {
       {readyCount === 2 && session.conditions.origin.kind === "current" && <button type="button" onClick={() => setStageDismissed(false)}>{session.travel ? "Xem điểm đến" : "Xem túi mù"}</button>}
       <dialog ref={stage} className="blind-bag-stage" aria-label="Xé Túi Mù" onClose={() => setStageDismissed(true)}>
         <button type="button" className="blind-bag-stage__close" aria-label="Đóng màn xé túi" onClick={() => stage.current?.close()}>×</button>
-        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} sessionId={session.id} version={session.version} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel} checkIn={session.checkIn} onUpdate={setSession}
+        {session.tear?.phase === "torn" && session.result ? <ResultCard key={session.result.name} sessionId={session.id} version={session.version} result={session.result} userId={user.id} reroll={session.tear.reroll} travel={session.travel} checkIn={session.checkIn} completion={session.completion} onUpdate={setSession}
+          onCompleted={(value) => { stage.current?.close(); setCompleted(value); setSession(null); }}
           onAccept={acceptPlace} onReport={reportPlace} onReroll={async (reason) => { await tearCommand("reroll", session.version, undefined, reason); }} /> : <div className="blind-bag-stage__scene" style={{ "--rip-length": `${session.tear?.phase === "waiting" ? dragProgress : session.tear?.progress ?? 0}%` } as CSSProperties}>
           <p className="blind-bag-stage__eyebrow">Một chuyến đi bí mật</p>
           <div className="blind-bag-stage__bag">

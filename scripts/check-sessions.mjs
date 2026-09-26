@@ -367,8 +367,38 @@ try {
   assert.equal(privatePhoto.headers.get("cache-control"), "private, no-store");
   assert.deepEqual(Buffer.from(await privatePhoto.arrayBuffer()), samplePhoto);
   assert.equal((await request(`${mediaPath}/00000000-0000-4000-8000-000000000099`, phong)).response.status, 404);
-  assert.equal((await act(phong, bagId, "complete", 15, "complete-ready-bag")).data.session.status, "completed");
-
+  const completePath = `/api/sessions/${bagId}/blind-bag-complete`;
+  const firstCompletion = await request(completePath, phong, "POST", {
+    challengeOutcome: "completed", expectedVersion: 15, idempotencyKey: "complete-ready-bag-phong",
+  });
+  assert.equal(firstCompletion.response.status, 201);
+  assert.equal(firstCompletion.data.session.status, "active");
+  assert.deepEqual(firstCompletion.data.session.completion.confirmedUserIds, ["user-phong"]);
+  const finalAttempts = await Promise.all([
+    request(completePath, nhi, "POST", {
+      challengeOutcome: "skipped", expectedVersion: 16, idempotencyKey: "complete-ready-bag-nhi-1",
+    }),
+    request(completePath, nhi, "POST", {
+      challengeOutcome: "skipped", expectedVersion: 16, idempotencyKey: "complete-ready-bag-nhi-2",
+    }),
+  ]);
+  assert.deepEqual(finalAttempts.map((item) => item.response.status).sort(), [201, 409],
+    "double tap must complete exactly once");
+  const completedBag = finalAttempts.find((item) => item.response.status === 201);
+  assert.equal(completedBag.data.session.status, "completed");
+  assert.equal(completedBag.data.session.completion.challengeOutcome, "skipped");
+  assert.match(completedBag.data.session.completion.visitId, /^[0-9a-f-]{36}$/i);
+  assert.match(completedBag.data.session.completion.stampId, /^[0-9a-f-]{36}$/i);
+  assert.equal(completedBag.data.session.completion.stampNumber, 1);
+  const replayedCompletion = await request(completePath, nhi, "POST", {
+    challengeOutcome: "skipped", expectedVersion: 16,
+    idempotencyKey: finalAttempts[0].response.status === 201 ? "complete-ready-bag-nhi-1" : "complete-ready-bag-nhi-2",
+  });
+  assert.equal(replayedCompletion.data.duplicate, true);
+  assert.equal(replayedCompletion.data.session.completion.visitId, completedBag.data.session.completion.visitId,
+    "completion retry must not duplicate the visit");
+  assert.equal(replayedCompletion.data.session.completion.stampId, completedBag.data.session.completion.stampId,
+    "completion retry must not duplicate the stamp");
   const declinedSession = await request("/api/sessions", nhi, "POST", {
     feature: "blind_bag", idempotencyKey: "create-decline-001",
     conditions: { ...blindBagConditions, origin: { kind: "current", latitude: 10.7769, longitude: 106.7009, accuracyMeters: 25 } },
@@ -627,7 +657,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.17/P3.2-P4.15 sessions: private media, GPS/manual check-in and idempotency = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15 sessions: check-in, media and atomic completion = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
