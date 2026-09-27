@@ -1,0 +1,13 @@
+{
+  "name": "@our-website/claw-physics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "matter-js": "0.20.0"
+  },
+  "devDependencies": {
+    "@types/matter-js": "0.20.2"
+  }
+}
