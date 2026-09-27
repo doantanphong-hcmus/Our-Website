@@ -286,6 +286,11 @@ button:disabled {
 .star-feedback { margin: 0; color: var(--color-success); }
 .star-feedback--error { color: var(--color-danger); }
 .star-history h3 { margin-block-end: var(--space-3); }
+.star-rewards { margin-block-start: var(--space-6); }
+.star-rewards ul { display: grid; gap: var(--space-2); padding: 0; list-style: none; }
+.star-rewards li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-medium); background: var(--color-surface-muted); }
+.star-rewards li span { display: grid; gap: 0.15rem; }
+.star-rewards li button { flex: none; padding-inline: var(--space-3); font-size: var(--font-small); }
 .star-history ul { display: grid; gap: var(--space-2); padding: 0; list-style: none; }
 .star-history li { display: flex; justify-content: space-between; gap: var(--space-3); padding-block: var(--space-3); border-block-end: 1px solid var(--color-border); }
 .star-history li span { display: grid; gap: 0.2rem; }

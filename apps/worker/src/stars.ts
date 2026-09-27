@@ -3,6 +3,7 @@ import catalog from "../../../content/english-stars.v1.json";
 
 interface StarsEnv { DB: D1Database; AUTH_PEPPER: string }
 type Activity = (typeof catalog.activities)[number];
+type Reward = (typeof catalog.rewards)[number];
 type TransactionRow = {
   id: string; kind: "award" | "redeem" | "adjustment"; delta: number; balance_after: number;
   rule_id: string; label_snapshot: string; note: string | null; created_at: number;
@@ -47,7 +48,7 @@ async function award(request: Request, env: StarsEnv, auth: NonNullable<Awaited<
     FROM star_transactions WHERE couple_space_id = ? AND idempotency_key = ?`)
     .bind(auth.user.couple_space_id, key).first<TransactionRow>();
   if (existing) {
-    if (existing.rule_id !== activity.id || existing.delta !== points || existing.note !== note) {
+    if (existing.kind !== "award" || existing.rule_id !== activity.id || existing.delta !== points || existing.note !== note) {
       return json({ error: "Mã thao tác đã được dùng cho một lần tặng khác." }, 409);
     }
     return json({ wallet: await wallet(env, auth.user.couple_space_id), transaction: transaction(existing), duplicate: true });
@@ -81,6 +82,44 @@ async function award(request: Request, env: StarsEnv, auth: NonNullable<Awaited<
   return json({ wallet: await wallet(env, auth.user.couple_space_id), transaction: transaction(created) }, 201);
 }
 
+async function redeem(request: Request, env: StarsEnv, auth: NonNullable<Awaited<ReturnType<typeof authenticatedUser>>>) {
+  const body = await request.json<Record<string, unknown>>().catch(() => null);
+  if (auth.user.role !== "boyfriend") return json({ error: "Chỉ Nam mới có thể ghi nhận đổi thưởng." }, 403);
+  const reward = catalog.rewards.find((item) => item.id === body?.rewardId) as Reward | undefined;
+  const key = typeof body?.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
+  if (!reward || !/^[A-Za-z0-9_-]{8,100}$/.test(key)) return json({ error: "Phần thưởng hoặc mã thao tác không hợp lệ." }, 400);
+
+  const existing = await env.DB.prepare(`SELECT id, kind, delta, balance_after, rule_id, label_snapshot, note, created_at
+    FROM star_transactions WHERE couple_space_id = ? AND idempotency_key = ?`)
+    .bind(auth.user.couple_space_id, key).first<TransactionRow>();
+  if (existing) {
+    if (existing.kind !== "redeem" || existing.rule_id !== reward.id || existing.delta !== -reward.cost) {
+      return json({ error: "Mã thao tác đã được dùng cho một giao dịch khác." }, 409);
+    }
+    return json({ wallet: await wallet(env, auth.user.couple_space_id), transaction: transaction(existing), duplicate: true });
+  }
+
+  const current = await env.DB.prepare("SELECT balance FROM star_wallets WHERE couple_space_id = ?")
+    .bind(auth.user.couple_space_id).first<{ balance: number }>();
+  if (!current || current.balance < reward.cost) return json({ error: "Ví chưa đủ sao để đổi phần thưởng này." }, 409);
+  const next = current.balance - reward.cost;
+  const id = crypto.randomUUID();
+  const now = Math.floor(Date.now() / 1000);
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE star_wallets SET balance = ?, updated_at = ?
+      WHERE couple_space_id = ? AND balance = ? AND balance >= ?`)
+      .bind(next, now, auth.user.couple_space_id, current.balance, reward.cost),
+    env.DB.prepare(`INSERT INTO star_transactions
+      (id, couple_space_id, actor_user_id, idempotency_key, kind, delta, balance_after, rule_id, label_snapshot, created_at)
+      SELECT ?, ?, ?, ?, 'redeem', ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(id, auth.user.couple_space_id, auth.user.id, key, -reward.cost, next, reward.id, reward.label, now),
+  ]);
+  if (results[1].meta.changes !== 1) return json({ error: "Số dư vừa thay đổi, vui lòng thử lại." }, 409);
+  const created: TransactionRow = { id, kind: "redeem", delta: -reward.cost, balance_after: next,
+    rule_id: reward.id, label_snapshot: reward.label, note: null, created_at: now };
+  return json({ wallet: await wallet(env, auth.user.couple_space_id), transaction: transaction(created) }, 201);
+}
+
 async function claimCelebrations(request: Request, env: StarsEnv, auth: NonNullable<Awaited<ReturnType<typeof authenticatedUser>>>) {
   await request.arrayBuffer();
   if (auth.user.role !== "girlfriend") return json({ error: "Chỉ Nhi mới nhận lời chúc này." }, 403);
@@ -102,6 +141,7 @@ export async function handleStars(request: Request, env: StarsEnv): Promise<Resp
   const path = new URL(request.url).pathname;
   if (path === "/api/stars" && request.method === "GET") return json({ wallet: await wallet(env, auth.user.couple_space_id) });
   if (path === "/api/stars/award" && request.method === "POST") return award(request, env, auth);
+  if (path === "/api/stars/redeem" && request.method === "POST") return redeem(request, env, auth);
   if (path === "/api/stars/celebrations/claim" && request.method === "POST") return claimCelebrations(request, env, auth);
   return json({ error: "Không tìm thấy." }, 404);
 }

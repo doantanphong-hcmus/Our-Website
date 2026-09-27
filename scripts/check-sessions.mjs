@@ -139,6 +139,7 @@ try {
   assert.equal(emptyWallet.response.status, 200);
   assert.equal(emptyWallet.data.wallet.balance, 0);
   assert.equal(emptyWallet.data.wallet.activities.length, 8);
+  assert.equal(emptyWallet.data.wallet.rewards.length, 7);
   assert.equal((await request("/api/stars/award", nhi, "POST", {
     activityId: "listening", idempotencyKey: "nhi-cannot-award-01",
   })).response.status, 403);
@@ -166,6 +167,30 @@ try {
   assert.deepEqual((await request("/api/stars/celebrations/claim", nhi, "POST")).data.celebrations, [],
     "reload must not replay a claimed celebration");
   assert.equal((await request("/api/stars", nhi)).data.wallet.transactions.length, 1);
+  assert.equal((await request("/api/stars/redeem", nhi, "POST", {
+    rewardId: "snack", idempotencyKey: "nhi-cannot-redeem-01",
+  })).response.status, 403);
+  assert.equal((await request("/api/stars/redeem", phong, "POST", {
+    rewardId: "snack", idempotencyKey: "insufficient-stars-01",
+  })).response.status, 409);
+  const specialAward = await request("/api/stars/award", phong, "POST", {
+    activityId: "special", points: 100, note: "Thưởng để kiểm tra đổi quà", idempotencyKey: "award-special-redeem-01",
+  });
+  assert.equal(specialAward.data.wallet.balance, 110);
+  const redemptions = await Promise.all([
+    request("/api/stars/redeem", phong, "POST", { rewardId: "snack", idempotencyKey: "redeem-snack-double-01" }),
+    request("/api/stars/redeem", phong, "POST", { rewardId: "snack", idempotencyKey: "redeem-snack-double-01" }),
+  ]);
+  assert.deepEqual(redemptions.map((item) => item.response.status).sort(), [200, 201]);
+  assert.equal(redemptions[0].data.wallet.balance, 80);
+  assert.equal(redemptions[1].data.wallet.balance, 80);
+  assert.equal(redemptions.filter((item) => item.data.duplicate).length, 1);
+  assert.equal((await request("/api/stars/redeem", phong, "POST", {
+    rewardId: "vietnam_trip", idempotencyKey: "insufficient-trip-01",
+  })).response.status, 409);
+  const redeemedWallet = (await request("/api/stars", nhi)).data.wallet;
+  assert.equal(redeemedWallet.balance, 80);
+  assert.deepEqual(redeemedWallet.transactions.map((item) => item.delta), [-30, 100, 10]);
 
   const replayedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong, "POST", {
     expectedVersion: 1, idempotencyKey: "history-deck-key-1",
@@ -689,7 +714,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2 sessions: stars, check-in, media and completion = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3 sessions: stars, check-in, media and completion = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

@@ -3,8 +3,9 @@ import { createPortal } from "react-dom";
 import type { User } from "./user";
 
 type Activity = { id: string; label: string; condition: string; points?: number; minimumPoints?: number; maximumPoints?: number };
+type Reward = { id: string; label: string; cost: number };
 type StarTransaction = { id: string; kind: string; delta: number; balanceAfter: number; label: string; note: string | null; createdAt: number };
-type Wallet = { balance: number; updatedAt: number; activities: Activity[]; transactions: StarTransaction[] };
+type Wallet = { balance: number; updatedAt: number; activities: Activity[]; rewards: Reward[]; transactions: StarTransaction[] };
 
 async function payloadFrom(response: Response) {
   const payload = await response.json().catch(() => null) as { error?: string; wallet?: Wallet; celebrations?: StarTransaction[] } | null;
@@ -23,6 +24,7 @@ export function Stars({ user }: { user: User }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const retry = useRef({ fingerprint: "", key: "" });
+  const redeemRetry = useRef({ rewardId: "", key: "" });
 
   async function loadWallet() {
     const response = await fetch("/api/stars", { credentials: "same-origin" });
@@ -83,6 +85,21 @@ export function Stars({ user }: { user: User }) {
     finally { setPending(false); }
   }
 
+  async function redeem(reward: Reward) {
+    if (redeemRetry.current.rewardId !== reward.id) redeemRetry.current = { rewardId: reward.id, key: crypto.randomUUID() };
+    setPending(true); setMessage(""); setError("");
+    try {
+      const response = await fetch("/api/stars/redeem", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rewardId: reward.id, idempotencyKey: redeemRetry.current.key }) });
+      const payload = await payloadFrom(response);
+      if (payload?.wallet) setWallet(payload.wallet);
+      redeemRetry.current = { rewardId: "", key: "" };
+      setMessage(`Đã ghi nhận đổi “${reward.label}”.`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể đổi thưởng."); }
+    finally { setPending(false); }
+  }
+
   return <>
     <button className="star-wallet-button" type="button" onClick={() => setOpen(true)}
       aria-label={user.role === "boyfriend" ? "Mở phần tặng sao" : `Ví có ${wallet?.balance ?? 0} sao`}>
@@ -105,13 +122,26 @@ export function Stars({ user }: { user: User }) {
           {message && <p className="star-feedback" role="status">{message}</p>}
           {error && <p className="star-feedback star-feedback--error" role="alert">{error}</p>}
           <button type="submit" disabled={pending || !wallet}>{pending ? "Đang tặng…" : "Tặng sao"}</button>
-        </form> : <div className="star-history">
+        </form> : null}
+        <div className="star-rewards">
+          <h3>Bảng đổi thưởng</h3>
+          <ul>{wallet?.rewards.map((reward) => {
+            const shortfall = Math.max(0, reward.cost - wallet.balance);
+            return <li key={reward.id}>
+              <span><strong>{reward.cost} ⭐</strong>{reward.label}</span>
+              {user.role === "boyfriend" && <button type="button" disabled={pending || shortfall > 0} onClick={() => void redeem(reward)}>
+                {shortfall ? `Thiếu ${shortfall} ⭐` : "Ghi nhận đổi"}
+              </button>}
+            </li>;
+          })}</ul>
+        </div>
+        {user.role === "girlfriend" ? <div className="star-history">
           <h3>Lịch sử gần đây</h3>
           {wallet?.transactions.length ? <ul>{wallet.transactions.map((item) => <li key={item.id}>
-            <span><strong>{item.label}</strong>{item.note && <small>{item.note}</small>}</span><b>+{item.delta} ⭐</b>
+            <span><strong>{item.label}</strong>{item.note && <small>{item.note}</small>}</span><b>{item.delta > 0 ? "+" : ""}{item.delta} ⭐</b>
           </li>)}</ul> : <p>Chưa có sao nào. Mình bắt đầu từ hôm nay nhé!</p>}
           {error && <p className="star-feedback star-feedback--error" role="alert">{error}</p>}
-        </div>}
+        </div> : null}
       </section>
     </div>, document.body)}
 
