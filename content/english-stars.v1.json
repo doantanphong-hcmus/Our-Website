@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "approval": {
+    "status": "approved",
+    "reviewedBy": "customer",
+    "reviewedAt": "2026-09-27"
+  },
+  "currency": {
+    "id": "star",
+    "label": "Ngôi sao",
+    "symbol": "⭐"
+  },
+  "activities": [
+    { "id": "listening", "label": "Luyện nghe", "condition": "Ít nhất 30 phút", "points": 10, "limit": "daily" },
+    { "id": "reading", "label": "Đọc bài", "condition": "Hoàn thành bài đọc trong ngày", "points": 5, "limit": "daily" },
+    { "id": "dictation", "label": "Nghe chép chính tả", "condition": "Hoàn thành một bài hoặc ít nhất 15 phút", "points": 10, "limit": "daily" },
+    { "id": "class", "label": "Tham gia buổi học", "condition": "Tham gia đầy đủ một buổi", "points": 20, "limit": "per_session" },
+    { "id": "test_8", "label": "Kiểm tra 8.0–8.9", "condition": "Một bài kiểm tra", "points": 25, "limit": "per_test" },
+    { "id": "test_9", "label": "Kiểm tra 9.0–9.4", "condition": "Một bài kiểm tra", "points": 35, "limit": "per_test" },
+    { "id": "test_95", "label": "Kiểm tra 9.5–10", "condition": "Một bài kiểm tra", "points": 50, "limit": "per_test" },
+    { "id": "special", "label": "Thưởng đặc biệt", "condition": "Nam nhập số sao và lý do", "minimumPoints": 1, "maximumPoints": 100, "limit": "manual" }
+  ],
+  "rewards": [
+    { "id": "snack", "label": "Một món ăn vặt bất kỳ", "cost": 30 },
+    { "id": "drink", "label": "Một món nước bất kỳ", "cost": 35 },
+    { "id": "jollibee", "label": "Đi ăn Jollibee", "cost": 80 },
+    { "id": "item_under_250k", "label": "Anh mua cho một món đồ bất kỳ trị giá dưới 250k", "cost": 100 },
+    { "id": "movie", "label": "Được anh bao đi coi một bộ phim bất kỳ", "cost": 150 },
+    { "id": "day_trip", "label": "Được anh bao đi chơi cả ngày ở địa điểm bất kỳ", "cost": 230 },
+    { "id": "vietnam_trip", "label": "Đi du lịch tại một địa điểm bất kỳ ở Việt Nam, anh lo chi phí", "cost": 1200 }
+  ]
+}

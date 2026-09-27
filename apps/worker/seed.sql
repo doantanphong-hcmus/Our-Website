@@ -15,3 +15,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO user_preferences (user_id)
 VALUES ('user-phong'), ('user-nhi')
 ON CONFLICT (user_id) DO NOTHING;
+
+INSERT INTO star_wallets (couple_space_id, beneficiary_user_id)
+SELECT couple_space_id, id FROM users WHERE role = 'girlfriend'
+ON CONFLICT (couple_space_id) DO NOTHING;

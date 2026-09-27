@@ -34,6 +34,12 @@ try {
   const rows = JSON.parse(output)[0].results[0];
   assert.deepEqual(rows, { users: 2, roles: 2, spaces: 1, preferences: 2 });
 
+  const walletOutput = run([
+    "d1", "execute", ...local, "--json", "--command",
+    "SELECT beneficiary_user_id, balance FROM star_wallets",
+  ]);
+  assert.deepEqual(JSON.parse(walletOutput)[0].results, [{ beneficiary_user_id: "user-nhi", balance: 0 }]);
+
   run([
     "d1", "execute", ...local, "--command",
     "INSERT INTO users (id,couple_space_id,username,password_hash,display_name,color,role) VALUES ('third','couple-main','third','!auth-not-configured','Third','#112233','boyfriend')",
@@ -48,7 +54,28 @@ try {
     "INSERT INTO activity_sessions (id,couple_space_id,feature,created_by_user_id,idempotency_key) VALUES ('two','couple-main','blind_bag','user-nhi','two')",
   ], true);
 
-  console.log("P1.4 D1 schema: migration, idempotent seed and constraints = OK");
+  run(["d1", "execute", ...local, "--command", `
+    UPDATE star_wallets SET balance=10, updated_at=unixepoch() WHERE couple_space_id='couple-main';
+    INSERT INTO star_transactions
+      (id,couple_space_id,actor_user_id,idempotency_key,kind,delta,balance_after,rule_id,label_snapshot)
+    VALUES ('stars-1','couple-main','user-phong','award-stars-001','award',10,10,'listening','Luyện nghe');`]);
+  run(["d1", "execute", ...local, "--command", `
+    INSERT INTO star_transactions
+      (id,couple_space_id,actor_user_id,idempotency_key,kind,delta,balance_after,rule_id,label_snapshot)
+    VALUES ('stars-2','couple-main','user-phong','award-stars-001','award',10,20,'reading','Đọc bài');`], true);
+  run(["d1", "execute", ...local, "--command", `
+    INSERT INTO star_transactions
+      (id,couple_space_id,actor_user_id,idempotency_key,kind,delta,balance_after,rule_id,label_snapshot)
+    VALUES ('stars-3','couple-main','user-phong','award-stars-002','award',-10,10,'listening','Luyện nghe');`], true);
+  run(["d1", "execute", ...local, "--command", `
+    INSERT INTO star_transactions
+      (id,couple_space_id,actor_user_id,idempotency_key,kind,delta,balance_after,rule_id,label_snapshot)
+    VALUES ('stars-4','couple-main','user-phong','award-stars-003','award',10,20,'listening','Luyện nghe');`], true);
+  run(["d1", "execute", ...local, "--command", "UPDATE star_transactions SET delta=20 WHERE id='stars-1'"], true);
+  run(["d1", "execute", ...local, "--command", "DELETE FROM star_transactions WHERE id='stars-1'"], true);
+  run(["d1", "execute", ...local, "--command", "UPDATE star_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
+
+  console.log("P1.4/E1.1 D1 schema: migration, idempotent seed, immutable star ledger and constraints = OK");
 } finally {
   await rm(state, { recursive: true, force: true });
 }
