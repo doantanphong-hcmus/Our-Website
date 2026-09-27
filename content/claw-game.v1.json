@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "language": "vi",
+  "approval": {
+    "status": "pending_owner_review",
+    "reviewedBy": null,
+    "reviewedAt": null
+  },
+  "economy": {
+    "currencyId": "star",
+    "packCost": 20,
+    "attemptsPerPack": 5,
+    "maximumPacksPerVietnamDay": 3,
+    "purchaseRole": "girlfriend",
+    "playRole": "girlfriend",
+    "minimumBalance": 0,
+    "realMoneyPurchases": false
+  },
+  "skillPolicy": {
+    "captureDeterminedBy": "physics_and_player_input",
+    "randomVictoryRoll": false,
+    "layoutUsesServerSeed": true,
+    "rewardRolledOnlyAfterCapture": true,
+    "rewardOddsDisclosed": true
+  },
+  "attempt": {
+    "creditConsumedOn": "create",
+    "initialState": "ready",
+    "terminalStates": ["won", "missed", "abandoned"],
+    "states": ["ready", "playing", "won", "missed", "abandoned"],
+    "transitions": [
+      { "from": "ready", "to": "playing", "action": "start" },
+      { "from": "ready", "to": "abandoned", "action": "expire" },
+      { "from": "playing", "to": "won", "action": "capture" },
+      { "from": "playing", "to": "missed", "action": "miss" },
+      { "from": "playing", "to": "abandoned", "action": "expire" }
+    ],
+    "inputPhases": ["aim", "drop", "close", "lift", "return", "release"],
+    "playerCanRepositionAfterDrop": false,
+    "maximumPlayingSeconds": 120,
+    "abandonAfterSeconds": 300
+  },
+  "physicsContract": {
+    "dimension": "2d",
+    "stepMode": "fixed",
+    "targetStepsPerSecond": 60,
+    "captureZone": "prize_chute",
+    "requiredEffects": ["gravity", "collision", "mass", "friction", "angular_momentum", "grip_force"],
+    "resultMustNotDependOnReducedMotion": true
+  },
+  "rewardTable": {
+    "version": 1,
+    "guaranteedPerCapturedPlush": true,
+    "selectionSide": "server",
+    "unit": "basis_points",
+    "outcomes": [
+      { "id": "tiny", "label": "Túi sao nhỏ", "weight": 5500, "stars": 1 },
+      { "id": "sweet", "label": "Túi sao xinh", "weight": 3000, "stars": 2 },
+      { "id": "lucky", "label": "Túi sao may mắn", "weight": 1200, "stars": 4 },
+      { "id": "jackpot", "label": "Túi sao lấp lánh", "weight": 300, "stars": 8 }
+    ]
+  },
+  "starterPlushes": [
+    { "id": "bear", "label": "Gấu ôm tim", "massClass": "medium", "gripDifficulty": "easy" },
+    { "id": "rabbit", "label": "Thỏ tai dài", "massClass": "light", "gripDifficulty": "medium" },
+    { "id": "cat", "label": "Mèo bánh mì", "massClass": "medium", "gripDifficulty": "medium" },
+    { "id": "capybara", "label": "Capybara nằm lười", "massClass": "heavy", "gripDifficulty": "hard" },
+    { "id": "dinosaur", "label": "Khủng long béo", "massClass": "heavy", "gripDifficulty": "medium" },
+    { "id": "seal", "label": "Hải cẩu bánh bao", "massClass": "light", "gripDifficulty": "easy" }
+  ]
+}
