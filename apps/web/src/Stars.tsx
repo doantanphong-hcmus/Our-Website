@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import type { User } from "./user";
 
 type Activity = { id: string; label: string; condition: string; points?: number; minimumPoints?: number; maximumPoints?: number };
@@ -88,7 +89,7 @@ export function Stars({ user }: { user: User }) {
       <span aria-hidden="true">⭐</span>{user.role === "girlfriend" ? wallet?.balance ?? "…" : "Tặng sao"}
     </button>
 
-    {open && <div className="star-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+    {open && createPortal(<div className="star-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
       <section className="star-panel" role="dialog" aria-modal="true" aria-labelledby="star-title">
         <button className="star-panel__close" type="button" aria-label="Đóng" onClick={() => setOpen(false)}>×</button>
         <p className="eyebrow">Góc học tiếng Anh</p>
@@ -112,17 +113,18 @@ export function Stars({ user }: { user: User }) {
           {error && <p className="star-feedback star-feedback--error" role="alert">{error}</p>}
         </div>}
       </section>
-    </div>}
+    </div>, document.body)}
 
-    {!!celebrations.length && <div className="star-celebration" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
+    {!!celebrations.length && createPortal(<div className="star-celebration" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
       <div className="star-celebration__sparkles" aria-hidden="true">⭐ ✦ ⭐ ✧ ⭐</div>
       <section>
+        <button className="star-panel__close" type="button" aria-label="Đóng" onClick={() => setCelebrations([])}>×</button>
         <span className="star-celebration__star" aria-hidden="true">⭐</span>
         <p className="eyebrow">Tuyệt vời quá em bé ơi!</p>
         <h2 id="celebration-title">Em vừa nhận được {celebrations.reduce((sum, item) => sum + item.delta, 0)} sao</h2>
         {celebrations.map((item) => <p key={item.id}><strong>{item.label}</strong>{item.note ? ` · ${item.note}` : ""}</p>)}
         <button type="button" onClick={() => setCelebrations([])}>Nhận sao</button>
       </section>
-    </div>}
+    </div>, document.body)}
   </>;
 }

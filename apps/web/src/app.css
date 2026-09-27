@@ -293,7 +293,7 @@ button:disabled {
 .star-history li b { flex: none; color: var(--color-shared); }
 
 .star-celebration { overflow: hidden; text-align: center; }
-.star-celebration > section { z-index: 1; inline-size: min(100%, 28rem); padding: var(--space-7) var(--space-5); border-radius: var(--radius-large); background: var(--color-surface); animation: star-celebration-in 700ms cubic-bezier(.2,.9,.25,1.15) both; }
+.star-celebration > section { position: relative; z-index: 1; inline-size: min(100%, 28rem); padding: var(--space-7) var(--space-5); border-radius: var(--radius-large); background: var(--color-surface); animation: star-celebration-in 700ms cubic-bezier(.2,.9,.25,1.15) both; }
 .star-celebration__star { display: block; margin-block-end: var(--space-3); font-size: 5rem; animation: star-bounce 1.2s ease-in-out infinite alternate; }
 .star-celebration__sparkles { position: absolute; font-size: clamp(2rem, 10vw, 5rem); letter-spacing: 0.25em; animation: star-sparkles 2s ease-in-out infinite alternate; }
 .star-celebration button { margin-block-start: var(--space-4); }
