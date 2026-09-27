@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { authenticatedUser, handleAuth } from "./auth";
 import { handleSessions, sessionSnapshot } from "./sessions";
+import { handleStars } from "./stars";
 import type { DeepTalkAiBinding } from "./deep-talk-ai";
 
 interface Env {
@@ -42,7 +43,8 @@ export default {
     const isDeckGeneration = /^\/api\/sessions\/[0-9a-f-]{36}\/deep-talk-deck$/i.test(url.pathname)
       && request.method === "POST";
     const isSocket = url.pathname === "/ws";
-    if (isSessions || isSocket) {
+    const isStars = url.pathname === "/api/stars" || url.pathname.startsWith("/api/stars/");
+    if (isSessions || isStars || isSocket) {
       try {
         if (isSocket && request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
           return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -51,6 +53,7 @@ export default {
         if (!auth) return unauthorized();
         // ponytail: P4.9 lets AI and fallback race; P4.10 can add a dedicated deck-status broadcast.
         if (isSessions && (request.method === "GET" || isDeckGeneration)) return handleSessions(request, env);
+        if (isStars && request.method === "GET") return handleStars(request, env);
         return env.REALTIME_ROOM.getByName(auth.user.couple_space_id).fetch(request);
       } catch {
         return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });
@@ -112,17 +115,25 @@ export class RealtimeRoom extends DurableObject<Env> {
   }
 
   private async command(request: Request): Promise<Response> {
-    const response = await handleSessions(request, this.env);
+    const isStars = new URL(request.url).pathname.startsWith("/api/stars/");
+    const response = isStars ? await handleStars(request, this.env) : await handleSessions(request, this.env);
     if (!response.ok) return response;
-    const payload = await response.clone().json<{ session?: unknown; duplicate?: boolean }>();
-    if (!payload.session || payload.duplicate) return response;
+    const payload = await response.clone().json<{ session?: unknown; wallet?: { balance: number; updatedAt: number }; duplicate?: boolean }>();
+    if ((!payload.session && !payload.wallet) || payload.duplicate) return response;
     const auth = await authenticatedUser(request, this.env);
     if (!auth) return response;
-    const latest = await this.env.DB.prepare(`SELECT coalesce(max(rowid), 0) AS version
-      FROM activity_session_events WHERE couple_space_id = ?`)
-      .bind(auth.user.couple_space_id).first<{ version: number }>();
-    const eventVersion = Number(latest?.version ?? 0);
-    const event = JSON.stringify({ type: "session.updated", eventVersion, session: payload.session });
+    let event: string;
+    if (payload.wallet) {
+      event = JSON.stringify({ type: "star.updated", wallet: {
+        balance: payload.wallet.balance, updatedAt: payload.wallet.updatedAt,
+      } });
+    } else {
+      const latest = await this.env.DB.prepare(`SELECT coalesce(max(rowid), 0) AS version
+        FROM activity_session_events WHERE couple_space_id = ?`)
+        .bind(auth.user.couple_space_id).first<{ version: number }>();
+      const eventVersion = Number(latest?.version ?? 0);
+      event = JSON.stringify({ type: "session.updated", eventVersion, session: payload.session });
+    }
     const sockets = this.ctx.getWebSockets();
     if (!sockets.length) return response;
     const now = Math.floor(Date.now() / 1000);

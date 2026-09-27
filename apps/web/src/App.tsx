@@ -6,6 +6,7 @@ import { BlindBagForm } from "./BlindBagForm";
 import { FoodSessionSetup } from "./FoodSessionSetup";
 import { DeepTalkSetup } from "./DeepTalkSetup";
 import { GiftLetter } from "./GiftLetter";
+import { Stars } from "./Stars";
 
 type Route = {
   path: string;
@@ -430,6 +431,7 @@ export function App({ user, onUserChange, onLogout }: {
         <div className="top-bar__brand">
           <AppLink path="/" className="brand" aria-label="Về trang chủ"><img src="/favicon.png" alt="" /></AppLink>
           {user.username.toLocaleLowerCase() === "nhi" && <GiftLetter />}
+          <Stars user={user} />
         </div>
         <details className="avatar-menu">
           <summary aria-label="Mở menu tài khoản" style={{ background: user.color }}><span aria-hidden="true">{(user.nickname ?? user.displayName).slice(0, 2).toUpperCase()}</span></summary>

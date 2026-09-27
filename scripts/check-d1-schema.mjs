@@ -75,7 +75,7 @@ try {
   run(["d1", "execute", ...local, "--command", "DELETE FROM star_transactions WHERE id='stars-1'"], true);
   run(["d1", "execute", ...local, "--command", "UPDATE star_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
 
-  console.log("P1.4/E1.1 D1 schema: migration, idempotent seed, immutable star ledger and constraints = OK");
+  console.log("P1.4/E1.1-E1.2 D1 schema: migration, idempotent seed, immutable star ledger and constraints = OK");
 } finally {
   await rm(state, { recursive: true, force: true });
 }

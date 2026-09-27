@@ -208,6 +208,19 @@ try {
   const exact = await connect(second.page, 8);
   assert.equal(exact.reconciled, false);
 
+  const realtimeAward = await api(first.page, "/api/stars/award", {
+    activityId: "reading", note: "Đọc bài rất tốt", idempotencyKey: "realtime-star-award-01",
+  });
+  assert.equal(realtimeAward.status, 201);
+  assert.equal(realtimeAward.data.wallet.balance, 5);
+  await Promise.all([
+    waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "star.updated" && event.wallet?.balance === 5)),
+    waitFor(second.page, () => globalThis.p110.events.some((event) => event.type === "star.updated" && event.wallet?.balance === 5)),
+  ]);
+  const realtimeCelebration = await api(second.page, "/api/stars/celebrations/claim", {});
+  assert.deepEqual(realtimeCelebration.data.celebrations.map((item) => item.delta), [5]);
+  assert.deepEqual((await api(second.page, "/api/stars/celebrations/claim", {})).data.celebrations, []);
+
   const revokedSocketClosed = second.page.evaluate(() => new Promise((resolve) => {
     const timer = setTimeout(() => resolve({ code: 0, readyState: globalThis.p110.socket.readyState }), 1_500);
     globalThis.p110.socket.addEventListener("close", ({ code }) => { clearTimeout(timer); resolve({ code }); }, { once: true });

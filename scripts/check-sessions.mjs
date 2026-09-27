@@ -135,6 +135,38 @@ try {
   const phong = await login("phong");
   const nhi = await login("nhi");
 
+  const emptyWallet = await request("/api/stars", nhi);
+  assert.equal(emptyWallet.response.status, 200);
+  assert.equal(emptyWallet.data.wallet.balance, 0);
+  assert.equal(emptyWallet.data.wallet.activities.length, 8);
+  assert.equal((await request("/api/stars/award", nhi, "POST", {
+    activityId: "listening", idempotencyKey: "nhi-cannot-award-01",
+  })).response.status, 403);
+  assert.equal((await request("/api/stars/award", phong, "POST", {
+    activityId: "special", points: 20, idempotencyKey: "special-no-note-01",
+  })).response.status, 400);
+  const award = await request("/api/stars/award", phong, "POST", {
+    activityId: "listening", note: "Em học chăm lắm", idempotencyKey: "award-listening-01",
+  });
+  assert.equal(award.response.status, 201);
+  assert.equal(award.data.wallet.balance, 10);
+  assert.equal(award.data.transaction.delta, 10);
+  const duplicateAward = await request("/api/stars/award", phong, "POST", {
+    activityId: "listening", note: "Em học chăm lắm", idempotencyKey: "award-listening-01",
+  });
+  assert.equal(duplicateAward.response.status, 200);
+  assert.equal(duplicateAward.data.duplicate, true);
+  assert.equal(duplicateAward.data.wallet.balance, 10);
+  assert.equal((await request("/api/stars/award", phong, "POST", {
+    activityId: "listening", idempotencyKey: "award-listening-02",
+  })).response.status, 409, "daily activities may only be awarded once per Vietnam day");
+  const firstCelebration = await request("/api/stars/celebrations/claim", nhi, "POST");
+  assert.equal(firstCelebration.response.status, 200);
+  assert.deepEqual(firstCelebration.data.celebrations.map((item) => item.delta), [10]);
+  assert.deepEqual((await request("/api/stars/celebrations/claim", nhi, "POST")).data.celebrations, [],
+    "reload must not replay a claimed celebration");
+  assert.equal((await request("/api/stars", nhi)).data.wallet.transactions.length, 1);
+
   const replayedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong, "POST", {
     expectedVersion: 1, idempotencyKey: "history-deck-key-1",
   });
@@ -657,7 +689,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.18/P3.2-P4.15 sessions: check-in, media and atomic completion = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2 sessions: stars, check-in, media and completion = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
