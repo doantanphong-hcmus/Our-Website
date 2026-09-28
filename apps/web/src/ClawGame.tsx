@@ -8,13 +8,20 @@ type Attempt = {
   controlTrace: ClawInput[]; capturedPlushId: string | null; resultSteps: number | null;
   version: number; expiresAt: number;
 };
-type Payload = { error?: string; credits?: Credits; attempt?: Attempt };
+type Reward = { id: string; tableVersion: number; tierId: string; label: string; stars: number; createdAt: number };
+type Capture = { instanceId: string; attemptId: string; plushId: string; plushLabel: string; capturedAt: number; reward: Reward };
+type RewardOption = { id: string; label: string; chancePercent: number; stars: number };
+type Payload = { error?: string; credits?: Credits; attempt?: Attempt; capture?: Capture;
+  collection?: Capture[]; rewardTable?: RewardOption[] };
 
 const STEP_MS = 1000 / 60;
 const plushStyle: Record<string, { color: string; ears: "round" | "long" | "small" }> = {
   bear: { color: "#c98c62", ears: "round" }, rabbit: { color: "#f4d8df", ears: "long" },
   cat: { color: "#e6b765", ears: "small" }, capybara: { color: "#ad7955", ears: "round" },
   dinosaur: { color: "#83b895", ears: "small" }, seal: { color: "#a9c7d9", ears: "round" },
+};
+const plushEmoji: Record<string, string> = {
+  bear: "🧸", rabbit: "🐰", cat: "🐱", capybara: "🦫", dinosaur: "🦕", seal: "🦭",
 };
 
 async function call(path: string, method = "GET", body?: unknown): Promise<Payload> {
@@ -90,6 +97,9 @@ const phaseText: Record<string, string> = {
 export function ClawGame({ user }: { user: User }) {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [credits, setCredits] = useState<Credits | null>(null);
+  const [collection, setCollection] = useState<Capture[]>([]);
+  const [rewardTable, setRewardTable] = useState<RewardOption[]>([]);
+  const [latestCapture, setLatestCapture] = useState<Capture | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -110,8 +120,9 @@ export function ClawGame({ user }: { user: User }) {
   async function load() {
     setLoading(true); setError("");
     try {
-      const payload = await call("/api/claw/attempts/active");
-      setAttempt(payload.attempt ?? null); setCredits(payload.credits ?? null);
+      const [active, owned] = await Promise.all([call("/api/claw/attempts/active"), call("/api/claw/collection")]);
+      setAttempt(active.attempt ?? null); setCredits(active.credits ?? null);
+      setCollection(owned.collection ?? []); setRewardTable(owned.rewardTable ?? []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Chưa mở được máy gắp."); }
     finally { setLoading(false); }
   }
@@ -158,6 +169,10 @@ export function ClawGame({ user }: { user: User }) {
         controlTrace: controls.current,
       });
       if (payload.attempt) setAttempt(payload.attempt);
+      if (payload.capture) {
+        setLatestCapture(payload.capture);
+        setCollection((items) => [payload.capture!, ...items.filter(({ instanceId }) => instanceId !== payload.capture!.instanceId)]);
+      }
       navigator.vibrate?.(outcome === "won" ? [35, 45, 70] : 25);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Chưa ghi nhận được lượt chơi."); }
   }
@@ -270,6 +285,11 @@ export function ClawGame({ user }: { user: User }) {
       <span aria-hidden="true">{attempt.status === "won" ? "🎉🧸" : "🌙"}</span>
       <h2>{attempt.status === "won" ? "Gắp được rồi!" : "Suýt nữa là được rồi"}</h2>
       <p>{attempt.status === "won" ? "Bé thú đã rơi gọn vào máng quà." : "Càng bị tuột mất, mình thử một vị trí khác nhé."}</p>
+      {latestCapture?.attemptId === attempt.id && <div className="claw-reward" role="status">
+        <span aria-hidden="true">{plushEmoji[latestCapture.plushId] ?? "🧸"}</span>
+        <strong>{latestCapture.plushLabel}</strong>
+        <small>{latestCapture.reward.label} · +{latestCapture.reward.stars} ⭐</small>
+      </div>}
       {canPlay && (credits?.balance
         ? <button type="button" disabled={pending} onClick={() => void createAttempt()}>Gắp lượt tiếp theo</button>
         : <button type="button" disabled={pending || (credits?.purchasedToday ?? 0) >= (credits?.maximumPacksPerDay ?? 0)} onClick={() => void buyPack()}>
@@ -287,5 +307,15 @@ export function ClawGame({ user }: { user: User }) {
       </div>}
     </div> : null}
     {error && <p className="claw-error" role="alert">{error}</p>}
+    {!loading && <section className="claw-collection" aria-labelledby="claw-collection-title">
+      <div><p className="eyebrow">Tủ thú của Nhi</p><h2 id="claw-collection-title">Bộ sưu tập</h2></div>
+      {collection.length ? <div className="claw-collection__grid">{collection.map((item) => <article key={item.instanceId}>
+        <span aria-hidden="true">{plushEmoji[item.plushId] ?? "🧸"}</span>
+        <strong>{item.plushLabel}</strong><small>Quà: +{item.reward.stars} ⭐</small>
+      </article>)}</div> : <p className="claw-message">Bé thú đầu tiên vẫn đang chờ em gắp về.</p>}
+      <details className="claw-odds"><summary>Quà có thể nhận</summary>
+        <ul>{rewardTable.map((item) => <li key={item.id}><span>{item.label} · +{item.stars} ⭐</span><strong>{item.chancePercent}%</strong></li>)}</ul>
+      </details>
+    </section>}
   </section>;
 }

@@ -13,6 +13,11 @@ type AttemptRow = {
   captured_plush_id: string | null; result_steps: number | null; result_verified: number; version: number;
   created_at: number; started_at: number | null; completed_at: number | null; expires_at: number; updated_at: number;
 };
+type CollectionRow = {
+  instance_id: string; attempt_id: string; plush_id: string; plush_label: string; captured_at: number;
+  reward_id: string; reward_table_version: number; tier_id: string; tier_label: string;
+  stars_awarded: number; reward_created_at: number;
+};
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -30,6 +35,96 @@ function attempt(row: AttemptRow) {
     resultSteps: row.result_steps, verified: Boolean(row.result_verified), version: row.version,
     createdAt: row.created_at, startedAt: row.started_at, completedAt: row.completed_at,
     expiresAt: row.expires_at, updatedAt: row.updated_at };
+}
+
+function capture(row: CollectionRow) {
+  return {
+    instanceId: row.instance_id, attemptId: row.attempt_id, plushId: row.plush_id,
+    plushLabel: row.plush_label, capturedAt: row.captured_at,
+    reward: { id: row.reward_id, tableVersion: row.reward_table_version, tierId: row.tier_id,
+      label: row.tier_label, stars: row.stars_awarded, createdAt: row.reward_created_at },
+  };
+}
+
+const collectionSql = `SELECT p.id AS instance_id, p.attempt_id, p.plush_id,
+  p.label_snapshot AS plush_label, p.captured_at, r.id AS reward_id,
+  r.reward_table_version, r.tier_id, r.tier_label_snapshot AS tier_label,
+  r.stars_awarded, r.created_at AS reward_created_at
+  FROM plush_collection p JOIN claw_rewards r ON r.plush_instance_id = p.id`;
+
+async function findCapture(env: ClawEnv, spaceId: string, attemptId: string) {
+  return env.DB.prepare(`${collectionSql} WHERE p.couple_space_id = ? AND p.attempt_id = ?`)
+    .bind(spaceId, attemptId).first<CollectionRow>();
+}
+
+async function collectionState(env: ClawEnv, spaceId: string) {
+  const rows = await env.DB.prepare(`${collectionSql} WHERE p.couple_space_id = ?
+    ORDER BY p.captured_at DESC, p.rowid DESC`).bind(spaceId).all<CollectionRow>();
+  return rows.results.map(capture);
+}
+
+function rewardOdds() {
+  return rules.rewardTable.outcomes.map(({ id, label, weight, stars }) =>
+    ({ id, label, chancePercent: weight / 100, stars }));
+}
+
+function rewardRoll() {
+  const ceiling = Math.floor(0x100000000 / 10000) * 10000;
+  let value = ceiling;
+  while (value >= ceiling) value = crypto.getRandomValues(new Uint32Array(1))[0];
+  return value % 10000;
+}
+
+async function grantWin(env: ClawEnv, auth: Auth, won: AttemptRow) {
+  const existing = await findCapture(env, auth.user.couple_space_id, won.id);
+  if (existing) {
+    const starWallet = await env.DB.prepare("SELECT balance, updated_at FROM star_wallets WHERE couple_space_id = ?")
+      .bind(auth.user.couple_space_id).first<{ balance: number; updated_at: number }>();
+    return { capture: capture(existing), wallet: starWallet && { balance: starWallet.balance, updatedAt: starWallet.updated_at } };
+  }
+  const plush = rules.starterPlushes.find(({ id }) => id === won.captured_plush_id);
+  if (won.status !== "won" || !won.result_verified || !plush) throw new Error("Winning attempt is not verified");
+  const wallet = await env.DB.prepare("SELECT balance FROM star_wallets WHERE couple_space_id = ?")
+    .bind(auth.user.couple_space_id).first<{ balance: number }>();
+  if (!wallet) throw new Error("Star wallet is missing");
+  const roll = rewardRoll();
+  let edge = 0;
+  const tier = rules.rewardTable.outcomes.find((item) => (edge += item.weight) > roll)!;
+  const now = Math.floor(Date.now() / 1000);
+  const nextBalance = wallet.balance + tier.stars;
+  const instanceId = crypto.randomUUID();
+  const rewardId = crypto.randomUUID();
+  const transactionId = crypto.randomUUID();
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO plush_collection
+        (id, couple_space_id, owner_user_id, attempt_id, plush_id, label_snapshot, captured_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(instanceId, auth.user.couple_space_id, auth.user.id,
+        won.id, plush.id, plush.label, now, now),
+      env.DB.prepare(`UPDATE star_wallets SET balance = ?, updated_at = ?
+        WHERE couple_space_id = ? AND balance = ?`).bind(nextBalance, now, auth.user.couple_space_id, wallet.balance),
+      env.DB.prepare(`INSERT INTO star_transactions
+        (id, couple_space_id, actor_user_id, idempotency_key, kind, delta, balance_after,
+          rule_id, label_snapshot, created_at)
+        VALUES (?, ?, ?, ?, 'award', ?, ?, ?, ?, ?)`)
+        .bind(transactionId, auth.user.couple_space_id, auth.user.id, `claw-reward-${won.id}`,
+          tier.stars, nextBalance, `claw-reward:${tier.id}`, tier.label, now),
+      env.DB.prepare(`INSERT INTO claw_rewards
+        (id, couple_space_id, beneficiary_user_id, attempt_id, plush_instance_id, reward_table_version,
+          tier_id, tier_label_snapshot, roll_basis_points, stars_awarded, star_transaction_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(rewardId, auth.user.couple_space_id, auth.user.id, won.id, instanceId,
+          rules.rewardTable.version, tier.id, tier.label, roll, tier.stars, transactionId, now),
+    ]);
+  } catch (error) {
+    const raced = await findCapture(env, auth.user.couple_space_id, won.id);
+    if (!raced) throw error;
+  }
+  const created = await findCapture(env, auth.user.couple_space_id, won.id);
+  if (!created) throw new Error("Claw reward was not created");
+  const currentWallet = await env.DB.prepare("SELECT balance, updated_at FROM star_wallets WHERE couple_space_id = ?")
+    .bind(auth.user.couple_space_id).first<{ balance: number; updated_at: number }>();
+  return { capture: capture(created), wallet: currentWallet && { balance: currentWallet.balance, updatedAt: currentWallet.updated_at } };
 }
 
 const attemptColumns = `id, seed, rules_version, status, control_trace_json, captured_plush_id,
@@ -168,7 +263,7 @@ async function completeAttempt(env: ClawEnv, auth: Auth, id: string, body: Recor
   if (["won", "missed"].includes(current.status)) {
     if (current.status === outcome && current.control_trace_json === traceJson
       && current.result_steps === steps && current.captured_plush_id === plushId) {
-      return json({ attempt: attempt(current), duplicate: true });
+      return json({ attempt: attempt(current), ...(current.status === "won" ? await grantWin(env, auth, current) : {}), duplicate: true });
     }
     return json({ error: "Lượt chơi đã được ghi nhận với kết quả khác.", attempt: attempt(current) }, 409);
   }
@@ -183,7 +278,8 @@ async function completeAttempt(env: ClawEnv, auth: Auth, id: string, body: Recor
   await env.DB.prepare(`UPDATE claw_attempts SET status = ?, control_trace_json = ?, captured_plush_id = ?,
     result_steps = ?, result_verified = 1, completed_at = ?, updated_at = ?, version = version + 1
     WHERE id = ? AND version = ?`).bind(outcome, traceJson, plushId, steps, now, now, id, version).run();
-  return json({ attempt: attempt((await findAttempt(env, auth.user.couple_space_id, id))!) });
+  const completed = (await findAttempt(env, auth.user.couple_space_id, id))!;
+  return json({ attempt: attempt(completed), ...(outcome === "won" ? await grantWin(env, auth, completed) : {}) });
 }
 
 async function creditState(env: ClawEnv, spaceId: string) {
@@ -250,6 +346,9 @@ export async function handleClaw(request: Request, env: ClawEnv): Promise<Respon
   await expireAttempts(env, auth.user.couple_space_id);
   if (path === "/api/claw/credits" && request.method === "GET") {
     return json({ credits: await creditState(env, auth.user.couple_space_id) });
+  }
+  if (path === "/api/claw/collection" && request.method === "GET") {
+    return json({ collection: await collectionState(env, auth.user.couple_space_id), rewardTable: rewardOdds() });
   }
   if (path === "/api/claw/credits/purchase" && request.method === "POST") return buyCredits(request, env, auth);
   if (path === "/api/claw/attempts" && request.method === "POST") return createAttempt(request, env, auth);

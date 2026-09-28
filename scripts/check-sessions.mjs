@@ -283,10 +283,25 @@ try {
   });
   assert.equal(wonAttempt.data.attempt.status, "won");
   assert.equal(wonAttempt.data.attempt.verified, true);
+  assert.equal(wonAttempt.data.capture.plushId, "bear");
+  assert.equal(wonAttempt.data.capture.reward.tableVersion, 1);
+  assert.ok([1, 2, 4, 8].includes(wonAttempt.data.capture.reward.stars), "every capture receives a configured reward");
+  const clawRewardStars = wonAttempt.data.capture.reward.stars;
+  assert.equal(wonAttempt.data.wallet.balance, 20 + clawRewardStars);
   const duplicateWin = await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
     expectedVersion: 3, outcome: "won", steps: 420, capturedPlushId: "bear", controlTrace: beforeStartTrace,
   });
   assert.equal(duplicateWin.data.duplicate, true);
+  assert.equal(duplicateWin.data.capture.instanceId, wonAttempt.data.capture.instanceId);
+  assert.equal(duplicateWin.data.capture.reward.id, wonAttempt.data.capture.reward.id,
+    "retrying completion must not award a second prize");
+  assert.equal(duplicateWin.data.wallet.balance, 20 + clawRewardStars);
+  const nhiCollection = await request("/api/claw/collection", nhi);
+  assert.equal(nhiCollection.data.collection.length, 1);
+  assert.equal(nhiCollection.data.collection[0].attemptId, clawAttemptId);
+  assert.equal(nhiCollection.data.rewardTable.reduce((sum, item) => sum + item.chancePercent, 0), 100);
+  assert.deepEqual((await request("/api/claw/collection", phong)).data.collection, nhiCollection.data.collection,
+    "both partners may view the shared plush collection");
   assert.equal((await request("/api/claw/attempts/active", nhi)).data.attempt, null);
   assert.equal((await request(`/api/claw/attempts/${clawAttemptId}`, phong)).data.attempt.status, "won",
     "Phong may view but cannot control Nhi's attempt");
@@ -298,6 +313,9 @@ try {
     expectedVersion: missedStart.data.attempt.version, outcome: "missed", steps: 420, controlTrace: beforeStartTrace,
   });
   assert.equal(missedAttempt.data.attempt.status, "missed");
+  assert.equal((await request("/api/claw/collection", nhi)).data.collection.length, 1,
+    "a missed attempt must not create a plush or reward");
+  assert.equal((await request("/api/stars", nhi)).data.wallet.balance, 20 + clawRewardStars);
   assert.equal((await request("/api/claw/credits", nhi)).data.credits.balance, 13,
     "won and missed attempts must each consume exactly one credit on create");
 

@@ -1973,7 +1973,51 @@ main {
 .claw-message { color: var(--color-text-muted); text-align: center; }
 .claw-error { margin: 0; color: var(--color-danger); text-align: center; }
 
-[data-motion="reduced"] .claw-machine { box-shadow: none; }
+.claw-reward {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  inline-size: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background: var(--color-shared-soft);
+  animation: claw-reward-in .45s ease-out both;
+}
+
+.claw-reward > span { font-size: 3rem; }
+.claw-reward small { color: var(--color-shared); font-weight: 800; }
+
+.claw-collection {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+}
+
+.claw-collection h2 { margin: 0; }
+.claw-collection__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.claw-collection__grid article {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  text-align: center;
+}
+.claw-collection__grid article > span { font-size: 2.5rem; }
+.claw-collection__grid small { color: var(--color-text-muted); }
+.claw-odds summary { cursor: pointer; color: var(--color-shared); font-weight: 800; }
+.claw-odds ul { display: grid; gap: var(--space-2); margin-block-end: 0; padding: 0; list-style: none; }
+.claw-odds li { display: flex; justify-content: space-between; gap: var(--space-2); }
+
+@keyframes claw-reward-in {
+  from { opacity: 0; transform: translateY(.75rem) scale(.96); }
+}
+
+[data-motion="reduced"] :is(.claw-machine, .claw-reward) { animation: none; box-shadow: none; }
 
 @media (max-width: 30rem) {
   .food-vote-actions { grid-template-columns: 1fr; }

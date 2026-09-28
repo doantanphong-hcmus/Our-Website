@@ -29,6 +29,12 @@ async function main() {
       controlTrace: [], capturedPlushId: null, resultSteps: null, version: 1, expiresAt: 2_000_000_000,
     };
     const clawCredits = { balance: 5, packCost: 20, attemptsPerPack: 5, purchasedToday: 1, maximumPacksPerDay: 3 };
+    const clawRewardTable = [
+      { id: "tiny", label: "Túi sao nhỏ", chancePercent: 55, stars: 1 },
+      { id: "sweet", label: "Túi sao xinh", chancePercent: 30, stars: 2 },
+      { id: "lucky", label: "Túi sao may mắn", chancePercent: 12, stars: 4 },
+      { id: "jackpot", label: "Túi sao lấp lánh", chancePercent: 3, stars: 8 },
+    ];
     await page.route("**/api/auth/session", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -53,6 +59,8 @@ async function main() {
       const url = new URL(route.request().url());
       const body = route.request().postData();
       const input = body ? JSON.parse(body) : {};
+      if (url.pathname.endsWith("/collection")) return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ collection: [], rewardTable: clawRewardTable }) });
       if (url.pathname.endsWith("/active")) return route.fulfill({ status: 200, contentType: "application/json",
         body: JSON.stringify({ attempt: clawAttempt, credits: clawCredits }) });
       if (url.pathname.endsWith("/start")) clawAttempt = { ...clawAttempt, status: "playing", version: 2 };
@@ -97,6 +105,8 @@ async function main() {
       color: "#3F6F61", role: "girlfriend", preferences: { theme: "dark", reducedMotion: false } };
     await page.goto(new URL("/gap-thu", baseUrl).href);
     await page.getByRole("heading", { name: "Gắp một bé về nhà" }).waitFor();
+    await page.getByText("Bộ sưu tập").waitFor();
+    assert.equal(await page.getByText("Quà có thể nhận").count(), 1);
     await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
     const machine = page.locator(".claw-machine canvas");
     await machine.waitFor();
@@ -112,7 +122,7 @@ async function main() {
 
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);
     await page.getByRole("heading", { name: "Không tìm thấy trang" }).waitFor();
-    console.log("P1.3/E2.5 app shell: routes, mobile claw canvas, controls and preferences = OK");
+    console.log("P1.3/E2.6 app shell: routes, mobile claw canvas, collection, controls and preferences = OK");
   } finally {
     await browser.close();
   }

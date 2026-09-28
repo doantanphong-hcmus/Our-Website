@@ -46,6 +46,12 @@ try {
   ]);
   assert.deepEqual(JSON.parse(clawWalletOutput)[0].results, [{ owner_user_id: "user-nhi", balance: 0 }]);
 
+  const collectionOutput = run([
+    "d1", "execute", ...local, "--json", "--command",
+    "SELECT (SELECT count(*) FROM plush_collection) AS plushes, (SELECT count(*) FROM claw_rewards) AS rewards",
+  ]);
+  assert.deepEqual(JSON.parse(collectionOutput)[0].results, [{ plushes: 0, rewards: 0 }]);
+
   run([
     "d1", "execute", ...local, "--command",
     "INSERT INTO users (id,couple_space_id,username,password_hash,display_name,color,role) VALUES ('third','couple-main','third','!auth-not-configured','Third','#112233','boyfriend')",
@@ -115,7 +121,7 @@ try {
     WHERE id='00000000-0000-4000-8000-000000000201';`]);
   run(["d1", "execute", ...local, "--command", "DELETE FROM claw_attempts WHERE id='00000000-0000-4000-8000-000000000201'"], true);
 
-  console.log("P1.4/E1.1-E1.2/E2.3-E2.4 D1 schema: atomic credits, guarded attempts and constraints = OK");
+  console.log("P1.4/E1.1-E1.2/E2.3-E2.6 D1 schema: credits, attempts, collection and rewards = OK");
 } finally {
   await rm(state, { recursive: true, force: true });
 }
