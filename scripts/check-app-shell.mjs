@@ -107,6 +107,7 @@ async function main() {
     await page.getByRole("heading", { name: "Gắp một bé về nhà" }).waitFor();
     await page.getByText("Bộ sưu tập").waitFor();
     assert.equal(await page.getByText("Quà có thể nhận").count(), 1);
+    assert.equal(await page.getByText(/Lượt này còn \d+ giây/).count(), 1);
     await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
     const machine = page.locator(".claw-machine canvas");
     await machine.waitFor();
@@ -118,11 +119,13 @@ async function main() {
     await page.waitForTimeout(80);
     await right.dispatchEvent("pointerup", { pointerId: 1 });
     await page.getByRole("button", { name: "THẢ CÀNG" }).click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("our:claw-state:v1") ?? "null")?.attempt?.controlTrace
+      ?.some((item) => item.drop === true));
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
 
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);
     await page.getByRole("heading", { name: "Không tìm thấy trang" }).waitFor();
-    console.log("P1.3/E2.6 app shell: routes, mobile claw canvas, collection, controls and preferences = OK");
+    console.log("P1.3/E2.7 app shell: mobile claw, local recovery cache, collection and controls = OK");
   } finally {
     await browser.close();
   }

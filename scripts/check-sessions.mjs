@@ -51,6 +51,10 @@ wranglerCommand(["d1", "execute", ...local, "--file", seed]);
 wranglerCommand(["d1", "execute", ...local, "--command", `
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-phong';
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-nhi';
+  UPDATE claw_credit_wallets SET balance=1 WHERE couple_space_id='couple-main';
+  INSERT INTO claw_attempts
+    (id,couple_space_id,player_user_id,idempotency_key,seed,rules_version,expires_at)
+  VALUES ('00000000-0000-4000-8000-000000000299','couple-main','user-nhi','expired-claw-attempt-01',29,1,unixepoch()-1);
   INSERT INTO activity_sessions
     (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,expires_at)
   VALUES ('00000000-0000-4000-8000-000000000001','couple-main','food_vote','pending','user-phong','expired-create-001',unixepoch()-1);
@@ -229,7 +233,9 @@ try {
   assert.equal((await request("/api/stars", nhi)).data.wallet.balance, 20,
     "three packs must spend exactly 60 stars");
 
-  assert.equal((await request("/api/claw/attempts/active", nhi)).data.attempt, null);
+  const expiredClaw = await request("/api/claw/attempts/active", nhi);
+  assert.equal(expiredClaw.data.attempt.status, "abandoned", "an expired attempt must remain visible as timed out");
+  assert.ok(expiredClaw.data.attempt.completedAt, "timeout must be recorded durably");
   assert.equal((await request("/api/claw/attempts", phong, "POST", {
     idempotencyKey: "phong-cannot-play-claw-01",
   })).response.status, 403);

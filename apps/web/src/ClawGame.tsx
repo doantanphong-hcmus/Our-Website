@@ -13,8 +13,13 @@ type Capture = { instanceId: string; attemptId: string; plushId: string; plushLa
 type RewardOption = { id: string; label: string; chancePercent: number; stars: number };
 type Payload = { error?: string; credits?: Credits; attempt?: Attempt; capture?: Capture;
   collection?: Capture[]; rewardTable?: RewardOption[] };
+type Completion = { attemptId: string; body: { expectedVersion: number; outcome: "won" | "missed";
+  steps: number; capturedPlushId?: string; controlTrace: ClawInput[] } };
+type ClawCache = { attempt: Attempt | null; credits: Credits | null; collection: Capture[]; rewardTable: RewardOption[] };
 
 const STEP_MS = 1000 / 60;
+const CACHE_KEY = "our:claw-state:v1";
+const COMPLETION_KEY = "our:claw-completion:v1";
 const plushStyle: Record<string, { color: string; ears: "round" | "long" | "small" }> = {
   bear: { color: "#c98c62", ears: "round" }, rabbit: { color: "#f4d8df", ears: "long" },
   cat: { color: "#e6b765", ears: "small" }, capybara: { color: "#ad7955", ears: "round" },
@@ -31,6 +36,25 @@ async function call(path: string, method = "GET", body?: unknown): Promise<Paylo
   const payload = await response.json().catch(() => null) as Payload | null;
   if (!response.ok) throw new Error(payload?.error ?? "Máy gắp đang bận, thử lại một chút nhé.");
   return payload ?? {};
+}
+
+function stored<T>(key: string): T | null {
+  try { return JSON.parse(localStorage.getItem(key) ?? "null") as T | null; } catch { return null; }
+}
+
+function store(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private browsing may block storage */ }
+}
+
+function forget(key: string) {
+  try { localStorage.removeItem(key); } catch { /* private browsing may block storage */ }
+}
+
+function mergeCachedTrace(server: Attempt | null, cached: Attempt | null) {
+  if (!server || !cached || server.id !== cached.id || server.status !== "playing"
+    || cached.controlTrace.length <= server.controlTrace.length
+    || JSON.stringify(cached.controlTrace.slice(0, server.controlTrace.length)) !== JSON.stringify(server.controlTrace)) return server;
+  return { ...server, controlTrace: cached.controlTrace };
 }
 
 function drawPlush(context: CanvasRenderingContext2D, plush: ClawSnapshot["plushes"][number]) {
@@ -104,6 +128,7 @@ export function ClawGame({ user }: { user: User }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState("aim");
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const canvas = useRef<HTMLCanvasElement>(null);
   const game = useRef<ClawPhysics | null>(null);
   const controls = useRef<ClawInput[]>([]);
@@ -117,17 +142,88 @@ export function ClawGame({ user }: { user: User }) {
   const createKey = useRef(crypto.randomUUID());
   const purchaseKey = useRef(crypto.randomUUID());
 
-  async function load() {
-    setLoading(true); setError("");
+  async function load(showLoading = true) {
+    if (showLoading) setLoading(true);
+    setError("");
     try {
       const [active, owned] = await Promise.all([call("/api/claw/attempts/active"), call("/api/claw/collection")]);
-      setAttempt(active.attempt ?? null); setCredits(active.credits ?? null);
+      const cached = stored<ClawCache>(CACHE_KEY);
+      setAttempt((current) => active.attempt
+        ? mergeCachedTrace(active.attempt, cached?.attempt ?? current)
+        : current && ["won", "missed", "abandoned"].includes(current.status) ? current : null);
+      setCredits(active.credits ?? null);
       setCollection(owned.collection ?? []); setRewardTable(owned.rewardTable ?? []);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Chưa mở được máy gắp."); }
-    finally { setLoading(false); }
+    } catch (reason) {
+      const cached = stored<ClawCache>(CACHE_KEY);
+      if (cached) {
+        const timedOut = cached.attempt && ["ready", "playing"].includes(cached.attempt.status)
+          && cached.attempt.expiresAt <= Math.floor(Date.now() / 1000);
+        setAttempt(timedOut ? { ...cached.attempt!, status: "abandoned" } : cached.attempt);
+        setCredits(cached.credits); setCollection(cached.collection); setRewardTable(cached.rewardTable);
+        setError("Đang mất mạng · tiến trình đã được giữ trên máy này.");
+      } else setError(reason instanceof Error ? reason.message : "Chưa mở được máy gắp.");
+    } finally { setLoading(false); }
   }
 
-  useEffect(() => { void load(); }, []);
+  async function recover(showLoading = true) {
+    const pendingCompletion = stored<Completion>(COMPLETION_KEY);
+    if (pendingCompletion && navigator.onLine) {
+      let active: Payload | null = null;
+      try {
+        active = await call("/api/claw/attempts/active");
+        const expectedVersion = active.attempt?.id === pendingCompletion.attemptId
+          ? active.attempt.version : pendingCompletion.body.expectedVersion;
+        const payload = await call(`/api/claw/attempts/${pendingCompletion.attemptId}/complete`, "POST",
+          { ...pendingCompletion.body, expectedVersion });
+        forget(COMPLETION_KEY);
+        if (payload.capture) setLatestCapture(payload.capture);
+      } catch {
+        if (active?.attempt?.id === pendingCompletion.attemptId && active.attempt.status === "abandoned") forget(COMPLETION_KEY);
+      }
+    }
+    await load(showLoading);
+  }
+
+  useEffect(() => {
+    void recover();
+    let stopped = false;
+    let reconnect = 0;
+    let socket: WebSocket | null = null;
+    const connect = () => {
+      if (stopped || !navigator.onLine || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
+      const url = new URL("/ws", location.href);
+      url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(url);
+      socket.addEventListener("open", () => void recover(false));
+      socket.addEventListener("message", ({ data }) => {
+        try { if ((JSON.parse(String(data)) as { type?: string }).type === "claw.updated") void load(false); }
+        catch { /* ignore malformed realtime messages */ }
+      });
+      socket.addEventListener("close", () => { if (!stopped) reconnect = window.setTimeout(connect, 1_000); });
+    };
+    const online = () => { void recover(false); connect(); };
+    connect(); window.addEventListener("online", online);
+    return () => { stopped = true; window.clearTimeout(reconnect); window.removeEventListener("online", online); socket?.close(); };
+  }, []);
+
+  useEffect(() => {
+    if (!loading) store(CACHE_KEY, { attempt, credits, collection, rewardTable } satisfies ClawCache);
+  }, [attempt, credits, collection, rewardTable, loading]);
+
+  useEffect(() => {
+    if (!attempt || !["ready", "playing"].includes(attempt.status)) return;
+    const tick = () => {
+      const value = Math.floor(Date.now() / 1000);
+      setNow(value);
+      if (value >= attempt.expiresAt) {
+        setAttempt((current) => current?.id === attempt.id ? { ...current, status: "abandoned" } : current);
+        if (navigator.onLine) void load(false);
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 1_000);
+    return () => window.clearInterval(timer);
+  }, [attempt?.id, attempt?.status, attempt?.expiresAt]);
 
   function syncTrace(trace: ClawInput[]) {
     if (!attempt) return;
@@ -136,7 +232,12 @@ export function ClawGame({ user }: { user: User }) {
       const payload = await call(`/api/claw/attempts/${attempt.id}/trace`, "POST", {
         expectedVersion: version.current, controlTrace: copy,
       });
-      if (payload.attempt) { version.current = payload.attempt.version; setAttempt(payload.attempt); }
+      if (payload.attempt) {
+        const saved = payload.attempt;
+        version.current = saved.version;
+        setAttempt((current) => current?.id === saved.id && current.controlTrace.length > saved.controlTrace.length
+          ? { ...saved, controlTrace: current.controlTrace } : saved);
+      }
     }).catch((reason) => setError(reason instanceof Error ? reason.message : "Chưa lưu được thao tác."));
   }
 
@@ -149,6 +250,8 @@ export function ClawGame({ user }: { user: User }) {
     if (input.drop) { input.move = 0; scheduledMove.current = 0; dropped.current = true; }
     const control = { step, ...input } as ClawInput;
     controls.current = [...controls.current, control];
+    const attemptId = attempt?.id;
+    setAttempt((saved) => saved && saved.id === attemptId ? { ...saved, controlTrace: controls.current } : saved);
     pendingControls.current.set(step, input);
     syncTrace(controls.current);
   }
@@ -163,18 +266,23 @@ export function ClawGame({ user }: { user: User }) {
     await syncQueue.current;
     try {
       const outcome = result.outcome === "won" ? "won" : "missed";
-      const payload = await call(`/api/claw/attempts/${attempt.id}/complete`, "POST", {
+      const body: Completion["body"] = {
         expectedVersion: version.current, outcome, steps: result.steps,
-        capturedPlushId: outcome === "won" ? result.capturedPlushId : undefined,
+        capturedPlushId: outcome === "won" ? result.capturedPlushId ?? undefined : undefined,
         controlTrace: controls.current,
-      });
+      };
+      store(COMPLETION_KEY, { attemptId: attempt.id, body } satisfies Completion);
+      const payload = await call(`/api/claw/attempts/${attempt.id}/complete`, "POST", body);
+      forget(COMPLETION_KEY);
       if (payload.attempt) setAttempt(payload.attempt);
       if (payload.capture) {
         setLatestCapture(payload.capture);
         setCollection((items) => [payload.capture!, ...items.filter(({ instanceId }) => instanceId !== payload.capture!.instanceId)]);
       }
       navigator.vibrate?.(outcome === "won" ? [35, 45, 70] : 25);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Chưa ghi nhận được lượt chơi."); }
+    } catch (reason) { setError(navigator.onLine
+      ? (reason instanceof Error ? reason.message : "Chưa ghi nhận được lượt chơi.")
+      : "Đã giữ kết quả trên máy · khi có mạng hệ thống sẽ tự gửi lại."); }
   }
 
   useEffect(() => {
@@ -255,11 +363,13 @@ export function ClawGame({ user }: { user: User }) {
 
   const playing = attempt?.status === "playing";
   const canPlay = user.role === "girlfriend";
+  const remaining = attempt && ["ready", "playing"].includes(attempt.status) ? Math.max(0, attempt.expiresAt - now) : null;
   return <section className="claw-game" aria-labelledby="page-title" onKeyDown={(event) => keyboard(event, true)} onKeyUp={(event) => keyboard(event, false)}>
     <header className="claw-game__header">
       <div><p className="eyebrow">Máy gắp của Nhi</p><h1 id="page-title">Gắp một bé về nhà</h1></div>
       <span className="claw-credit" aria-label={`${credits?.balance ?? 0} lượt gắp`}>🕹️ {credits?.balance ?? "…"}</span>
     </header>
+    {remaining !== null && <p className="claw-timeout" role="status">Lượt này còn {remaining} giây</p>}
     {loading ? <p className="claw-message" role="status">Đang bật đèn máy gắp…</p> : null}
     {!loading && playing ? <>
       <div className={`claw-machine claw-machine--${phase}`}>
@@ -282,9 +392,10 @@ export function ClawGame({ user }: { user: User }) {
         : <p>Đợi Nhi khởi động máy nhé.</p>}
     </div> : null}
     {!loading && attempt && ["won", "missed", "abandoned"].includes(attempt.status) ? <div className="claw-result">
-      <span aria-hidden="true">{attempt.status === "won" ? "🎉🧸" : "🌙"}</span>
-      <h2>{attempt.status === "won" ? "Gắp được rồi!" : "Suýt nữa là được rồi"}</h2>
-      <p>{attempt.status === "won" ? "Bé thú đã rơi gọn vào máng quà." : "Càng bị tuột mất, mình thử một vị trí khác nhé."}</p>
+      <span aria-hidden="true">{attempt.status === "won" ? "🎉🧸" : attempt.status === "abandoned" ? "⏳" : "🌙"}</span>
+      <h2>{attempt.status === "won" ? "Gắp được rồi!" : attempt.status === "abandoned" ? "Lượt gắp đã hết thời gian" : "Suýt nữa là được rồi"}</h2>
+      <p>{attempt.status === "won" ? "Bé thú đã rơi gọn vào máng quà." : attempt.status === "abandoned"
+        ? "Lượt đang chơi đã được đóng an toàn. Mình bắt đầu lượt mới nhé." : "Càng bị tuột mất, mình thử một vị trí khác nhé."}</p>
       {latestCapture?.attemptId === attempt.id && <div className="claw-reward" role="status">
         <span aria-hidden="true">{plushEmoji[latestCapture.plushId] ?? "🧸"}</span>
         <strong>{latestCapture.plushLabel}</strong>

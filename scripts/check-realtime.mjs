@@ -37,6 +37,7 @@ wranglerCommand(["d1", "execute", ...local, "--file", seed]);
 wranglerCommand(["d1", "execute", ...local, "--command", `
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-phong';
   UPDATE users SET password_hash='${passwordHash()}' WHERE id='user-nhi';
+  UPDATE claw_credit_wallets SET balance=1 WHERE couple_space_id='couple-main';
   INSERT INTO activity_sessions (id,couple_space_id,feature,status,created_by_user_id,idempotency_key,payload_json,result_json)
   VALUES ('${deepTalkSessionId}','couple-main','deep_talk','active','user-phong','realtime-deep-session',
     '{"conditions":{"level":"gentle","duration":"30","sensitiveTopics":{}}}',
@@ -217,6 +218,15 @@ try {
     waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "star.updated" && event.wallet?.balance === 5)),
     waitFor(second.page, () => globalThis.p110.events.some((event) => event.type === "star.updated" && event.wallet?.balance === 5)),
   ]);
+  const clawAttempt = await api(second.page, "/api/claw/attempts", { idempotencyKey: "realtime-claw-attempt-01" });
+  assert.equal(clawAttempt.status, 201);
+  await Promise.all([
+    waitFor(first.page, () => globalThis.p110.events.some((event) => event.type === "claw.updated")),
+    waitFor(second.page, () => globalThis.p110.events.some((event) => event.type === "claw.updated")),
+  ]);
+  const syncedClaw = await get(first.page, "/api/claw/attempts/active");
+  assert.equal(syncedClaw.data.attempt.id, clawAttempt.data.attempt.id);
+  assert.equal(syncedClaw.data.credits.balance, 0);
   const realtimeCelebration = await api(second.page, "/api/stars/celebrations/claim", {});
   assert.deepEqual(realtimeCelebration.data.celebrations.map((item) => item.delta), [5]);
   assert.deepEqual((await api(second.page, "/api/stars/celebrations/claim", {})).data.celebrations, []);
@@ -235,7 +245,7 @@ try {
   const revoked = await revokedSocketClosed;
   assert.ok(revoked.code === 4401 || revoked.readyState === 2 || revoked.readyState === 3, JSON.stringify(revoked));
 
-  console.log(`P1.10/P2.11/P4.12 realtime: auth/revoke, two-device ready/tear sync, ${broadcastMs}ms broadcast and ${reconnectMs}ms reconnect = OK`);
+  console.log(`P1.10/P2.11/P4.12/E2.7 realtime: sessions, claw sync, ${broadcastMs}ms broadcast and ${reconnectMs}ms reconnect = OK`);
   await Promise.all([first.context.close(), second.context.close()]);
 } finally {
   await browser?.close().catch(() => {});

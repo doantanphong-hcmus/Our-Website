@@ -124,20 +124,24 @@ export class RealtimeRoom extends DurableObject<Env> {
         : await handleSessions(request, this.env);
     if (!response.ok) return response;
     const payload = await response.clone().json<{ session?: unknown; wallet?: { balance: number; updatedAt: number }; duplicate?: boolean }>();
-    if ((!payload.session && !payload.wallet) || payload.duplicate) return response;
+    const isClaw = path.startsWith("/api/claw/");
+    if ((!payload.session && !payload.wallet && !isClaw) || payload.duplicate) return response;
     const auth = await authenticatedUser(request, this.env);
     if (!auth) return response;
-    let event: string;
+    const events: string[] = [];
     if (payload.wallet) {
-      event = JSON.stringify({ type: "star.updated", wallet: {
+      events.push(JSON.stringify({ type: "star.updated", wallet: {
         balance: payload.wallet.balance, updatedAt: payload.wallet.updatedAt,
-      } });
-    } else {
+      } }));
+    }
+    if (isClaw) {
+      events.push(JSON.stringify({ type: "claw.updated" }));
+    } else if (payload.session) {
       const latest = await this.env.DB.prepare(`SELECT coalesce(max(rowid), 0) AS version
         FROM activity_session_events WHERE couple_space_id = ?`)
         .bind(auth.user.couple_space_id).first<{ version: number }>();
       const eventVersion = Number(latest?.version ?? 0);
-      event = JSON.stringify({ type: "session.updated", eventVersion, session: payload.session });
+      events.push(JSON.stringify({ type: "session.updated", eventVersion, session: payload.session }));
     }
     const sockets = this.ctx.getWebSockets();
     if (!sockets.length) return response;
@@ -150,7 +154,7 @@ export class RealtimeRoom extends DurableObject<Env> {
     }));
     for (let index = 0; index < sockets.length; index++) {
       try {
-        if (validity[index].results.length) sockets[index].send(event);
+        if (validity[index].results.length) events.forEach((event) => sockets[index].send(event));
         else sockets[index].close(4401, "Session expired");
       } catch { /* disconnected socket */ }
     }

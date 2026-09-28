@@ -354,8 +354,9 @@ export async function handleClaw(request: Request, env: ClawEnv): Promise<Respon
   if (path === "/api/claw/attempts" && request.method === "POST") return createAttempt(request, env, auth);
   if (path === "/api/claw/attempts/active" && request.method === "GET") {
     const row = await env.DB.prepare(`SELECT ${attemptColumns} FROM claw_attempts WHERE couple_space_id = ?
-      AND status IN ('ready', 'playing') LIMIT 1`).bind(auth.user.couple_space_id).first<AttemptRow>();
-    return json({ attempt: row ? attempt(row) : null, credits: await creditState(env, auth.user.couple_space_id) });
+      ORDER BY created_at DESC, rowid DESC LIMIT 1`).bind(auth.user.couple_space_id).first<AttemptRow>();
+    return json({ attempt: row && ["ready", "playing", "abandoned"].includes(row.status) ? attempt(row) : null,
+      credits: await creditState(env, auth.user.couple_space_id) });
   }
   const match = path.match(/^\/api\/claw\/attempts\/([0-9a-f-]{36})(?:\/(start|trace|complete))?$/i);
   if (match && request.method === "GET" && !match[2]) {
