@@ -140,6 +140,17 @@ try {
   assert.equal(emptyWallet.data.wallet.balance, 0);
   assert.equal(emptyWallet.data.wallet.activities.length, 8);
   assert.equal(emptyWallet.data.wallet.rewards.length, 7);
+  const emptyCredits = await request("/api/claw/credits", nhi);
+  assert.equal(emptyCredits.response.status, 200);
+  assert.equal(emptyCredits.data.credits.balance, 0);
+  assert.equal(emptyCredits.data.credits.packCost, 20);
+  assert.equal(emptyCredits.data.credits.attemptsPerPack, 5);
+  assert.equal((await request("/api/claw/credits/purchase", nhi, "POST", {
+    idempotencyKey: "insufficient-claw-stars-01",
+  })).response.status, 409);
+  assert.equal((await request("/api/claw/credits/purchase", phong, "POST", {
+    idempotencyKey: "phong-cannot-buy-claw-01",
+  })).response.status, 403);
   assert.equal((await request("/api/stars/award", nhi, "POST", {
     activityId: "listening", idempotencyKey: "nhi-cannot-award-01",
   })).response.status, 403);
@@ -191,6 +202,32 @@ try {
   const redeemedWallet = (await request("/api/stars", nhi)).data.wallet;
   assert.equal(redeemedWallet.balance, 80);
   assert.deepEqual(redeemedWallet.transactions.map((item) => item.delta), [-30, 100, 10]);
+
+  const clawPurchases = await Promise.all([
+    request("/api/claw/credits/purchase", nhi, "POST", { idempotencyKey: "buy-claw-pack-double-01" }),
+    request("/api/claw/credits/purchase", nhi, "POST", { idempotencyKey: "buy-claw-pack-double-01" }),
+  ]);
+  assert.deepEqual(clawPurchases.map((item) => item.response.status).sort(), [200, 201]);
+  assert.equal(clawPurchases[0].data.credits.balance, 5);
+  assert.equal(clawPurchases[1].data.credits.balance, 5);
+  assert.equal(clawPurchases.filter((item) => item.data.duplicate).length, 1);
+  assert.equal((await request("/api/claw/credits/purchase", nhi, "POST", {
+    idempotencyKey: "award-listening-01",
+  })).response.status, 409, "an idempotency key cannot be reused across ledgers");
+  assert.equal((await request("/api/claw/credits/purchase", nhi, "POST", {
+    idempotencyKey: "buy-claw-pack-02",
+  })).response.status, 201);
+  assert.equal((await request("/api/claw/credits/purchase", nhi, "POST", {
+    idempotencyKey: "buy-claw-pack-03",
+  })).response.status, 201);
+  const fullCredits = await request("/api/claw/credits", nhi);
+  assert.deepEqual({ balance: fullCredits.data.credits.balance, purchasedToday: fullCredits.data.credits.purchasedToday },
+    { balance: 15, purchasedToday: 3 });
+  assert.equal((await request("/api/claw/credits/purchase", nhi, "POST", {
+    idempotencyKey: "buy-claw-pack-04",
+  })).response.status, 409, "only three packs may be purchased per Vietnam day");
+  assert.equal((await request("/api/stars", nhi)).data.wallet.balance, 20,
+    "three packs must spend exactly 60 stars");
 
   const replayedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong, "POST", {
     expectedVersion: 1, idempotencyKey: "history-deck-key-1",
@@ -714,7 +751,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3 sessions: stars, check-in, media and completion = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3/E2.3 sessions: stars, claw credits, check-in, media and completion = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

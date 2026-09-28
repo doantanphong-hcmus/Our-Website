@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { authenticatedUser, handleAuth } from "./auth";
 import { handleSessions, sessionSnapshot } from "./sessions";
 import { handleStars } from "./stars";
+import { handleClaw } from "./claw";
 import type { DeepTalkAiBinding } from "./deep-talk-ai";
 
 interface Env {
@@ -44,7 +45,8 @@ export default {
       && request.method === "POST";
     const isSocket = url.pathname === "/ws";
     const isStars = url.pathname === "/api/stars" || url.pathname.startsWith("/api/stars/");
-    if (isSessions || isStars || isSocket) {
+    const isClaw = url.pathname === "/api/claw/credits" || url.pathname.startsWith("/api/claw/credits/");
+    if (isSessions || isStars || isClaw || isSocket) {
       try {
         if (isSocket && request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
           return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -54,6 +56,7 @@ export default {
         // ponytail: P4.9 lets AI and fallback race; P4.10 can add a dedicated deck-status broadcast.
         if (isSessions && (request.method === "GET" || isDeckGeneration)) return handleSessions(request, env);
         if (isStars && request.method === "GET") return handleStars(request, env);
+        if (isClaw && request.method === "GET") return handleClaw(request, env);
         return env.REALTIME_ROOM.getByName(auth.user.couple_space_id).fetch(request);
       } catch {
         return Response.json({ error: "Không thể xử lý yêu cầu lúc này." }, { status: 500 });
@@ -115,8 +118,10 @@ export class RealtimeRoom extends DurableObject<Env> {
   }
 
   private async command(request: Request): Promise<Response> {
-    const isStars = new URL(request.url).pathname.startsWith("/api/stars/");
-    const response = isStars ? await handleStars(request, this.env) : await handleSessions(request, this.env);
+    const path = new URL(request.url).pathname;
+    const response = path.startsWith("/api/stars/") ? await handleStars(request, this.env)
+      : path.startsWith("/api/claw/") ? await handleClaw(request, this.env)
+        : await handleSessions(request, this.env);
     if (!response.ok) return response;
     const payload = await response.clone().json<{ session?: unknown; wallet?: { balance: number; updatedAt: number }; duplicate?: boolean }>();
     if ((!payload.session && !payload.wallet) || payload.duplicate) return response;

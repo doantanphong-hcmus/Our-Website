@@ -40,6 +40,12 @@ try {
   ]);
   assert.deepEqual(JSON.parse(walletOutput)[0].results, [{ beneficiary_user_id: "user-nhi", balance: 0 }]);
 
+  const clawWalletOutput = run([
+    "d1", "execute", ...local, "--json", "--command",
+    "SELECT owner_user_id, balance FROM claw_credit_wallets",
+  ]);
+  assert.deepEqual(JSON.parse(clawWalletOutput)[0].results, [{ owner_user_id: "user-nhi", balance: 0 }]);
+
   run([
     "d1", "execute", ...local, "--command",
     "INSERT INTO users (id,couple_space_id,username,password_hash,display_name,color,role) VALUES ('third','couple-main','third','!auth-not-configured','Third','#112233','boyfriend')",
@@ -75,7 +81,21 @@ try {
   run(["d1", "execute", ...local, "--command", "DELETE FROM star_transactions WHERE id='stars-1'"], true);
   run(["d1", "execute", ...local, "--command", "UPDATE star_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
 
-  console.log("P1.4/E1.1-E1.2 D1 schema: migration, idempotent seed, immutable star ledger and constraints = OK");
+  run(["d1", "execute", ...local, "--command", `
+    UPDATE star_wallets SET balance=30, updated_at=unixepoch() WHERE couple_space_id='couple-main';
+    INSERT INTO claw_credit_purchases
+      (id,couple_space_id,buyer_user_id,idempotency_key,star_transaction_id,stars_spent,credits_added,label_snapshot)
+    VALUES ('pack-1','couple-main','user-nhi','buy-claw-pack-001','stars-pack-1',20,5,'5 lượt gắp thú');`]);
+  const clawPurchaseOutput = run([
+    "d1", "execute", ...local, "--json", "--command",
+    "SELECT (SELECT balance FROM star_wallets) AS stars, (SELECT balance FROM claw_credit_wallets) AS credits",
+  ]);
+  assert.deepEqual(JSON.parse(clawPurchaseOutput)[0].results, [{ stars: 10, credits: 5 }]);
+  run(["d1", "execute", ...local, "--command", "UPDATE claw_credit_purchases SET credits_added=10 WHERE id='pack-1'"], true);
+  run(["d1", "execute", ...local, "--command", "DELETE FROM claw_credit_purchases WHERE id='pack-1'"], true);
+  run(["d1", "execute", ...local, "--command", "UPDATE claw_credit_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
+
+  console.log("P1.4/E1.1-E1.2/E2.3 D1 schema: immutable star/claw ledgers and constraints = OK");
 } finally {
   await rm(state, { recursive: true, force: true });
 }
