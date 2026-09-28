@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { ClawPhysics, type ClawInput, type ClawSnapshot } from "@our-website/claw-physics";
 import type { User } from "./user";
 
@@ -25,9 +25,12 @@ const plushStyle: Record<string, { color: string; ears: "round" | "long" | "smal
   cat: { color: "#e6b765", ears: "small" }, capybara: { color: "#ad7955", ears: "round" },
   dinosaur: { color: "#83b895", ears: "small" }, seal: { color: "#a9c7d9", ears: "round" },
 };
-const plushEmoji: Record<string, string> = {
-  bear: "🧸", rabbit: "🐰", cat: "🐱", capybara: "🦫", dinosaur: "🦕", seal: "🦭",
-};
+
+function PlushIcon({ id }: { id: string }) {
+  const style = plushStyle[id] ?? { color: "#c7a6cf", ears: "round" as const };
+  return <span className={`claw-plush-icon claw-plush-icon--${style.ears}`} aria-hidden="true"
+    style={{ "--plush-color": style.color } as CSSProperties} />;
+}
 
 async function call(path: string, method = "GET", body?: unknown): Promise<Payload> {
   const response = await fetch(path, { method, credentials: "same-origin",
@@ -93,9 +96,18 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   const background = context.createLinearGradient(0, 0, 0, 640);
   background.addColorStop(0, "#342743"); background.addColorStop(.7, "#241b30"); background.addColorStop(1, "#17111f");
   context.fillStyle = background; context.fillRect(0, 0, 360, 640);
-  context.fillStyle = "rgba(255,255,255,.06)"; context.fillRect(17, 20, 326, 535);
+  context.fillStyle = "#463252"; context.fillRect(8, 8, 344, 47);
+  context.fillStyle = "#fff1f5"; context.font = "800 15px system-ui"; context.textAlign = "center";
+  context.fillText("MÁY GẮP CỦA NHI", 180, 38); context.textAlign = "start";
+  for (const [x, y] of [[38, 85], [92, 145], [305, 105], [275, 190], [58, 245]]) {
+    context.fillStyle = "rgba(248,190,215,.3)"; context.beginPath(); context.arc(x, y, 2.2, 0, Math.PI * 2); context.fill();
+  }
+  context.fillStyle = "rgba(255,255,255,.06)"; context.fillRect(17, 55, 326, 500);
   context.strokeStyle = "#c6a6d6"; context.lineWidth = 4; context.strokeRect(17, 20, 326, 535);
-  context.fillStyle = "#8e5ca2"; context.fillRect(22, 28, 316, 19);
+  context.fillStyle = "#8e5ca2"; context.fillRect(22, 55, 316, 8);
+  context.fillStyle = "#382943"; context.fillRect(88, 520, 250, 35);
+  context.strokeStyle = "rgba(255,255,255,.1)"; context.lineWidth = 2;
+  for (let x = 100; x < 338; x += 24) { context.beginPath(); context.moveTo(x, 520); context.lineTo(x - 12, 555); context.stroke(); }
   context.fillStyle = "#17111f"; context.fillRect(0, 580, 360, 60);
   context.fillStyle = "#60416e"; context.fillRect(95, 575, 265, 26);
   context.fillStyle = "#120e18"; context.fillRect(0, 555, 88, 85);
@@ -141,6 +153,27 @@ export function ClawGame({ user }: { user: User }) {
   const finishing = useRef(false);
   const createKey = useRef(crypto.randomUUID());
   const purchaseKey = useRef(crypto.randomUUID());
+  const audio = useRef<AudioContext | null>(null);
+  const [feedback, setFeedback] = useState(() => stored<boolean>("our:claw-feedback:v1") ?? true);
+
+  function sound(kind: "start" | "drop" | "won" | "missed", force = false) {
+    if (!feedback && !force) return;
+    try {
+      const context = audio.current ?? new AudioContext();
+      audio.current = context;
+      void context.resume();
+      const notes = kind === "won" ? [523, 659, 784] : kind === "missed" ? [330, 247] : kind === "drop" ? [440, 330] : [392, 523];
+      notes.forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const begins = context.currentTime + index * .09;
+        oscillator.type = "sine"; oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(.0001, begins); gain.gain.exponentialRampToValueAtTime(.08, begins + .015);
+        gain.gain.exponentialRampToValueAtTime(.0001, begins + .13);
+        oscillator.connect(gain).connect(context.destination); oscillator.start(begins); oscillator.stop(begins + .14);
+      });
+    } catch { /* audio is optional */ }
+  }
 
   async function load(showLoading = true) {
     if (showLoading) setLoading(true);
@@ -206,6 +239,8 @@ export function ClawGame({ user }: { user: User }) {
     return () => { stopped = true; window.clearTimeout(reconnect); window.removeEventListener("online", online); socket?.close(); };
   }, []);
 
+  useEffect(() => () => { void audio.current?.close(); }, []);
+
   useEffect(() => {
     if (!loading) store(CACHE_KEY, { attempt, credits, collection, rewardTable } satisfies ClawCache);
   }, [attempt, credits, collection, rewardTable, loading]);
@@ -247,7 +282,7 @@ export function ClawGame({ user }: { user: User }) {
     const lastStep = controls.current.at(-1)?.step ?? 0;
     const step = Math.max(current.stepNumber + 1, lastStep + 1);
     if (input.move !== undefined) scheduledMove.current = input.move;
-    if (input.drop) { input.move = 0; scheduledMove.current = 0; dropped.current = true; }
+    if (input.drop) { input.move = 0; scheduledMove.current = 0; dropped.current = true; sound("drop"); }
     const control = { step, ...input } as ClawInput;
     controls.current = [...controls.current, control];
     const attemptId = attempt?.id;
@@ -279,7 +314,8 @@ export function ClawGame({ user }: { user: User }) {
         setLatestCapture(payload.capture);
         setCollection((items) => [payload.capture!, ...items.filter(({ instanceId }) => instanceId !== payload.capture!.instanceId)]);
       }
-      navigator.vibrate?.(outcome === "won" ? [35, 45, 70] : 25);
+      sound(outcome);
+      if (feedback && !user.preferences.reducedMotion) navigator.vibrate?.(outcome === "won" ? [35, 45, 70] : 25);
     } catch (reason) { setError(navigator.onLine
       ? (reason instanceof Error ? reason.message : "Chưa ghi nhận được lượt chơi.")
       : "Đã giữ kết quả trên máy · khi có mạng hệ thống sẽ tự gửi lại."); }
@@ -336,6 +372,7 @@ export function ClawGame({ user }: { user: User }) {
 
   async function start() {
     if (!attempt) return;
+    sound("start");
     setPending(true); setError("");
     try {
       const payload = await call(`/api/claw/attempts/${attempt.id}/start`, "POST", { expectedVersion: attempt.version });
@@ -367,7 +404,14 @@ export function ClawGame({ user }: { user: User }) {
   return <section className="claw-game" aria-labelledby="page-title" onKeyDown={(event) => keyboard(event, true)} onKeyUp={(event) => keyboard(event, false)}>
     <header className="claw-game__header">
       <div><p className="eyebrow">Máy gắp của Nhi</p><h1 id="page-title">Gắp một bé về nhà</h1></div>
-      <span className="claw-credit" aria-label={`${credits?.balance ?? 0} lượt gắp`}>🕹️ {credits?.balance ?? "…"}</span>
+      <div className="claw-status">
+        <button type="button" className="claw-feedback" aria-pressed={feedback}
+          aria-label={`${feedback ? "Tắt" : "Bật"} âm thanh và rung`} onClick={() => {
+            const enabled = !feedback; setFeedback(enabled); store("our:claw-feedback:v1", enabled);
+            if (enabled) sound("start", true);
+          }}>{feedback ? "🔊" : "🔇"}</button>
+        <span className="claw-credit" aria-label={`${credits?.balance ?? 0} lượt gắp`}>🕹️ {credits?.balance ?? "…"}</span>
+      </div>
     </header>
     {remaining !== null && <p className="claw-timeout" role="status">Lượt này còn {remaining} giây</p>}
     {loading ? <p className="claw-message" role="status">Đang bật đèn máy gắp…</p> : null}
@@ -387,17 +431,18 @@ export function ClawGame({ user }: { user: User }) {
       </div>
     </> : null}
     {!loading && attempt?.status === "ready" ? <div className="claw-lobby">
-      <span aria-hidden="true">🧸</span><h2>Máy đã xếp thú xong</h2><p>Một lượt chỉ bắt đầu khi em bấm nút bên dưới.</p>
+      <PlushIcon id="bear" /><h2>Máy đã xếp thú xong</h2><p>Một lượt chỉ bắt đầu khi em bấm nút bên dưới.</p>
       {canPlay ? <button type="button" disabled={pending} onClick={() => void start()}>{pending ? "Đang khởi động…" : "Bắt đầu gắp"}</button>
         : <p>Đợi Nhi khởi động máy nhé.</p>}
     </div> : null}
-    {!loading && attempt && ["won", "missed", "abandoned"].includes(attempt.status) ? <div className="claw-result">
-      <span aria-hidden="true">{attempt.status === "won" ? "🎉🧸" : attempt.status === "abandoned" ? "⏳" : "🌙"}</span>
+    {!loading && attempt && ["won", "missed", "abandoned"].includes(attempt.status) ? <div className={`claw-result claw-result--${attempt.status}`}>
+      {attempt.status === "won" ? <PlushIcon id={attempt.capturedPlushId ?? "bear"} />
+        : <span aria-hidden="true">{attempt.status === "abandoned" ? "⏳" : "🌙"}</span>}
       <h2>{attempt.status === "won" ? "Gắp được rồi!" : attempt.status === "abandoned" ? "Lượt gắp đã hết thời gian" : "Suýt nữa là được rồi"}</h2>
       <p>{attempt.status === "won" ? "Bé thú đã rơi gọn vào máng quà." : attempt.status === "abandoned"
         ? "Lượt đang chơi đã được đóng an toàn. Mình bắt đầu lượt mới nhé." : "Càng bị tuột mất, mình thử một vị trí khác nhé."}</p>
       {latestCapture?.attemptId === attempt.id && <div className="claw-reward" role="status">
-        <span aria-hidden="true">{plushEmoji[latestCapture.plushId] ?? "🧸"}</span>
+        <PlushIcon id={latestCapture.plushId} />
         <strong>{latestCapture.plushLabel}</strong>
         <small>{latestCapture.reward.label} · +{latestCapture.reward.stars} ⭐</small>
       </div>}
@@ -421,7 +466,7 @@ export function ClawGame({ user }: { user: User }) {
     {!loading && <section className="claw-collection" aria-labelledby="claw-collection-title">
       <div><p className="eyebrow">Tủ thú của Nhi</p><h2 id="claw-collection-title">Bộ sưu tập</h2></div>
       {collection.length ? <div className="claw-collection__grid">{collection.map((item) => <article key={item.instanceId}>
-        <span aria-hidden="true">{plushEmoji[item.plushId] ?? "🧸"}</span>
+        <PlushIcon id={item.plushId} />
         <strong>{item.plushLabel}</strong><small>Quà: +{item.reward.stars} ⭐</small>
       </article>)}</div> : <p className="claw-message">Bé thú đầu tiên vẫn đang chờ em gắp về.</p>}
       <details className="claw-odds"><summary>Quà có thể nhận</summary>

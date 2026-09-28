@@ -102,12 +102,18 @@ async function main() {
     assert.equal(await page.locator("html").getAttribute("data-motion"), "reduced");
 
     user = { ...user, id: "user-nhi", username: "nhi", displayName: "Nhi", nickname: "Nhi",
-      color: "#3F6F61", role: "girlfriend", preferences: { theme: "dark", reducedMotion: false } };
+      color: "#3F6F61", role: "girlfriend", preferences: { theme: "dark", reducedMotion: true } };
     await page.goto(new URL("/gap-thu", baseUrl).href);
     await page.getByRole("heading", { name: "Gắp một bé về nhà" }).waitFor();
+    assert.equal(await page.locator("html").getAttribute("data-motion"), "reduced");
     await page.getByText("Bộ sưu tập").waitFor();
     assert.equal(await page.getByText("Quà có thể nhận").count(), 1);
     assert.equal(await page.getByText(/Lượt này còn \d+ giây/).count(), 1);
+    assert.equal(await page.locator(".claw-plush-icon").count(), 1);
+    const feedback = page.getByRole("button", { name: "Tắt âm thanh và rung" });
+    await feedback.click();
+    assert.equal(await page.getByRole("button", { name: "Bật âm thanh và rung" }).getAttribute("aria-pressed"), "false");
+    assert.equal(await page.evaluate(() => localStorage.getItem("our:claw-feedback:v1")), "false");
     await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
     const machine = page.locator(".claw-machine canvas");
     await machine.waitFor();
@@ -125,7 +131,7 @@ async function main() {
 
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);
     await page.getByRole("heading", { name: "Không tìm thấy trang" }).waitFor();
-    console.log("P1.3/E2.7 app shell: mobile claw, local recovery cache, collection and controls = OK");
+    console.log("P1.3/E2.8 app shell: mobile claw art, optional feedback, reduced motion and recovery = OK");
   } finally {
     await browser.close();
   }

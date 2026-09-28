@@ -1881,6 +1881,24 @@ main {
 
 .claw-game__header h1 { margin: 0; }
 
+.claw-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.claw-feedback {
+  display: grid;
+  place-items: center;
+  inline-size: 2.6rem;
+  min-block-size: 2.6rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
 .claw-credit {
   flex: none;
   padding: .45rem .75rem;
@@ -1904,7 +1922,11 @@ main {
   border-radius: var(--radius-large);
   background: #17111f;
   box-shadow: 0 1rem 3rem rgb(23 17 31 / 28%);
+  transition: box-shadow .25s ease, transform .25s ease;
 }
+
+.claw-machine--close,
+.claw-machine--release { box-shadow: 0 1rem 3rem rgb(23 17 31 / 32%), 0 0 0 .2rem rgb(240 163 181 / 18%); }
 
 .claw-machine canvas {
   display: block;
@@ -1950,6 +1972,8 @@ main {
 
 .claw-lobby,
 .claw-result {
+  position: relative;
+  overflow: hidden;
   display: grid;
   justify-items: center;
   gap: var(--space-3);
@@ -1980,6 +2004,67 @@ main {
 .claw-message { color: var(--color-text-muted); text-align: center; }
 .claw-error { margin: 0; color: var(--color-danger); text-align: center; }
 
+.claw-plush-icon {
+  --plush-color: #c7a6cf;
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 4rem;
+  block-size: 3.7rem;
+  border: .18rem solid rgb(43 36 48 / 78%);
+  border-radius: 48% 48% 44% 44%;
+  background: var(--plush-color);
+  box-shadow: inset 0 -.45rem rgb(43 36 48 / 8%), 0 .35rem .8rem rgb(24 16 30 / 15%);
+}
+
+.claw-plush-icon::before {
+  position: absolute;
+  z-index: -1;
+  inset-block-start: -.42rem;
+  inset-inline-start: .45rem;
+  inline-size: .9rem;
+  block-size: .9rem;
+  border: .16rem solid rgb(43 36 48 / 78%);
+  border-radius: 50%;
+  background: var(--plush-color);
+  box-shadow: 2.15rem 0 0 -.16rem var(--plush-color), 2.15rem 0 0 0 rgb(43 36 48 / 78%);
+  content: "";
+}
+
+.claw-plush-icon::after {
+  color: #2b2430;
+  content: "• ᴗ •";
+  font: 800 .85rem/1 system-ui, sans-serif;
+  letter-spacing: .08rem;
+}
+
+.claw-plush-icon--long::before {
+  inset-block-start: -1rem;
+  inline-size: .72rem;
+  block-size: 1.65rem;
+  border-radius: var(--radius-pill);
+  box-shadow: 2.38rem 0 0 -.16rem var(--plush-color), 2.38rem 0 0 0 rgb(43 36 48 / 78%);
+  transform: rotate(-8deg);
+}
+
+.claw-plush-icon--small::before { transform: scale(.72) rotate(18deg); }
+.claw-lobby > .claw-plush-icon,
+.claw-result > .claw-plush-icon { font-size: initial; }
+
+.claw-result--won::before {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 18%, #f0a3b5 0 .22rem, transparent .25rem),
+    radial-gradient(circle at 82% 22%, #c8a9d2 0 .2rem, transparent .23rem),
+    radial-gradient(circle at 20% 75%, #f4c867 0 .18rem, transparent .21rem),
+    radial-gradient(circle at 88% 70%, #8fc9b2 0 .2rem, transparent .23rem);
+  content: "";
+  pointer-events: none;
+  animation: claw-confetti 1.8s ease-in-out infinite alternate;
+}
+
 .claw-reward {
   display: grid;
   justify-items: center;
@@ -1991,7 +2076,7 @@ main {
   animation: claw-reward-in .45s ease-out both;
 }
 
-.claw-reward > span { font-size: 3rem; }
+.claw-reward > span { font-size: initial; }
 .claw-reward small { color: var(--color-shared); font-weight: 800; }
 
 .claw-collection {
@@ -2014,7 +2099,7 @@ main {
   border-radius: var(--radius-medium);
   text-align: center;
 }
-.claw-collection__grid article > span { font-size: 2.5rem; }
+.claw-collection__grid article > span { font-size: initial; }
 .claw-collection__grid small { color: var(--color-text-muted); }
 .claw-odds summary { cursor: pointer; color: var(--color-shared); font-weight: 800; }
 .claw-odds ul { display: grid; gap: var(--space-2); margin-block-end: 0; padding: 0; list-style: none; }
@@ -2024,9 +2109,17 @@ main {
   from { opacity: 0; transform: translateY(.75rem) scale(.96); }
 }
 
+@keyframes claw-confetti {
+  to { transform: translateY(.45rem) rotate(.8deg); }
+}
+
 [data-motion="reduced"] :is(.claw-machine, .claw-reward) { animation: none; box-shadow: none; }
+[data-motion="reduced"] .claw-result--won::before { display: none; }
 
 @media (max-width: 30rem) {
+  .claw-game__header { align-items: center; }
+  .claw-game__header h1 { font-size: clamp(1.75rem, 9vw, 2.35rem); }
+  .claw-status { flex-direction: column; }
   .food-vote-actions { grid-template-columns: 1fr; }
   .food-result-actions { grid-template-columns: 1fr; }
   .deep-talk-topics fieldset { grid-template-columns: 1fr; }
