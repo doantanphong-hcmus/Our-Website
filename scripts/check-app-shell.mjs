@@ -127,11 +127,22 @@ async function main() {
     await page.getByRole("button", { name: "THẢ CÀNG" }).click();
     await page.waitForFunction(() => JSON.parse(localStorage.getItem("our:claw-state:v1") ?? "null")?.attempt?.controlTrace
       ?.some((item) => item.drop === true));
+    await page.evaluate(() => {
+      const attempt = JSON.parse(localStorage.getItem("our:claw-state:v1") ?? "null").attempt;
+      localStorage.setItem("our:claw-completion:v1", JSON.stringify({ attemptId: attempt.id, body: {
+        expectedVersion: attempt.version, outcome: "missed", steps: 420, controlTrace: attempt.controlTrace,
+      } }));
+      window.dispatchEvent(new Event("online"));
+    });
+    await page.waitForFunction(() => localStorage.getItem("our:claw-completion:v1") === null);
+    await page.getByRole("heading", { name: "Suýt nữa là được rồi" }).waitFor();
+    assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
+    await page.setViewportSize({ width: 430, height: 932 });
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
 
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);
     await page.getByRole("heading", { name: "Không tìm thấy trang" }).waitFor();
-    console.log("P1.3/E2.8 app shell: mobile claw art, optional feedback, reduced motion and recovery = OK");
+    console.log("P1.3/E2.9 app shell: 360-430px, offline completion retry, feedback and reduced motion = OK");
   } finally {
     await browser.close();
   }

@@ -23,6 +23,30 @@ describe("claw physics spike", () => {
     expect(runClawReplay(20260927, aimAt(winningTarget), { gripStrength: 0.15 }).outcome).toBe("missed");
   });
 
+  it("keeps terminal and geometry invariants across 20 deterministic rounds", () => {
+    for (let index = 0; index < 20; index++) {
+      const seed = 9000 + index;
+      const controls = aimAt(112 + (index * 37) % 228);
+      const result = runClawReplay(seed, controls);
+      expect(result).toEqual(runClawReplay(seed, controls));
+      expect(["won", "missed"]).toContain(result.outcome);
+      expect(result.steps).toBeLessThanOrEqual(900);
+      expect(result.capturedPlushId === null).toBe(result.outcome !== "won");
+      expect(new Set(result.finalPlushes.map(({ id }) => id)).size).toBe(6);
+      expect(result.finalPlushes.every(({ x, y, angle }) => [x, y, angle].every(Number.isFinite))).toBe(true);
+    }
+  });
+
+  it("clamps aim and abandons an attempt that never drops", () => {
+    const game = new ClawPhysics(7);
+    for (let step = 0; step < 100; step++) game.step({ move: -1 });
+    expect(game.snapshot().claw.x).toBe(112);
+    for (let step = 0; step < 200; step++) game.step({ move: 1 });
+    expect(game.snapshot().claw.x).toBe(340);
+    while (game.phase !== "abandoned") game.step();
+    expect(game.result()).toMatchObject({ outcome: "abandoned", capturedPlushId: null, steps: 900 });
+  });
+
   it("keeps the headless replay cheap enough for a Worker spike", () => {
     const started = performance.now();
     for (let index = 0; index < 20; index++) runClawReplay(index + 1, aimAt(150 + index * 5));

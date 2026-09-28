@@ -284,9 +284,14 @@ try {
   })).response.status, 409, "saved controls are append-only");
   assert.deepEqual((await request("/api/claw/attempts/active", nhi)).data.attempt.controlTrace, beforeStartTrace,
     "reload must recover the server seed and saved controls");
-  const wonAttempt = await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
+  const completedWins = await Promise.all([1, 2].map(() => request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
     expectedVersion: 3, outcome: "won", steps: 420, capturedPlushId: "bear", controlTrace: beforeStartTrace,
-  });
+  })));
+  assert.deepEqual(completedWins.map(({ response }) => response.status), [200, 200]);
+  assert.equal(completedWins.filter(({ data }) => data.duplicate).length, 1,
+    "double tap must finalize and reward the attempt exactly once");
+  const wonAttempt = completedWins.find(({ data }) => !data.duplicate);
+  const duplicateWin = completedWins.find(({ data }) => data.duplicate);
   assert.equal(wonAttempt.data.attempt.status, "won");
   assert.equal(wonAttempt.data.attempt.verified, true);
   assert.equal(wonAttempt.data.capture.plushId, "bear");
@@ -294,9 +299,6 @@ try {
   assert.ok([1, 2, 4, 8].includes(wonAttempt.data.capture.reward.stars), "every capture receives a configured reward");
   const clawRewardStars = wonAttempt.data.capture.reward.stars;
   assert.equal(wonAttempt.data.wallet.balance, 20 + clawRewardStars);
-  const duplicateWin = await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
-    expectedVersion: 3, outcome: "won", steps: 420, capturedPlushId: "bear", controlTrace: beforeStartTrace,
-  });
   assert.equal(duplicateWin.data.duplicate, true);
   assert.equal(duplicateWin.data.capture.instanceId, wonAttempt.data.capture.instanceId);
   assert.equal(duplicateWin.data.capture.reward.id, wonAttempt.data.capture.reward.id,
@@ -847,7 +849,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3/E2.3-E2.4 sessions: claw lifecycle, stars and activities = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3/E2.9 sessions: claw concurrency, rewards, stars and activities = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([
