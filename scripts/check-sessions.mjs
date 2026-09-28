@@ -229,6 +229,78 @@ try {
   assert.equal((await request("/api/stars", nhi)).data.wallet.balance, 20,
     "three packs must spend exactly 60 stars");
 
+  assert.equal((await request("/api/claw/attempts/active", nhi)).data.attempt, null);
+  assert.equal((await request("/api/claw/attempts", phong, "POST", {
+    idempotencyKey: "phong-cannot-play-claw-01",
+  })).response.status, 403);
+  const createdAttempts = await Promise.all([
+    request("/api/claw/attempts", nhi, "POST", { idempotencyKey: "create-claw-attempt-double-01" }),
+    request("/api/claw/attempts", nhi, "POST", { idempotencyKey: "create-claw-attempt-double-01" }),
+  ]);
+  assert.deepEqual(createdAttempts.map((item) => item.response.status).sort(), [200, 201]);
+  assert.equal(createdAttempts[0].data.attempt.id, createdAttempts[1].data.attempt.id);
+  assert.equal(createdAttempts[0].data.attempt.status, "ready");
+  assert.ok(Number.isInteger(createdAttempts[0].data.attempt.seed));
+  assert.equal(createdAttempts[0].data.credits.balance, 14, "double create must consume one credit");
+  const clawAttemptId = createdAttempts[0].data.attempt.id;
+  assert.equal((await request("/api/claw/attempts", nhi, "POST", {
+    idempotencyKey: "second-active-claw-01",
+  })).response.status, 409);
+  const reloadedReadyAttempt = await request("/api/claw/attempts/active", nhi);
+  assert.equal(reloadedReadyAttempt.data.attempt.id, clawAttemptId);
+  assert.equal(reloadedReadyAttempt.data.attempt.seed, createdAttempts[0].data.attempt.seed);
+  assert.equal((await request(`/api/claw/attempts/${clawAttemptId}/start`, phong, "POST", {
+    expectedVersion: 1,
+  })).response.status, 403);
+  const beforeStartTrace = [{ step: 1, move: -1 }, { step: 17, move: 0, drop: true }];
+  assert.equal((await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
+    expectedVersion: 1, outcome: "missed", steps: 300, controlTrace: beforeStartTrace,
+  })).response.status, 409, "a ready attempt cannot be completed");
+  const startedAttempt = await request(`/api/claw/attempts/${clawAttemptId}/start`, nhi, "POST", {
+    expectedVersion: 1,
+  });
+  assert.equal(startedAttempt.response.status, 200);
+  assert.equal(startedAttempt.data.attempt.status, "playing");
+  assert.equal(startedAttempt.data.attempt.version, 2);
+  const duplicateStart = await request(`/api/claw/attempts/${clawAttemptId}/start`, nhi, "POST", {
+    expectedVersion: 1,
+  });
+  assert.equal(duplicateStart.data.duplicate, true);
+  assert.equal((await request(`/api/claw/attempts/${clawAttemptId}/trace`, nhi, "POST", {
+    expectedVersion: 2, controlTrace: [{ step: 1, drop: true }, { step: 2, move: 1 }],
+  })).response.status, 400, "the claw cannot be repositioned after drop");
+  const savedTrace = await request(`/api/claw/attempts/${clawAttemptId}/trace`, nhi, "POST", {
+    expectedVersion: 2, controlTrace: beforeStartTrace,
+  });
+  assert.equal(savedTrace.data.attempt.version, 3);
+  assert.equal((await request(`/api/claw/attempts/${clawAttemptId}/trace`, nhi, "POST", {
+    expectedVersion: 3, controlTrace: [{ step: 2, move: 1 }],
+  })).response.status, 409, "saved controls are append-only");
+  assert.deepEqual((await request("/api/claw/attempts/active", nhi)).data.attempt.controlTrace, beforeStartTrace,
+    "reload must recover the server seed and saved controls");
+  const wonAttempt = await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
+    expectedVersion: 3, outcome: "won", steps: 420, capturedPlushId: "bear", controlTrace: beforeStartTrace,
+  });
+  assert.equal(wonAttempt.data.attempt.status, "won");
+  assert.equal(wonAttempt.data.attempt.verified, true);
+  const duplicateWin = await request(`/api/claw/attempts/${clawAttemptId}/complete`, nhi, "POST", {
+    expectedVersion: 3, outcome: "won", steps: 420, capturedPlushId: "bear", controlTrace: beforeStartTrace,
+  });
+  assert.equal(duplicateWin.data.duplicate, true);
+  assert.equal((await request("/api/claw/attempts/active", nhi)).data.attempt, null);
+  assert.equal((await request(`/api/claw/attempts/${clawAttemptId}`, phong)).data.attempt.status, "won",
+    "Phong may view but cannot control Nhi's attempt");
+
+  const missedCreate = await request("/api/claw/attempts", nhi, "POST", { idempotencyKey: "create-claw-miss-01" });
+  const missedId = missedCreate.data.attempt.id;
+  const missedStart = await request(`/api/claw/attempts/${missedId}/start`, nhi, "POST", { expectedVersion: 1 });
+  const missedAttempt = await request(`/api/claw/attempts/${missedId}/complete`, nhi, "POST", {
+    expectedVersion: missedStart.data.attempt.version, outcome: "missed", steps: 420, controlTrace: beforeStartTrace,
+  });
+  assert.equal(missedAttempt.data.attempt.status, "missed");
+  assert.equal((await request("/api/claw/credits", nhi)).data.credits.balance, 13,
+    "won and missed attempts must each consume exactly one credit on create");
+
   const replayedDeck = await request("/api/sessions/00000000-0000-4000-8000-000000000101/deep-talk-deck", phong, "POST", {
     expectedVersion: 1, idempotencyKey: "history-deck-key-1",
   });
@@ -751,7 +823,7 @@ try {
   const snapshot = (await request("/api/sessions", phong)).data;
   assert.equal(snapshot.deepTalkPlayedToday, true);
 
-  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3/E2.3 sessions: stars, claw credits, check-in, media and completion = OK");
+  console.log("P1.9/P2.16-P2.18/P3.2-P4.15/E1.2-E1.3/E2.3-E2.4 sessions: claw lifecycle, stars and activities = OK");
 } finally {
   server.kill("SIGTERM");
   await Promise.race([

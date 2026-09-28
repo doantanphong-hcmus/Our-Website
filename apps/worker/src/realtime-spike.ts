@@ -45,7 +45,7 @@ export default {
       && request.method === "POST";
     const isSocket = url.pathname === "/ws";
     const isStars = url.pathname === "/api/stars" || url.pathname.startsWith("/api/stars/");
-    const isClaw = url.pathname === "/api/claw/credits" || url.pathname.startsWith("/api/claw/credits/");
+    const isClaw = url.pathname.startsWith("/api/claw/");
     if (isSessions || isStars || isClaw || isSocket) {
       try {
         if (isSocket && request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {

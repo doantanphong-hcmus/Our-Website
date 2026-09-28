@@ -95,7 +95,27 @@ try {
   run(["d1", "execute", ...local, "--command", "DELETE FROM claw_credit_purchases WHERE id='pack-1'"], true);
   run(["d1", "execute", ...local, "--command", "UPDATE claw_credit_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
 
-  console.log("P1.4/E1.1-E1.2/E2.3 D1 schema: immutable star/claw ledgers and constraints = OK");
+  run(["d1", "execute", ...local, "--command", `INSERT INTO claw_attempts
+    (id,couple_space_id,player_user_id,idempotency_key,seed,rules_version,expires_at)
+    VALUES ('00000000-0000-4000-8000-000000000201','couple-main','user-nhi','claw-attempt-001',42,1,unixepoch()+300)`]);
+  const attemptOutput = run([
+    "d1", "execute", ...local, "--json", "--command",
+    "SELECT (SELECT balance FROM claw_credit_wallets) AS credits, (SELECT status FROM claw_attempts) AS status",
+  ]);
+  assert.deepEqual(JSON.parse(attemptOutput)[0].results, [{ credits: 4, status: "ready" }]);
+  run(["d1", "execute", ...local, "--command", `INSERT INTO claw_attempts
+    (id,couple_space_id,player_user_id,idempotency_key,seed,rules_version,expires_at)
+    VALUES ('00000000-0000-4000-8000-000000000202','couple-main','user-nhi','claw-attempt-002',43,1,unixepoch()+300)`], true);
+  run(["d1", "execute", ...local, "--command",
+    "UPDATE claw_attempts SET seed=99, version=2 WHERE id='00000000-0000-4000-8000-000000000201'"], true);
+  run(["d1", "execute", ...local, "--command", `UPDATE claw_attempts SET status='playing', started_at=unixepoch(),
+    expires_at=unixepoch()+120, updated_at=unixepoch(), version=2 WHERE id='00000000-0000-4000-8000-000000000201';
+    UPDATE claw_attempts SET status='missed', control_trace_json='[{"step":1,"drop":true}]', result_steps=300,
+    result_verified=1, completed_at=unixepoch(), updated_at=unixepoch(), version=3
+    WHERE id='00000000-0000-4000-8000-000000000201';`]);
+  run(["d1", "execute", ...local, "--command", "DELETE FROM claw_attempts WHERE id='00000000-0000-4000-8000-000000000201'"], true);
+
+  console.log("P1.4/E1.1-E1.2/E2.3-E2.4 D1 schema: atomic credits, guarded attempts and constraints = OK");
 } finally {
   await rm(state, { recursive: true, force: true });
 }
