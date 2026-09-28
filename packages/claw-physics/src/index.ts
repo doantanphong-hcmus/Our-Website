@@ -13,6 +13,12 @@ export type ClawResult = {
   steps: number;
   finalPlushes: { id: string; x: number; y: number; angle: number }[];
 };
+export type ClawSnapshot = {
+  phase: ClawPhase;
+  step: number;
+  claw: { x: number; y: number; close: number };
+  plushes: { id: string; x: number; y: number; angle: number; radius: number }[];
+};
 
 type Plush = { id: string; body: Matter.Body; radius: number; grip: number };
 
@@ -124,6 +130,13 @@ export class ClawPhysics {
       finalPlushes: this.plushes.map(({ id, body }) => ({ id,
         x: Number(body.position.x.toFixed(3)), y: Number(body.position.y.toFixed(3)), angle: Number(body.angle.toFixed(4)) })),
     };
+  }
+
+  snapshot(): ClawSnapshot {
+    return { phase: this.phase, step: this.stepNumber,
+      claw: { x: this.clawX, y: this.clawY, close: this.closeAmount },
+      plushes: this.plushes.map(({ id, body, radius }) => ({ id, radius,
+        x: body.position.x, y: body.position.y, angle: body.angle })) };
   }
 
   private isTerminal() { return this.phase === "won" || this.phase === "missed" || this.phase === "abandoned"; }

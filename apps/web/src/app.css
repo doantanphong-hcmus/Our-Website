@@ -275,6 +275,18 @@ button:disabled {
 
 .star-balance { margin-block: var(--space-3) var(--space-5); color: var(--color-text-muted); }
 .star-balance span { color: var(--color-text); font-size: clamp(2.5rem, 12vw, 4rem); font-weight: 850; }
+.claw-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background: linear-gradient(135deg, var(--color-user-two-soft), var(--color-shared-soft));
+  text-decoration: none;
+}
+.claw-entry > span:first-child { font-size: 2rem; }
+.claw-entry > span:nth-child(2) { display: grid; flex: 1; }
+.claw-entry small { color: var(--color-text-muted); }
 .star-award-form { display: grid; gap: var(--space-4); }
 .star-award-form label { display: grid; gap: var(--space-2); font-weight: 750; }
 .star-award-form select,
@@ -1852,6 +1864,116 @@ main {
 
 .food-result-actions button { min-block-size: 3.25rem; }
 .food-result-actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
+
+.claw-game {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 26rem;
+  margin-inline: auto;
+}
+
+.claw-game__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.claw-game__header h1 { margin: 0; }
+
+.claw-credit {
+  flex: none;
+  padding: .45rem .75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-weight: 850;
+}
+
+.claw-machine {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: #17111f;
+  box-shadow: 0 1rem 3rem rgb(23 17 31 / 28%);
+}
+
+.claw-machine canvas {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 9 / 16;
+  touch-action: none;
+}
+
+.claw-phase {
+  position: absolute;
+  inset-inline: var(--space-3);
+  inset-block-end: var(--space-3);
+  margin: 0;
+  padding: .55rem .8rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: var(--radius-pill);
+  background: rgb(23 17 31 / 78%);
+  color: #fff8f1;
+  font-size: var(--font-small);
+  font-weight: 750;
+  text-align: center;
+  backdrop-filter: blur(.5rem);
+}
+
+.claw-controls {
+  display: grid;
+  grid-template-columns: 1fr 1.7fr 1fr;
+  gap: var(--space-2);
+  user-select: none;
+}
+
+.claw-controls button {
+  min-block-size: 4rem;
+  font-size: 1.55rem;
+  touch-action: none;
+}
+
+.claw-controls .claw-drop {
+  background: var(--color-user-one);
+  font-size: .9rem;
+  letter-spacing: .04em;
+}
+
+.claw-lobby,
+.claw-result {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+  text-align: center;
+  box-shadow: var(--shadow-card);
+}
+
+.claw-lobby > span,
+.claw-result > span { font-size: 4rem; }
+.claw-lobby :where(h2, p),
+.claw-result :where(h2, p) { margin: 0; }
+.claw-lobby p,
+.claw-result p { color: var(--color-text-muted); }
+.claw-lobby button,
+.claw-result button { min-block-size: 3.25rem; padding-inline: var(--space-5); }
+
+.claw-lobby__actions {
+  display: grid;
+  gap: var(--space-2);
+  inline-size: 100%;
+}
+
+.claw-lobby__actions .secondary-button { background: var(--color-shared-soft); color: var(--color-shared); }
+.claw-message { color: var(--color-text-muted); text-align: center; }
+.claw-error { margin: 0; color: var(--color-danger); text-align: center; }
+
+[data-motion="reduced"] .claw-machine { box-shadow: none; }
 
 @media (max-width: 30rem) {
   .food-vote-actions { grid-template-columns: 1fr; }

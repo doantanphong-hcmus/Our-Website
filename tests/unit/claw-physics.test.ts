@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { aimAt, runClawReplay } from "../../packages/claw-physics/src/index";
+import { aimAt, ClawPhysics, runClawReplay } from "../../packages/claw-physics/src/index";
 
 describe("claw physics spike", () => {
   it("replays the same fixed-step attempt deterministically", () => {
     const controls = aimAt(148);
     expect(runClawReplay(20260927, controls)).toEqual(runClawReplay(20260927, controls));
+  });
+
+  it("exposes a render snapshot without leaking engine internals", () => {
+    const game = new ClawPhysics(42);
+    const snapshot = game.snapshot();
+    expect(snapshot.claw).toEqual({ x: 180, y: 70, close: 0 });
+    expect(snapshot.plushes).toHaveLength(6);
   });
 
   it("uses aim, mass and grip instead of a random victory roll", () => {

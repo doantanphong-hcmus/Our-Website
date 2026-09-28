@@ -24,6 +24,11 @@ async function main() {
       activities: [{ id: "listening", label: "Luyện nghe", condition: "Ít nhất 30 phút", points: 10 }],
       rewards: [{ id: "snack", label: "Một món ăn vặt bất kỳ", cost: 30 }], transactions: [],
     };
+    let clawAttempt = {
+      id: "00000000-0000-4000-8000-000000000301", status: "ready", seed: 20260928,
+      controlTrace: [], capturedPlushId: null, resultSteps: null, version: 1, expiresAt: 2_000_000_000,
+    };
+    const clawCredits = { balance: 5, packCost: 20, attemptsPerPack: 5, purchasedToday: 1, maximumPacksPerDay: 3 };
     await page.route("**/api/auth/session", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -44,6 +49,18 @@ async function main() {
       }] };
       await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ wallet: starWallet }) });
     });
+    await page.route("**/api/claw/**", async (route) => {
+      const url = new URL(route.request().url());
+      const body = route.request().postData();
+      const input = body ? JSON.parse(body) : {};
+      if (url.pathname.endsWith("/active")) return route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ attempt: clawAttempt, credits: clawCredits }) });
+      if (url.pathname.endsWith("/start")) clawAttempt = { ...clawAttempt, status: "playing", version: 2 };
+      if (url.pathname.endsWith("/trace")) clawAttempt = { ...clawAttempt, controlTrace: input.controlTrace, version: clawAttempt.version + 1 };
+      if (url.pathname.endsWith("/complete")) clawAttempt = { ...clawAttempt, status: input.outcome, capturedPlushId: input.capturedPlushId ?? null,
+        resultSteps: input.steps, version: clawAttempt.version + 1 };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ attempt: clawAttempt, credits: clawCredits }) });
+    });
     await page.goto(baseUrl);
 
     await page.getByRole("button", { name: "Mở phần tặng sao" }).click();
@@ -53,6 +70,7 @@ async function main() {
     await page.getByRole("button", { name: "Ghi nhận đổi" }).click();
     await page.getByText("Đã ghi nhận đổi").waitFor();
     assert.equal(await page.locator(".star-balance span").textContent(), "70");
+    assert.equal(await starPanel.getByRole("link", { name: /Máy gắp thú/ }).getAttribute("href"), "/gap-thu");
     await starPanel.getByRole("button", { name: "Đóng" }).click();
 
     const nav = page.getByRole("navigation", { name: "Điều hướng chính" });
@@ -75,9 +93,26 @@ async function main() {
     await page.waitForFunction(() => document.documentElement.dataset.motion === "reduced");
     assert.equal(await page.locator("html").getAttribute("data-motion"), "reduced");
 
+    user = { ...user, id: "user-nhi", username: "nhi", displayName: "Nhi", nickname: "Nhi",
+      color: "#3F6F61", role: "girlfriend", preferences: { theme: "dark", reducedMotion: false } };
+    await page.goto(new URL("/gap-thu", baseUrl).href);
+    await page.getByRole("heading", { name: "Gắp một bé về nhà" }).waitFor();
+    await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
+    const machine = page.locator(".claw-machine canvas");
+    await machine.waitFor();
+    const machineBounds = await machine.boundingBox();
+    assert.ok(machineBounds && machineBounds.width <= 328 && machineBounds.height > machineBounds.width,
+      "claw canvas must fit the 360px mobile viewport");
+    const right = page.getByRole("button", { name: "Di chuyển càng sang phải" });
+    await right.dispatchEvent("pointerdown", { pointerId: 1 });
+    await page.waitForTimeout(80);
+    await right.dispatchEvent("pointerup", { pointerId: 1 });
+    await page.getByRole("button", { name: "THẢ CÀNG" }).click();
+    assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
+
     await page.goto(new URL("/khong-ton-tai", baseUrl).href);
     await page.getByRole("heading", { name: "Không tìm thấy trang" }).waitFor();
-    console.log("P1.3 app shell: routes, navigation, responsive width and preferences = OK");
+    console.log("P1.3/E2.5 app shell: routes, mobile claw canvas, controls and preferences = OK");
   } finally {
     await browser.close();
   }

@@ -112,6 +112,7 @@ export function Stars({ user }: { user: User }) {
         <p className="eyebrow">Góc học tiếng Anh</p>
         <h2 id="star-title">{user.role === "boyfriend" ? "Tặng sao cho Nhi" : "Ví sao của Nhi"}</h2>
         <p className="star-balance"><span>{wallet?.balance ?? "…"}</span> ⭐</p>
+        <a className="claw-entry" href="/gap-thu" onClick={() => setOpen(false)}><span aria-hidden="true">🕹️</span><span><strong>Máy gắp thú</strong><small>20 sao đổi 5 lượt chơi</small></span><b aria-hidden="true">→</b></a>
         {user.role === "boyfriend" ? <form className="star-award-form" onSubmit={submit}>
           <label>Hoạt động<select value={activityId} onChange={(event) => { setActivityId(event.target.value); setMessage(""); setError(""); }}>
             {wallet?.activities.map((activity) => <option key={activity.id} value={activity.id}>{activity.label}</option>)}

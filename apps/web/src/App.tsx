@@ -7,6 +7,7 @@ import { FoodSessionSetup } from "./FoodSessionSetup";
 import { DeepTalkSetup } from "./DeepTalkSetup";
 import { GiftLetter } from "./GiftLetter";
 import { Stars } from "./Stars";
+import { ClawGame } from "./ClawGame";
 
 type Route = {
   path: string;
@@ -42,6 +43,7 @@ const bottomRoutes: Route[] = [
 
 const extraRoutes: Route[] = [
   { path: "/di-dau/xe-tui-mu", label: "Xé Túi Mù", eyebrow: "Đi đâu", description: "Mở một gợi ý bất ngờ cho buổi hẹn tiếp theo.", icon: "sparkle" },
+  { path: "/gap-thu", label: "Gắp Thú", eyebrow: "Đổi sao lấy lượt", description: "Canh càng thật khéo để đưa một bé thú về nhà.", icon: "heart" },
   { path: "/tai-khoan", label: "Thông tin tài khoản", eyebrow: "Cá nhân", description: "Thông tin của tài khoản đang đăng nhập.", icon: "user" },
   { path: "/doi-mat-khau", label: "Đổi mật khẩu", eyebrow: "Bảo mật", description: "Cập nhật mật khẩu cho tài khoản.", icon: "lock" },
 ];
@@ -461,6 +463,8 @@ export function App({ user, onUserChange, onLogout }: {
           <FoodSessionSetup user={user} />
         ) : route?.path === "/deep-talk" ? (
           <DeepTalkSetup user={user} />
+        ) : route?.path === "/gap-thu" ? (
+          <ClawGame user={user} />
         ) : route?.path === "/di-dau" ? (
           <section className="route-card coming-soon" aria-labelledby="page-title">
             <h1 id="page-title">Coming soon ... em bé hãy đợi anh</h1>
