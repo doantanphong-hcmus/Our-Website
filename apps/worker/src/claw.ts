@@ -7,7 +7,7 @@ type PurchaseRow = {
   id: string; stars_spent: number; credits_added: number; label_snapshot: string; created_at: number;
 };
 type AttemptStatus = "ready" | "playing" | "won" | "missed" | "abandoned";
-type Control = { step: number; move?: -1 | 0 | 1; drop?: true };
+type Control = { step: number; move?: -1 | 0 | 1; moveX?: number; moveZ?: number; drop?: true };
 type AttemptRow = {
   id: string; seed: number; rules_version: number; status: AttemptStatus; control_trace_json: string;
   captured_plush_id: string | null; result_steps: number | null; result_verified: number; version: number;
@@ -138,16 +138,20 @@ function readTrace(value: unknown, mustFinish = false): { trace?: Control[]; err
   for (const valueItem of value) {
     if (!valueItem || typeof valueItem !== "object" || Array.isArray(valueItem)) return { error: "Dữ liệu điều khiển không hợp lệ." };
     const item = valueItem as Record<string, unknown>;
-    if (Object.keys(item).some((key) => !["step", "move", "drop"].includes(key))
+    if (Object.keys(item).some((key) => !["step", "move", "moveX", "moveZ", "drop"].includes(key))
       || typeof item.step !== "number" || !Number.isInteger(item.step) || item.step <= lastStep || item.step > 7200
       || (item.move !== undefined && (typeof item.move !== "number" || ![-1, 0, 1].includes(item.move)))
+      || (item.moveX !== undefined && (typeof item.moveX !== "number" || !Number.isFinite(item.moveX) || Math.abs(item.moveX) > 1))
+      || (item.moveZ !== undefined && (typeof item.moveZ !== "number" || !Number.isFinite(item.moveZ) || Math.abs(item.moveZ) > 1))
       || (item.drop !== undefined && item.drop !== true) || dropped) {
       return { error: "Dữ liệu điều khiển không hợp lệ." };
     }
     const control: Control = { step: Number(item.step) };
     if (item.move !== undefined) control.move = Number(item.move) as -1 | 0 | 1;
+    if (item.moveX !== undefined) control.moveX = Number(item.moveX);
+    if (item.moveZ !== undefined) control.moveZ = Number(item.moveZ);
     if (item.drop === true) { control.drop = true; dropped = true; }
-    if (control.move === undefined && !control.drop) return { error: "Dữ liệu điều khiển không hợp lệ." };
+    if (control.move === undefined && control.moveX === undefined && control.moveZ === undefined && !control.drop) return { error: "Dữ liệu điều khiển không hợp lệ." };
     trace.push(control);
     lastStep = control.step;
   }

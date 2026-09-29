@@ -41,11 +41,11 @@
     "abandonAfterSeconds": 300
   },
   "physicsContract": {
-    "dimension": "2d",
+    "dimension": "3d",
     "stepMode": "fixed",
     "targetStepsPerSecond": 60,
     "captureZone": "prize_chute",
-    "requiredEffects": ["gravity", "collision", "mass", "friction", "angular_momentum", "grip_force"],
+    "requiredEffects": ["gravity", "collision", "mass", "friction", "angular_momentum", "grip_force", "joystick_inertia"],
     "resultMustNotDependOnReducedMotion": true
   },
   "rewardTable": {

@@ -121,11 +121,14 @@ async function main() {
     const machineBounds = await machine.boundingBox();
     assert.ok(machineBounds && machineBounds.width <= 328 && machineBounds.height > machineBounds.width,
       "claw canvas must fit the 360px mobile viewport");
-    const right = page.getByRole("button", { name: "Di chuyển càng sang phải" });
-    await right.dispatchEvent("pointerdown", { pointerId: 1 });
+    const joystick = page.getByRole("button", { name: "Cần điều khiển càng theo bốn hướng" });
+    const joystickBounds = await joystick.boundingBox();
+    assert.ok(joystickBounds, "joystick must be visible");
+    await joystick.dispatchEvent("pointerdown", { pointerId: 1,
+      clientX: joystickBounds.x + joystickBounds.width * .82, clientY: joystickBounds.y + joystickBounds.height * .25 });
     await page.waitForTimeout(80);
-    await right.dispatchEvent("pointerup", { pointerId: 1 });
-    await page.getByRole("button", { name: "THẢ CÀNG" }).click();
+    await joystick.dispatchEvent("pointerup", { pointerId: 1 });
+    await page.getByRole("button", { name: "HẠ CÀNG" }).click();
     await page.waitForFunction(() => JSON.parse(localStorage.getItem("our:claw-state:v1") ?? "null")?.attempt?.controlTrace
       ?.some((item) => item.drop === true));
     await page.evaluate(() => {

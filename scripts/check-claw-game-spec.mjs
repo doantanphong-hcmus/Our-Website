@@ -29,8 +29,8 @@ assert.equal(spec.attempt.playerCanRepositionAfterDrop, false);
 assert.ok(spec.attempt.maximumPlayingSeconds < spec.attempt.abandonAfterSeconds);
 
 assert.deepEqual(spec.physicsContract, {
-  dimension: "2d", stepMode: "fixed", targetStepsPerSecond: 60, captureZone: "prize_chute",
-  requiredEffects: ["gravity", "collision", "mass", "friction", "angular_momentum", "grip_force"],
+  dimension: "3d", stepMode: "fixed", targetStepsPerSecond: 60, captureZone: "prize_chute",
+  requiredEffects: ["gravity", "collision", "mass", "friction", "angular_momentum", "grip_force", "joystick_inertia"],
   resultMustNotDependOnReducedMotion: true,
 });
 

@@ -2011,22 +2011,89 @@ main {
 
 .claw-controls {
   display: grid;
-  grid-template-columns: 1fr 1.7fr 1fr;
-  gap: var(--space-2);
+  grid-template-columns: 1.15fr 1fr;
+  align-items: center;
+  gap: var(--space-4);
+  inline-size: min(100%, 20rem);
+  margin-inline: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-user-one) 28%, var(--color-surface)), var(--color-surface));
+  box-shadow: inset 0 1px rgb(255 255 255 / 12%), var(--shadow-card);
   user-select: none;
 }
 
 .claw-controls button {
-  min-block-size: 4rem;
-  font-size: 1.55rem;
   touch-action: none;
 }
 
+.claw-joystick {
+  --stick-x: 0;
+  --stick-z: 0;
+  position: relative;
+  justify-self: center;
+  inline-size: 7.5rem;
+  block-size: 7.5rem;
+  padding: 0;
+  border: .45rem solid color-mix(in srgb, var(--color-user-one) 55%, var(--color-border));
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-user-one) 25%, var(--color-surface-muted)) 0 35%, var(--color-surface-muted) 36% 62%, color-mix(in srgb, var(--color-user-one) 35%, var(--color-surface)) 63%);
+  box-shadow: inset 0 .45rem 1rem rgb(20 13 27 / 35%), 0 .45rem .8rem rgb(20 13 27 / 24%);
+}
+
+.claw-joystick__gate {
+  position: absolute;
+  inset: 17%;
+  border: 1px solid color-mix(in srgb, var(--color-user-one) 60%, transparent);
+  border-radius: 50%;
+}
+
+.claw-joystick__gate::before,
+.claw-joystick__gate::after {
+  position: absolute;
+  inset: 50% 8% auto;
+  block-size: 1px;
+  background: color-mix(in srgb, var(--color-user-one) 48%, transparent);
+  content: "";
+}
+
+.claw-joystick__gate::after { transform: rotate(90deg); }
+
+.claw-joystick__stick {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 3.25rem;
+  block-size: 3.25rem;
+  border: .18rem solid rgb(255 255 255 / 28%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #ffd6bd, color-mix(in srgb, var(--color-user-one) 82%, #a95b43));
+  box-shadow: 0 .55rem .8rem rgb(20 13 27 / 38%), inset 0 -.35rem .6rem rgb(80 35 35 / 28%);
+  transform: translate(calc(-50% + var(--stick-x) * 2rem), calc(-50% + var(--stick-z) * 2rem));
+  transition: transform .09s ease-out;
+}
+
 .claw-controls .claw-drop {
-  background: var(--color-user-one);
-  font-size: .9rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: .25rem;
+  justify-self: center;
+  inline-size: 6.2rem;
+  min-block-size: 6.2rem;
+  padding: .5rem;
+  border: .45rem solid color-mix(in srgb, var(--color-user-one) 65%, var(--color-border));
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #ffd7c2, var(--color-user-one) 58%, color-mix(in srgb, var(--color-user-one) 70%, #512a37));
+  color: #2c1821;
+  box-shadow: 0 .55rem 0 color-mix(in srgb, var(--color-user-one) 62%, #5b3041), 0 .8rem 1rem rgb(20 13 27 / 30%);
+  font-size: .78rem;
   letter-spacing: .04em;
 }
+
+.claw-controls .claw-drop:active:not(:disabled) { transform: translateY(.35rem); box-shadow: 0 .2rem 0 color-mix(in srgb, var(--color-user-one) 62%, #5b3041); }
+.claw-drop > span { font-size: 1.45rem; line-height: 1; }
 
 .claw-lobby,
 .claw-result {

@@ -5,22 +5,22 @@ const STEP_MS = 1000 / 60;
 const WIDTH = 360;
 const CLAW_START_X = 180;
 
-export type ClawInput = { step: number; move?: -1 | 0 | 1; drop?: true };
+export type ClawInput = { step: number; move?: -1 | 0 | 1; moveX?: number; moveZ?: number; drop?: true };
 export type ClawPhase = "aim" | "drop" | "close" | "lift" | "return" | "release" | "settle" | "won" | "missed" | "abandoned";
 export type ClawResult = {
   outcome: "won" | "missed" | "abandoned";
   capturedPlushId: string | null;
   steps: number;
-  finalPlushes: { id: string; x: number; y: number; angle: number }[];
+  finalPlushes: { id: string; x: number; y: number; z: number; angle: number }[];
 };
 export type ClawSnapshot = {
   phase: ClawPhase;
   step: number;
-  claw: { x: number; y: number; close: number };
-  plushes: { id: string; x: number; y: number; angle: number; radius: number }[];
+  claw: { x: number; y: number; z: number; velocityX: number; velocityZ: number; close: number };
+  plushes: { id: string; x: number; y: number; z: number; angle: number; radius: number }[];
 };
 
-type Plush = { id: string; body: Matter.Body; radius: number; grip: number };
+type Plush = { id: string; body: Matter.Body; z: number; radius: number; grip: number };
 
 function randomFrom(seed: number) {
   let value = seed >>> 0 || 1;
@@ -38,6 +38,9 @@ export class ClawPhysics {
   private phaseSteps = 0;
   private clawX = CLAW_START_X;
   private clawY = 70;
+  private clawZ = 90;
+  private velocityX = 0;
+  private velocityZ = 0;
   private closeAmount = 0;
   private held: Plush | null = null;
   private releasedId: string | null = null;
@@ -67,7 +70,7 @@ export class ClawPhysics {
           density: item.density, friction: 0.72, frictionStatic: 0.9, restitution: 0.08,
           angle: (random() - 0.5) * 0.45, label: `plush:${item.id}`,
         });
-      return { id: item.id, body, radius: item.radius, grip: item.grip };
+      return { id: item.id, body, z: 55 + row * 55 + (random() - .5) * 14, radius: item.radius, grip: item.grip };
     });
     const boundaries = [
       Bodies.rectangle(-10, 320, 20, 640, { isStatic: true }),
@@ -84,8 +87,15 @@ export class ClawPhysics {
     this.stepNumber++;
     this.phaseSteps++;
     if (this.phase === "aim") {
-      this.clawX = Math.max(112, Math.min(340, this.clawX + (input?.move ?? 0) * 2.5));
-      if (input?.drop) this.changePhase("drop");
+      const moveX = input?.moveX ?? input?.move ?? 0;
+      const moveZ = input?.moveZ ?? 0;
+      this.velocityX = Math.max(-3.2, Math.min(3.2, (this.velocityX + moveX * .24) * .94));
+      this.velocityZ = Math.max(-2.7, Math.min(2.7, (this.velocityZ + moveZ * .2) * .94));
+      this.clawX += this.velocityX;
+      this.clawZ += this.velocityZ;
+      if (this.clawX < 112 || this.clawX > 340) { this.clawX = Math.max(112, Math.min(340, this.clawX)); this.velocityX *= -.22; }
+      if (this.clawZ < 30 || this.clawZ > 150) { this.clawZ = Math.max(30, Math.min(150, this.clawZ)); this.velocityZ *= -.22; }
+      if (input?.drop) { this.velocityX *= .25; this.velocityZ *= .25; this.changePhase("drop"); }
     } else if (this.phase === "drop") {
       this.clawY += 3;
       if (this.clawY >= 480) this.changePhase("close");
@@ -98,8 +108,9 @@ export class ClawPhysics {
       if (this.clawY <= 80) this.changePhase("return");
     } else if (this.phase === "return") {
       this.clawX = Math.max(30, this.clawX - 3);
+      this.clawZ = Math.max(34, this.clawZ - 2.5);
       this.checkGrip();
-      if (this.clawX <= 30 && (!this.grip || (this.held?.body.position.x ?? WIDTH) < 72 || this.phaseSteps >= 180)) {
+      if (this.clawX <= 30 && this.clawZ <= 34 && (!this.grip || (this.held?.body.position.x ?? WIDTH) < 72 || this.phaseSteps >= 180)) {
         this.changePhase("release");
       }
     } else if (this.phase === "release") {
@@ -108,7 +119,7 @@ export class ClawPhysics {
       this.closeAmount = Math.max(0, this.closeAmount - 0.1);
       if (this.phaseSteps >= 12) this.changePhase("settle");
     } else if (this.phase === "settle" && this.phaseSteps >= 150) {
-      const winner = this.plushes.find(({ id, body }) => id === this.releasedId && body.position.x < 84 && body.position.y > 580);
+      const winner = this.plushes.find(({ id, body, z }) => id === this.releasedId && body.position.x < 84 && z < 60);
       this.changePhase(winner ? "won" : "missed");
       this.held = winner ?? null;
     }
@@ -127,16 +138,17 @@ export class ClawPhysics {
       outcome,
       capturedPlushId: outcome === "won" ? this.held?.id ?? null : null,
       steps: this.stepNumber,
-      finalPlushes: this.plushes.map(({ id, body }) => ({ id,
-        x: Number(body.position.x.toFixed(3)), y: Number(body.position.y.toFixed(3)), angle: Number(body.angle.toFixed(4)) })),
+      finalPlushes: this.plushes.map(({ id, body, z }) => ({ id,
+        x: Number(body.position.x.toFixed(3)), y: Number(body.position.y.toFixed(3)), z: Number(z.toFixed(3)), angle: Number(body.angle.toFixed(4)) })),
     };
   }
 
   snapshot(): ClawSnapshot {
     return { phase: this.phase, step: this.stepNumber,
-      claw: { x: this.clawX, y: this.clawY, close: this.closeAmount },
-      plushes: this.plushes.map(({ id, body, radius }) => ({ id, radius,
-        x: body.position.x, y: body.position.y, angle: body.angle })) };
+      claw: { x: this.clawX, y: this.clawY, z: this.clawZ,
+        velocityX: this.velocityX, velocityZ: this.velocityZ, close: this.closeAmount },
+      plushes: this.plushes.map(({ id, body, z, radius }) => ({ id, radius,
+        x: body.position.x, y: body.position.y, z, angle: body.angle })) };
   }
 
   private isTerminal() { return this.phase === "won" || this.phase === "missed" || this.phase === "abandoned"; }
@@ -150,12 +162,13 @@ export class ClawPhysics {
     Body.setAngle(this.leftProng, -angle);
     Body.setPosition(this.rightProng, { x: this.clawX + spread, y: this.clawY + 26 });
     Body.setAngle(this.rightProng, angle);
+    if (this.grip && this.held) this.held.z += (this.clawZ - this.held.z) * .35;
   }
 
   private attachClosest() {
     const gripPoint = { x: this.clawX, y: this.clawY + 30 };
     const candidates = this.plushes.map((plush) => ({ plush,
-      distance: Math.hypot(plush.body.position.x - gripPoint.x, plush.body.position.y - gripPoint.y) }))
+      distance: Math.hypot(plush.body.position.x - gripPoint.x, plush.body.position.y - gripPoint.y, plush.z - this.clawZ) }))
       .filter(({ plush, distance }) => distance <= plush.radius + 40)
       .sort((left, right) => left.distance - right.distance);
     if (!candidates.length) return;
@@ -185,16 +198,30 @@ export function runClawReplay(seed: number, inputs: ClawInput[], options?: { gri
   const game = new ClawPhysics(seed, options);
   const byStep = new Map(inputs.map(({ step, ...input }) => [step, input]));
   let move: -1 | 0 | 1 = 0;
+  let moveX = 0;
+  let moveZ = 0;
   while (!["won", "missed", "abandoned"].includes(game.phase)) {
     const input = byStep.get(game.stepNumber + 1);
     if (input?.move !== undefined) move = input.move;
-    game.step({ move, ...(input?.drop ? { drop: true } : {}) });
+    if (input?.moveX !== undefined) moveX = input.moveX;
+    if (input?.moveZ !== undefined) moveZ = input.moveZ;
+    game.step({ move, moveX: input?.moveX !== undefined || moveX !== 0 ? moveX : move, moveZ,
+      ...(input?.drop ? { drop: true } : {}) });
   }
   return game.result();
 }
 
-export function aimAt(targetX: number): ClawInput[] {
-  const direction: -1 | 1 = targetX < CLAW_START_X ? -1 : 1;
-  const steps = Math.round(Math.abs(targetX - CLAW_START_X) / 2.5);
-  return [{ step: 1, move: direction }, { step: steps + 1, move: 0, drop: true }];
+export function aimAt(targetX: number, targetZ = 55): ClawInput[] {
+  const game = new ClawPhysics(1);
+  const trace: ClawInput[] = [{ step: 1, moveX: Math.sign(targetX - CLAW_START_X), moveZ: Math.sign(targetZ - 90) }];
+  while (game.stepNumber < 240) {
+    const snapshot = game.snapshot().claw;
+    const moveX = Math.abs(targetX - snapshot.x) < 3 ? 0 : Math.sign(targetX - snapshot.x);
+    const moveZ = Math.abs(targetZ - snapshot.z) < 3 ? 0 : Math.sign(targetZ - snapshot.z);
+    game.step({ moveX, moveZ });
+    if (moveX !== trace.at(-1)?.moveX || moveZ !== trace.at(-1)?.moveZ) trace.push({ step: game.stepNumber + 1, moveX, moveZ });
+    if (!moveX && !moveZ && Math.abs(snapshot.velocityX) < .15 && Math.abs(snapshot.velocityZ) < .15) break;
+  }
+  trace.push({ step: game.stepNumber + 1, moveX: 0, moveZ: 0, drop: true });
+  return trace;
 }

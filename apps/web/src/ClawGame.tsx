@@ -129,30 +129,32 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   context.fillStyle = "#120e18"; context.fillRect(0, 555, 88, 85);
   context.strokeStyle = "#f0a3b5"; context.lineWidth = 3; context.strokeRect(5, 560, 78, 72);
   context.fillStyle = "#f7d7e0"; context.font = "700 12px system-ui"; context.fillText("MÁNG QUÀ", 11, 625);
-  for (const plush of [...snapshot.plushes].sort((left, right) => left.y - right.y)) {
+  for (const plush of [...snapshot.plushes].sort((left, right) => left.z - right.z)) {
+    const depthScale = .84 + (plush.z - 30) / 120 * .18;
+    const projected = { ...plush, x: 180 + (plush.x - 180) * depthScale,
+      y: plush.y + (plush.z - 90) * .28 };
     context.save();
     context.fillStyle = "rgba(9,6,12,.28)";
-    context.beginPath(); context.ellipse(plush.x + 5, Math.min(558, plush.y + plush.radius * .8), plush.radius * .9, plush.radius * .28, 0, 0, Math.PI * 2); context.fill();
+    context.beginPath(); context.ellipse(projected.x + 5, Math.min(558, projected.y + plush.radius * .8), plush.radius * .9, plush.radius * .28, 0, 0, Math.PI * 2); context.fill();
     context.restore();
-    drawPlush(context, plush, .9 + Math.max(0, Math.min(1, (plush.y - 450) / 120)) * .1);
+    drawPlush(context, projected, depthScale);
   }
 
-  const { x, y, close } = snapshot.claw;
-  context.strokeStyle = "#eadff0"; context.lineWidth = 3; context.beginPath(); context.moveTo(x, 47); context.lineTo(x, y); context.stroke();
-  context.fillStyle = "#d4b5df"; context.beginPath(); context.arc(x, y, 9, 0, Math.PI * 2); context.fill();
+  const { x, y, z, close } = snapshot.claw;
+  const clawScale = .84 + (z - 30) / 120 * .18;
+  const clawX = 180 + (x - 180) * clawScale;
+  const clawY = y + (z - 90) * .28;
+  context.strokeStyle = "#eadff0"; context.lineWidth = 3; context.beginPath(); context.moveTo(clawX, 47); context.lineTo(clawX, clawY); context.stroke();
+  context.fillStyle = "#d4b5df"; context.beginPath(); context.arc(clawX, clawY, 9 * clawScale, 0, Math.PI * 2); context.fill();
   const spread = 20 - close * 10;
   context.strokeStyle = "#d4b5df"; context.lineWidth = 7; context.lineCap = "round";
-  context.beginPath(); context.moveTo(x - 3, y + 6); context.quadraticCurveTo(x - spread, y + 25, x - spread + close * 5, y + 52); context.stroke();
-  context.beginPath(); context.moveTo(x + 3, y + 6); context.quadraticCurveTo(x + spread, y + 25, x + spread - close * 5, y + 52); context.stroke();
+  context.beginPath(); context.moveTo(clawX - 3, clawY + 6); context.quadraticCurveTo(clawX - spread, clawY + 25, clawX - spread + close * 5, clawY + 52); context.stroke();
+  context.beginPath(); context.moveTo(clawX + 3, clawY + 6); context.quadraticCurveTo(clawX + spread, clawY + 25, clawX + spread - close * 5, clawY + 52); context.stroke();
   context.strokeStyle = "rgba(255,255,255,.16)"; context.lineWidth = 2;
   context.beginPath(); context.moveTo(70, 72); context.lineTo(35, 430); context.stroke();
   context.beginPath(); context.moveTo(294, 72); context.lineTo(325, 350); context.stroke();
   context.restore();
 }
-
-const topCameraDepth: Record<string, number> = {
-  bear: 76, rabbit: 76, cat: 76, capybara: 45, dinosaur: 45, seal: 45,
-};
 
 function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -171,9 +173,10 @@ function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
   for (let y = 15; y < 108; y += 20) { context.beginPath(); context.moveTo(0, y); context.lineTo(160, y); context.stroke(); }
 
   const projectX = (x: number) => 10 + Math.max(0, Math.min(1, (x - 90) / 270)) * 140;
+  const projectZ = (z: number) => 12 + Math.max(0, Math.min(1, (z - 30) / 120)) * 84;
   for (const plush of snapshot.plushes) {
     const x = projectX(plush.x);
-    const y = plush.y < 440 ? 54 : topCameraDepth[plush.id] ?? 62;
+    const y = projectZ(plush.z);
     const style = plushStyle[plush.id] ?? { color: "#c7a6cf" };
     context.fillStyle = "rgba(0,0,0,.28)"; context.beginPath(); context.ellipse(x + 2, y + 3, 8, 5, 0, 0, Math.PI * 2); context.fill();
     context.fillStyle = style.color; context.beginPath(); context.arc(x, y, 7, 0, Math.PI * 2); context.fill();
@@ -181,7 +184,7 @@ function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
   }
 
   const targetX = projectX(snapshot.claw.x);
-  const targetY = 54;
+  const targetY = projectZ(snapshot.claw.z);
   context.strokeStyle = "#ff4f64"; context.lineWidth = 1.5;
   context.beginPath(); context.arc(targetX, targetY, 10, 0, Math.PI * 2); context.stroke();
   context.beginPath(); context.moveTo(targetX - 15, targetY); context.lineTo(targetX + 15, targetY); context.moveTo(targetX, targetY - 15); context.lineTo(targetX, targetY + 15); context.stroke();
@@ -209,8 +212,8 @@ export function ClawGame({ user }: { user: User }) {
   const game = useRef<ClawPhysics | null>(null);
   const controls = useRef<ClawInput[]>([]);
   const pendingControls = useRef(new Map<number, Omit<ClawInput, "step">>());
-  const move = useRef<-1 | 0 | 1>(0);
-  const scheduledMove = useRef<-1 | 0 | 1>(0);
+  const move = useRef({ x: 0, z: 0 });
+  const scheduledMove = useRef({ x: 0, z: 0 });
   const dropped = useRef(false);
   const version = useRef(1);
   const syncQueue = useRef(Promise.resolve());
@@ -218,6 +221,7 @@ export function ClawGame({ user }: { user: User }) {
   const createKey = useRef(crypto.randomUUID());
   const purchaseKey = useRef(crypto.randomUUID());
   const audio = useRef<AudioContext | null>(null);
+  const [joystick, setJoystick] = useState({ x: 0, z: 0 });
   const [feedback, setFeedback] = useState(() => stored<boolean>("our:claw-feedback:v1") ?? true);
 
   function sound(kind: "start" | "drop" | "won" | "missed", force = false) {
@@ -345,8 +349,13 @@ export function ClawGame({ user }: { user: User }) {
     if (!current || dropped.current) return;
     const lastStep = controls.current.at(-1)?.step ?? 0;
     const step = Math.max(current.stepNumber + 1, lastStep + 1);
-    if (input.move !== undefined) scheduledMove.current = input.move;
-    if (input.drop) { input.move = 0; scheduledMove.current = 0; dropped.current = true; sound("drop"); }
+    if (input.move !== undefined) scheduledMove.current.x = input.move;
+    if (input.moveX !== undefined) scheduledMove.current.x = input.moveX;
+    if (input.moveZ !== undefined) scheduledMove.current.z = input.moveZ;
+    if (input.drop) {
+      input.moveX = 0; input.moveZ = 0; scheduledMove.current = { x: 0, z: 0 };
+      setJoystick({ x: 0, z: 0 }); dropped.current = true; sound("drop");
+    }
     const control = { step, ...input } as ClawInput;
     controls.current = [...controls.current, control];
     const attemptId = attempt?.id;
@@ -355,9 +364,22 @@ export function ClawGame({ user }: { user: User }) {
     syncTrace(controls.current);
   }
 
-  function steer(direction: -1 | 0 | 1) {
-    if (direction === scheduledMove.current || dropped.current) return;
-    schedule({ move: direction });
+  function steer(x: number, z: number) {
+    if ((x === scheduledMove.current.x && z === scheduledMove.current.z) || dropped.current) return;
+    schedule({ moveX: x, moveZ: z });
+  }
+
+  function moveJoystick(event: PointerEvent<HTMLButtonElement>) {
+    const box = event.currentTarget.getBoundingClientRect();
+    const rawX = (event.clientX - box.left - box.width / 2) / (box.width * .34);
+    const rawZ = (event.clientY - box.top - box.height / 2) / (box.height * .34);
+    const length = Math.max(1, Math.hypot(rawX, rawZ));
+    const next = { x: Math.round(rawX / length * 4) / 4, z: Math.round(rawZ / length * 4) / 4 };
+    setJoystick(next); steer(next.x, next.z);
+  }
+
+  function releaseJoystick() {
+    setJoystick({ x: 0, z: 0 }); steer(0, 0);
   }
 
   async function finish(result: ReturnType<ClawPhysics["result"]>) {
@@ -389,14 +411,16 @@ export function ClawGame({ user }: { user: User }) {
     if (!attempt || attempt.status !== "playing" || !canvas.current || !topCanvas.current) return;
     const machine = new ClawPhysics(attempt.seed);
     game.current = machine; controls.current = [...attempt.controlTrace]; version.current = attempt.version;
-    pendingControls.current.clear(); move.current = 0; scheduledMove.current = 0;
+    pendingControls.current.clear(); move.current = { x: 0, z: 0 }; scheduledMove.current = { x: 0, z: 0 };
     dropped.current = attempt.controlTrace.some(({ drop }) => drop); finishing.current = false;
     const replay = new Map(attempt.controlTrace.map(({ step, ...input }) => [step, input]));
     const lastSavedStep = attempt.controlTrace.at(-1)?.step ?? 0;
     while (machine.stepNumber < lastSavedStep) {
       const input = replay.get(machine.stepNumber + 1);
-      if (input?.move !== undefined) move.current = input.move;
-      machine.step({ move: move.current, ...(input?.drop ? { drop: true } : {}) });
+      if (input?.move !== undefined) move.current.x = input.move;
+      if (input?.moveX !== undefined) move.current.x = input.moveX;
+      if (input?.moveZ !== undefined) move.current.z = input.moveZ;
+      machine.step({ moveX: move.current.x, moveZ: move.current.z, ...(input?.drop ? { drop: true } : {}) });
     }
     let frame = 0;
     let previous = performance.now();
@@ -405,8 +429,10 @@ export function ClawGame({ user }: { user: User }) {
       accumulator += Math.min(100, now - previous); previous = now;
       while (accumulator >= STEP_MS && !["won", "missed", "abandoned"].includes(machine.phase)) {
         const input = pendingControls.current.get(machine.stepNumber + 1);
-        if (input?.move !== undefined) move.current = input.move;
-        machine.step({ move: move.current, ...(input?.drop ? { drop: true } : {}) });
+        if (input?.move !== undefined) move.current.x = input.move;
+        if (input?.moveX !== undefined) move.current.x = input.moveX;
+        if (input?.moveZ !== undefined) move.current.z = input.moveZ;
+        machine.step({ moveX: move.current.x, moveZ: move.current.z, ...(input?.drop ? { drop: true } : {}) });
         accumulator -= STEP_MS;
       }
       const snapshot = machine.snapshot();
@@ -458,10 +484,14 @@ export function ClawGame({ user }: { user: User }) {
   }
 
   function keyboard(event: KeyboardEvent<HTMLElement>, pressed: boolean) {
-    if (!["ArrowLeft", "ArrowRight", " "].includes(event.key)) return;
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) return;
     event.preventDefault();
     if (event.key === " " && pressed) schedule({ drop: true });
-    else if (event.key !== " ") steer(pressed ? (event.key === "ArrowLeft" ? -1 : 1) : 0);
+    else if (event.key !== " ") {
+      const x = pressed && event.key === "ArrowLeft" ? -1 : pressed && event.key === "ArrowRight" ? 1 : 0;
+      const z = pressed && event.key === "ArrowUp" ? -1 : pressed && event.key === "ArrowDown" ? 1 : 0;
+      setJoystick({ x, z }); steer(x, z);
+    }
   }
 
   const playing = attempt?.status === "playing";
@@ -492,13 +522,17 @@ export function ClawGame({ user }: { user: User }) {
         <p className="claw-phase" aria-live="polite">{phaseText[phase] ?? "Đang kiểm tra kết quả…"}</p>
       </div>
       <div className="claw-controls" aria-label="Điều khiển máy gắp">
-        <button type="button" disabled={!canPlay || dropped.current} aria-label="Di chuyển càng sang trái"
-          onPointerDown={(event: PointerEvent<HTMLButtonElement>) => { event.currentTarget.setPointerCapture(event.pointerId); steer(-1); }}
-          onPointerUp={() => steer(0)} onPointerCancel={() => steer(0)}>←</button>
-        <button className="claw-drop" type="button" disabled={!canPlay || dropped.current} onClick={() => schedule({ drop: true })}>THẢ CÀNG</button>
-        <button type="button" disabled={!canPlay || dropped.current} aria-label="Di chuyển càng sang phải"
-          onPointerDown={(event: PointerEvent<HTMLButtonElement>) => { event.currentTarget.setPointerCapture(event.pointerId); steer(1); }}
-          onPointerUp={() => steer(0)} onPointerCancel={() => steer(0)}>→</button>
+        <button className="claw-joystick" type="button" disabled={!canPlay || dropped.current}
+          aria-label="Cần điều khiển càng theo bốn hướng" style={{ "--stick-x": joystick.x, "--stick-z": joystick.z } as CSSProperties}
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); moveJoystick(event); }}
+          onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) moveJoystick(event); }}
+          onPointerUp={releaseJoystick} onPointerCancel={releaseJoystick}>
+          <span className="claw-joystick__gate" aria-hidden="true" />
+          <span className="claw-joystick__stick" aria-hidden="true" />
+        </button>
+        <button className="claw-drop" type="button" disabled={!canPlay || dropped.current} onClick={() => schedule({ drop: true })}>
+          <span aria-hidden="true">●</span><strong>HẠ CÀNG</strong>
+        </button>
       </div>
     </> : null}
     {!loading && attempt?.status === "ready" ? <div className="claw-lobby">

@@ -10,8 +10,9 @@ describe("claw physics spike", () => {
   it("exposes a render snapshot without leaking engine internals", () => {
     const game = new ClawPhysics(42);
     const snapshot = game.snapshot();
-    expect(snapshot.claw).toEqual({ x: 180, y: 70, close: 0 });
+    expect(snapshot.claw).toEqual({ x: 180, y: 70, z: 90, velocityX: 0, velocityZ: 0, close: 0 });
     expect(snapshot.plushes).toHaveLength(6);
+    expect(snapshot.plushes.every(({ z }) => Number.isFinite(z))).toBe(true);
   });
 
   it("uses aim, mass and grip instead of a random victory roll", () => {
@@ -33,7 +34,7 @@ describe("claw physics spike", () => {
       expect(result.steps).toBeLessThanOrEqual(900);
       expect(result.capturedPlushId === null).toBe(result.outcome !== "won");
       expect(new Set(result.finalPlushes.map(({ id }) => id)).size).toBe(6);
-      expect(result.finalPlushes.every(({ x, y, angle }) => [x, y, angle].every(Number.isFinite))).toBe(true);
+      expect(result.finalPlushes.every(({ x, y, z, angle }) => [x, y, z, angle].every(Number.isFinite))).toBe(true);
     }
   });
 
@@ -45,6 +46,17 @@ describe("claw physics spike", () => {
     expect(game.snapshot().claw.x).toBe(340);
     while (game.phase !== "abandoned") game.step();
     expect(game.result()).toMatchObject({ outcome: "abandoned", capturedPlushId: null, steps: 900 });
+  });
+
+  it("keeps moving briefly after the joystick returns to center", () => {
+    const game = new ClawPhysics(7);
+    for (let step = 0; step < 12; step++) game.step({ moveX: 1, moveZ: -1 });
+    const released = game.snapshot().claw;
+    game.step({ moveX: 0, moveZ: 0 });
+    const coasting = game.snapshot().claw;
+    expect(coasting.x).toBeGreaterThan(released.x);
+    expect(coasting.z).toBeLessThan(released.z);
+    expect(Math.abs(coasting.velocityX)).toBeLessThan(Math.abs(released.velocityX));
   });
 
   it("keeps the headless replay cheap enough for a Worker spike", () => {
