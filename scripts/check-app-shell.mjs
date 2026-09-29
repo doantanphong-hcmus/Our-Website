@@ -115,8 +115,9 @@ async function main() {
     assert.equal(await page.getByRole("button", { name: "Bật âm thanh và rung" }).getAttribute("aria-pressed"), "false");
     assert.equal(await page.evaluate(() => localStorage.getItem("our:claw-feedback:v1")), "false");
     await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
-    const machine = page.locator(".claw-machine canvas");
+    const machine = page.locator(".claw-machine__main");
     await machine.waitFor();
+    assert.equal(await page.getByLabel("Camera nóc máy gắp với tâm ngắm màu đỏ").count(), 1);
     const machineBounds = await machine.boundingBox();
     assert.ok(machineBounds && machineBounds.width <= 328 && machineBounds.height > machineBounds.width,
       "claw canvas must fit the 360px mobile viewport");

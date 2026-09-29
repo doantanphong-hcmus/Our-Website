@@ -60,11 +60,12 @@ function mergeCachedTrace(server: Attempt | null, cached: Attempt | null) {
   return { ...server, controlTrace: cached.controlTrace };
 }
 
-function drawPlush(context: CanvasRenderingContext2D, plush: ClawSnapshot["plushes"][number]) {
+function drawPlush(context: CanvasRenderingContext2D, plush: ClawSnapshot["plushes"][number], scale = 1) {
   const style = plushStyle[plush.id] ?? { color: "#c7a6cf", ears: "round" as const };
   context.save();
   context.translate(plush.x, plush.y);
   context.rotate(plush.angle);
+  context.scale(scale, scale);
   context.fillStyle = style.color;
   if (style.ears === "long") {
     context.beginPath(); context.ellipse(-9, -plush.radius, 6, 17, -0.18, 0, Math.PI * 2); context.fill();
@@ -82,6 +83,12 @@ function drawPlush(context: CanvasRenderingContext2D, plush: ClawSnapshot["plush
   context.restore();
 }
 
+function polygon(context: CanvasRenderingContext2D, points: [number, number][]) {
+  context.beginPath();
+  points.forEach(([x, y], index) => index ? context.lineTo(x, y) : context.moveTo(x, y));
+  context.closePath();
+}
+
 function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedMotion: boolean) {
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
   if (canvas.width !== 360 * ratio || canvas.height !== 640 * ratio) {
@@ -96,15 +103,24 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   const background = context.createLinearGradient(0, 0, 0, 640);
   background.addColorStop(0, "#342743"); background.addColorStop(.7, "#241b30"); background.addColorStop(1, "#17111f");
   context.fillStyle = background; context.fillRect(0, 0, 360, 640);
-  context.fillStyle = "#463252"; context.fillRect(8, 8, 344, 47);
+  context.fillStyle = "#463252"; context.fillRect(8, 8, 344, 52);
   context.fillStyle = "#fff1f5"; context.font = "800 15px system-ui"; context.textAlign = "center";
   context.fillText("MÁY GẮP CỦA NHI", 180, 38); context.textAlign = "start";
-  for (const [x, y] of [[38, 85], [92, 145], [305, 105], [275, 190], [58, 245]]) {
-    context.fillStyle = "rgba(248,190,215,.3)"; context.beginPath(); context.arc(x, y, 2.2, 0, Math.PI * 2); context.fill();
+  const glass = context.createLinearGradient(0, 60, 360, 555);
+  glass.addColorStop(0, "rgba(255,255,255,.13)"); glass.addColorStop(.45, "rgba(255,255,255,.035)"); glass.addColorStop(1, "rgba(124,83,143,.18)");
+  context.fillStyle = glass; polygon(context, [[20, 60], [340, 60], [326, 555], [34, 555]]); context.fill();
+  context.fillStyle = "rgba(10,7,14,.36)";
+  polygon(context, [[20, 60], [53, 82], [53, 520], [34, 555]]); context.fill();
+  polygon(context, [[340, 60], [307, 82], [307, 520], [326, 555]]); context.fill();
+  context.fillStyle = "rgba(141,91,161,.28)";
+  polygon(context, [[34, 555], [326, 555], [307, 492], [53, 492]]); context.fill();
+  context.strokeStyle = "rgba(255,255,255,.08)"; context.lineWidth = 1;
+  for (let depth = 0; depth < 4; depth++) {
+    const inset = depth * 7;
+    context.beginPath(); context.moveTo(38 + inset, 548 - depth * 15); context.lineTo(322 - inset, 548 - depth * 15); context.stroke();
   }
-  context.fillStyle = "rgba(255,255,255,.06)"; context.fillRect(17, 55, 326, 500);
   context.strokeStyle = "#c6a6d6"; context.lineWidth = 4; context.strokeRect(17, 20, 326, 535);
-  context.fillStyle = "#8e5ca2"; context.fillRect(22, 55, 316, 8);
+  context.fillStyle = "#8e5ca2"; context.fillRect(22, 58, 316, 8);
   context.fillStyle = "#382943"; context.fillRect(88, 520, 250, 35);
   context.strokeStyle = "rgba(255,255,255,.1)"; context.lineWidth = 2;
   for (let x = 100; x < 338; x += 24) { context.beginPath(); context.moveTo(x, 520); context.lineTo(x - 12, 555); context.stroke(); }
@@ -113,7 +129,13 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   context.fillStyle = "#120e18"; context.fillRect(0, 555, 88, 85);
   context.strokeStyle = "#f0a3b5"; context.lineWidth = 3; context.strokeRect(5, 560, 78, 72);
   context.fillStyle = "#f7d7e0"; context.font = "700 12px system-ui"; context.fillText("MÁNG QUÀ", 11, 625);
-  for (const plush of snapshot.plushes) drawPlush(context, plush);
+  for (const plush of [...snapshot.plushes].sort((left, right) => left.y - right.y)) {
+    context.save();
+    context.fillStyle = "rgba(9,6,12,.28)";
+    context.beginPath(); context.ellipse(plush.x + 5, Math.min(558, plush.y + plush.radius * .8), plush.radius * .9, plush.radius * .28, 0, 0, Math.PI * 2); context.fill();
+    context.restore();
+    drawPlush(context, plush, .9 + Math.max(0, Math.min(1, (plush.y - 450) / 120)) * .1);
+  }
 
   const { x, y, close } = snapshot.claw;
   context.strokeStyle = "#eadff0"; context.lineWidth = 3; context.beginPath(); context.moveTo(x, 47); context.lineTo(x, y); context.stroke();
@@ -122,7 +144,48 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   context.strokeStyle = "#d4b5df"; context.lineWidth = 7; context.lineCap = "round";
   context.beginPath(); context.moveTo(x - 3, y + 6); context.quadraticCurveTo(x - spread, y + 25, x - spread + close * 5, y + 52); context.stroke();
   context.beginPath(); context.moveTo(x + 3, y + 6); context.quadraticCurveTo(x + spread, y + 25, x + spread - close * 5, y + 52); context.stroke();
+  context.strokeStyle = "rgba(255,255,255,.16)"; context.lineWidth = 2;
+  context.beginPath(); context.moveTo(70, 72); context.lineTo(35, 430); context.stroke();
+  context.beginPath(); context.moveTo(294, 72); context.lineTo(325, 350); context.stroke();
   context.restore();
+}
+
+const topCameraDepth: Record<string, number> = {
+  bear: 76, rabbit: 76, cat: 76, capybara: 45, dinosaur: 45, seal: 45,
+};
+
+function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  if (canvas.width !== 160 * ratio || canvas.height !== 108 * ratio) {
+    canvas.width = 160 * ratio; canvas.height = 108 * ratio;
+  }
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, 160, 108);
+  const background = context.createLinearGradient(0, 0, 0, 108);
+  background.addColorStop(0, "#201729"); background.addColorStop(1, "#0e0a13");
+  context.fillStyle = background; context.fillRect(0, 0, 160, 108);
+  context.strokeStyle = "rgba(255,255,255,.08)"; context.lineWidth = 1;
+  for (let x = 16; x < 160; x += 24) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, 108); context.stroke(); }
+  for (let y = 15; y < 108; y += 20) { context.beginPath(); context.moveTo(0, y); context.lineTo(160, y); context.stroke(); }
+
+  const projectX = (x: number) => 10 + Math.max(0, Math.min(1, (x - 90) / 270)) * 140;
+  for (const plush of snapshot.plushes) {
+    const x = projectX(plush.x);
+    const y = plush.y < 440 ? 54 : topCameraDepth[plush.id] ?? 62;
+    const style = plushStyle[plush.id] ?? { color: "#c7a6cf" };
+    context.fillStyle = "rgba(0,0,0,.28)"; context.beginPath(); context.ellipse(x + 2, y + 3, 8, 5, 0, 0, Math.PI * 2); context.fill();
+    context.fillStyle = style.color; context.beginPath(); context.arc(x, y, 7, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "rgba(255,255,255,.55)"; context.beginPath(); context.arc(x - 2, y - 2, 1.4, 0, Math.PI * 2); context.fill();
+  }
+
+  const targetX = projectX(snapshot.claw.x);
+  const targetY = 54;
+  context.strokeStyle = "#ff4f64"; context.lineWidth = 1.5;
+  context.beginPath(); context.arc(targetX, targetY, 10, 0, Math.PI * 2); context.stroke();
+  context.beginPath(); context.moveTo(targetX - 15, targetY); context.lineTo(targetX + 15, targetY); context.moveTo(targetX, targetY - 15); context.lineTo(targetX, targetY + 15); context.stroke();
+  context.fillStyle = "#ff4058"; context.beginPath(); context.arc(targetX, targetY, 3.2, 0, Math.PI * 2); context.fill();
 }
 
 const phaseText: Record<string, string> = {
@@ -142,6 +205,7 @@ export function ClawGame({ user }: { user: User }) {
   const [phase, setPhase] = useState("aim");
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const canvas = useRef<HTMLCanvasElement>(null);
+  const topCanvas = useRef<HTMLCanvasElement>(null);
   const game = useRef<ClawPhysics | null>(null);
   const controls = useRef<ClawInput[]>([]);
   const pendingControls = useRef(new Map<number, Omit<ClawInput, "step">>());
@@ -322,7 +386,7 @@ export function ClawGame({ user }: { user: User }) {
   }
 
   useEffect(() => {
-    if (!attempt || attempt.status !== "playing" || !canvas.current) return;
+    if (!attempt || attempt.status !== "playing" || !canvas.current || !topCanvas.current) return;
     const machine = new ClawPhysics(attempt.seed);
     game.current = machine; controls.current = [...attempt.controlTrace]; version.current = attempt.version;
     pendingControls.current.clear(); move.current = 0; scheduledMove.current = 0;
@@ -348,6 +412,7 @@ export function ClawGame({ user }: { user: User }) {
       const snapshot = machine.snapshot();
       setPhase(snapshot.phase);
       drawMachine(canvas.current!, snapshot, user.preferences.reducedMotion);
+      drawTopCamera(topCanvas.current!, snapshot);
       if (["won", "missed", "abandoned"].includes(machine.phase)) {
         if (!finishing.current) { finishing.current = true; void finish(machine.result()); }
         return;
@@ -355,6 +420,7 @@ export function ClawGame({ user }: { user: User }) {
       frame = requestAnimationFrame(animate);
     };
     drawMachine(canvas.current, machine.snapshot(), user.preferences.reducedMotion);
+    drawTopCamera(topCanvas.current, machine.snapshot());
     frame = requestAnimationFrame(animate);
     return () => { cancelAnimationFrame(frame); game.current = null; };
   }, [attempt?.id, attempt?.status, user.preferences.reducedMotion]);
@@ -417,7 +483,12 @@ export function ClawGame({ user }: { user: User }) {
     {loading ? <p className="claw-message" role="status">Đang bật đèn máy gắp…</p> : null}
     {!loading && playing ? <>
       <div className={`claw-machine claw-machine--${phase}`}>
-        <canvas ref={canvas} role="img" aria-label="Máy gắp với sáu thú bông và máng quà bên trái" />
+        <canvas className="claw-machine__main" ref={canvas} role="img" aria-label="Góc nhìn chính từ bên ngoài máy gắp, với sáu thú bông và máng quà bên trái" />
+        <span className="claw-machine__view-label" aria-hidden="true">GÓC NHÌN CHÍNH</span>
+        <aside className="claw-camera" aria-label="Camera nóc máy gắp với tâm ngắm màu đỏ">
+          <div className="claw-camera__status"><span aria-hidden="true" /> CAM NÓC</div>
+          <canvas ref={topCanvas} role="img" aria-label="Góc nhìn từ camera trên nóc với tâm ngắm màu đỏ" />
+        </aside>
         <p className="claw-phase" aria-live="polite">{phaseText[phase] ?? "Đang kiểm tra kết quả…"}</p>
       </div>
       <div className="claw-controls" aria-label="Điều khiển máy gắp">

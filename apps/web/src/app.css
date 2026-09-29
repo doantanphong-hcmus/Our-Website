@@ -1928,11 +1928,69 @@ main {
 .claw-machine--close,
 .claw-machine--release { box-shadow: 0 1rem 3rem rgb(23 17 31 / 32%), 0 0 0 .2rem rgb(240 163 181 / 18%); }
 
-.claw-machine canvas {
+.claw-machine__main {
   display: block;
   inline-size: 100%;
   aspect-ratio: 9 / 16;
   touch-action: none;
+}
+
+.claw-machine__view-label {
+  position: absolute;
+  inset-block-start: .75rem;
+  inset-inline-end: .75rem;
+  padding: .3rem .5rem;
+  border-radius: var(--radius-pill);
+  background: rgb(23 17 31 / 68%);
+  color: rgb(255 248 241 / 72%);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  backdrop-filter: blur(.35rem);
+}
+
+.claw-camera {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: .75rem;
+  inset-inline-start: .75rem;
+  overflow: hidden;
+  inline-size: min(44%, 10rem);
+  border: 2px solid rgb(255 248 241 / 74%);
+  border-radius: .7rem;
+  background: #0e0a13;
+  box-shadow: 0 .5rem 1.2rem rgb(9 6 12 / 45%);
+  pointer-events: none;
+}
+
+.claw-camera canvas {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 40 / 27;
+}
+
+.claw-camera__status {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: .35rem;
+  inset-inline-start: .4rem;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  color: #fff8f1;
+  font-size: .58rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 3px #0e0a13;
+}
+
+.claw-camera__status span {
+  inline-size: .42rem;
+  block-size: .42rem;
+  border-radius: 50%;
+  background: #ff4058;
+  box-shadow: 0 0 .45rem #ff4058;
+  animation: claw-camera-live 1.4s ease-in-out infinite;
 }
 
 .claw-phase {
@@ -2113,8 +2171,13 @@ main {
   to { transform: translateY(.45rem) rotate(.8deg); }
 }
 
+@keyframes claw-camera-live {
+  50% { opacity: .35; }
+}
+
 [data-motion="reduced"] :is(.claw-machine, .claw-reward) { animation: none; box-shadow: none; }
 [data-motion="reduced"] .claw-result--won::before { display: none; }
+[data-motion="reduced"] .claw-camera__status span { animation: none; }
 
 @media (max-width: 30rem) {
   .claw-game__header { align-items: center; }
