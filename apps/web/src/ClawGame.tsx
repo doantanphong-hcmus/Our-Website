@@ -235,26 +235,62 @@ export function ClawGame({ user }: { user: User }) {
   const createKey = useRef(crypto.randomUUID());
   const purchaseKey = useRef(crypto.randomUUID());
   const audio = useRef<AudioContext | null>(null);
+  const motor = useRef<{ oscillator: OscillatorNode; gain: GainNode; filter: BiquadFilterNode } | null>(null);
   const [joystick, setJoystick] = useState({ x: 0, z: 0 });
   const [feedback, setFeedback] = useState(() => stored<boolean>("our:claw-feedback:v1") ?? true);
+  const feedbackRef = useRef(feedback);
+  feedbackRef.current = feedback;
 
   function sound(kind: "start" | "drop" | "won" | "missed", force = false) {
-    if (!feedback && !force) return;
+    if (!feedbackRef.current && !force) return;
     try {
       const context = audio.current ?? new AudioContext();
       audio.current = context;
       void context.resume();
-      const notes = kind === "won" ? [523, 659, 784] : kind === "missed" ? [330, 247] : kind === "drop" ? [440, 330] : [392, 523];
+      const notes = kind === "won" ? [523, 659, 784] : kind === "missed" ? [330, 247]
+        : kind === "drop" ? [220, 196, 174] : [392, 523];
+      const peak = kind === "drop" || kind === "start" ? .026 : .065;
+      const duration = kind === "drop" ? .22 : .14;
       notes.forEach((frequency, index) => {
         const oscillator = context.createOscillator();
         const gain = context.createGain();
-        const begins = context.currentTime + index * .09;
+        const begins = context.currentTime + index * (kind === "drop" ? .075 : .09);
         oscillator.type = "sine"; oscillator.frequency.value = frequency;
-        gain.gain.setValueAtTime(.0001, begins); gain.gain.exponentialRampToValueAtTime(.08, begins + .015);
-        gain.gain.exponentialRampToValueAtTime(.0001, begins + .13);
-        oscillator.connect(gain).connect(context.destination); oscillator.start(begins); oscillator.stop(begins + .14);
+        gain.gain.setValueAtTime(.0001, begins); gain.gain.exponentialRampToValueAtTime(peak, begins + .02);
+        gain.gain.exponentialRampToValueAtTime(.0001, begins + duration);
+        oscillator.connect(gain).connect(context.destination); oscillator.start(begins); oscillator.stop(begins + duration + .01);
       });
     } catch { /* audio is optional */ }
+  }
+
+  function motorSound(snapshot: ClawSnapshot) {
+    const context = audio.current;
+    if (!context || !feedbackRef.current) return quietMotor();
+    try {
+      if (!motor.current) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const filter = context.createBiquadFilter();
+        oscillator.type = "triangle"; oscillator.frequency.value = 82;
+        filter.type = "lowpass"; filter.frequency.value = 360; filter.Q.value = .55;
+        gain.gain.value = .0001;
+        oscillator.connect(filter).connect(gain).connect(context.destination);
+        oscillator.start();
+        motor.current = { oscillator, gain, filter };
+      }
+      const speed = Math.hypot(snapshot.claw.velocityX, snapshot.claw.velocityZ);
+      const vertical = ["drop", "lift", "return"].includes(snapshot.phase);
+      const moving = snapshot.phase === "aim" && speed > .04;
+      const target = vertical ? .011 : moving ? Math.min(.009, .0025 + speed * .002) : .0001;
+      motor.current.oscillator.frequency.setTargetAtTime(vertical ? 72 : 84 + speed * 7, context.currentTime, .06);
+      motor.current.gain.gain.setTargetAtTime(target, context.currentTime, target > .001 ? .045 : .09);
+    } catch { /* audio is optional */ }
+  }
+
+  function quietMotor() {
+    const context = audio.current;
+    if (!context || !motor.current) return;
+    try { motor.current.gain.gain.setTargetAtTime(.0001, context.currentTime, .06); } catch { /* context closed */ }
   }
 
   async function load(showLoading = true) {
@@ -320,7 +356,7 @@ export function ClawGame({ user }: { user: User }) {
     return () => { stopped = true; window.clearTimeout(reconnect); window.removeEventListener("online", online); socket?.close(); };
   }, []);
 
-  useEffect(() => () => { void audio.current?.close(); }, []);
+  useEffect(() => () => { motor.current = null; void audio.current?.close(); }, []);
 
   useEffect(() => {
     if (!loading) store(CACHE_KEY, { attempt, credits, collection, rewardTable } satisfies ClawCache);
@@ -453,7 +489,9 @@ export function ClawGame({ user }: { user: User }) {
       setPhase(snapshot.phase);
       drawMachine(canvas.current!, snapshot, user.preferences.reducedMotion);
       drawTopCamera(topCanvas.current!, snapshot);
+      motorSound(snapshot);
       if (["won", "missed", "abandoned"].includes(machine.phase)) {
+        quietMotor();
         if (!finishing.current) { finishing.current = true; void finish(machine.result()); }
         return;
       }
@@ -462,7 +500,7 @@ export function ClawGame({ user }: { user: User }) {
     drawMachine(canvas.current, machine.snapshot(), user.preferences.reducedMotion);
     drawTopCamera(topCanvas.current, machine.snapshot());
     frame = requestAnimationFrame(animate);
-    return () => { cancelAnimationFrame(frame); game.current = null; };
+    return () => { cancelAnimationFrame(frame); quietMotor(); game.current = null; };
   }, [attempt?.id, attempt?.status, user.preferences.reducedMotion]);
 
   async function createAttempt() {
@@ -518,7 +556,8 @@ export function ClawGame({ user }: { user: User }) {
         <button type="button" className="claw-feedback" aria-pressed={feedback}
           aria-label={`${feedback ? "Tắt" : "Bật"} âm thanh và rung`} onClick={() => {
             const enabled = !feedback; setFeedback(enabled); store("our:claw-feedback:v1", enabled);
-            if (enabled) sound("start", true);
+            feedbackRef.current = enabled;
+            if (enabled) sound("start", true); else quietMotor();
           }}>{feedback ? "🔊" : "🔇"}</button>
         <span className="claw-credit" aria-label={`${credits?.balance ?? 0} lượt gắp`}>🕹️ {credits?.balance ?? "…"}</span>
       </div>
