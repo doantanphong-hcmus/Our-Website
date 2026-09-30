@@ -28,6 +28,7 @@ async function main() {
       id: "00000000-0000-4000-8000-000000000301", status: "ready", seed: 20260928,
       controlTrace: [], capturedPlushId: null, resultSteps: null, version: 1, expiresAt: 2_000_000_000,
     };
+    let completionRequests = 0;
     const clawCredits = { balance: 5, packCost: 20, attemptsPerPack: 5, purchasedToday: 1, maximumPacksPerDay: 3 };
     const clawRewardTable = [
       { id: "tiny", label: "Túi sao nhỏ", chancePercent: 55, stars: 1 },
@@ -65,8 +66,13 @@ async function main() {
         body: JSON.stringify({ attempt: clawAttempt, credits: clawCredits }) });
       if (url.pathname.endsWith("/start")) clawAttempt = { ...clawAttempt, status: "playing", version: 2 };
       if (url.pathname.endsWith("/trace")) clawAttempt = { ...clawAttempt, controlTrace: input.controlTrace, version: clawAttempt.version + 1 };
-      if (url.pathname.endsWith("/complete")) clawAttempt = { ...clawAttempt, status: input.outcome, capturedPlushId: input.capturedPlushId ?? null,
-        resultSteps: input.steps, version: clawAttempt.version + 1 };
+      if (url.pathname.endsWith("/complete")) {
+        completionRequests++;
+        if (completionRequests === 1) return route.fulfill({ status: 409, contentType: "application/json",
+          body: JSON.stringify({ error: "Lượt chơi vừa thay đổi, vui lòng đồng bộ lại.", attempt: clawAttempt }) });
+        clawAttempt = { ...clawAttempt, status: input.outcome, capturedPlushId: input.capturedPlushId ?? null,
+          resultSteps: input.steps, version: clawAttempt.version + 1 };
+      }
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ attempt: clawAttempt, credits: clawCredits }) });
     });
     await page.goto(baseUrl);
@@ -139,6 +145,7 @@ async function main() {
       window.dispatchEvent(new Event("online"));
     });
     await page.waitForFunction(() => localStorage.getItem("our:claw-completion:v1") === null);
+    assert.equal(completionRequests, 2, "completion must reconcile a stale version without refresh");
     await page.getByRole("heading", { name: "Suýt nữa là được rồi" }).waitFor();
     assert.equal(await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth), true);
     await page.setViewportSize({ width: 430, height: 932 });

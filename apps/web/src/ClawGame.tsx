@@ -53,6 +53,20 @@ function forget(key: string) {
   try { localStorage.removeItem(key); } catch { /* private browsing may block storage */ }
 }
 
+async function completeWithReconciliation(completion: Completion) {
+  try {
+    return await call(`/api/claw/attempts/${completion.attemptId}/complete`, "POST", completion.body);
+  } catch (firstError) {
+    const active = await call("/api/claw/attempts/active").catch(() => null);
+    const expectedVersion = active?.attempt?.id === completion.attemptId
+      ? active.attempt.version : completion.body.expectedVersion;
+    try {
+      return await call(`/api/claw/attempts/${completion.attemptId}/complete`, "POST",
+        { ...completion.body, expectedVersion });
+    } catch { throw firstError; }
+  }
+}
+
 function mergeCachedTrace(server: Attempt | null, cached: Attempt | null) {
   if (!server || !cached || server.id !== cached.id || server.status !== "playing"
     || cached.controlTrace.length <= server.controlTrace.length
@@ -249,9 +263,12 @@ export function ClawGame({ user }: { user: User }) {
     try {
       const [active, owned] = await Promise.all([call("/api/claw/attempts/active"), call("/api/claw/collection")]);
       const cached = stored<ClawCache>(CACHE_KEY);
-      setAttempt((current) => active.attempt
-        ? mergeCachedTrace(active.attempt, cached?.attempt ?? current)
-        : current && ["won", "missed", "abandoned"].includes(current.status) ? current : null);
+      setAttempt((current) => {
+        if (!active.attempt) return current && ["won", "missed", "abandoned"].includes(current.status) ? current : null;
+        if (current?.id === active.attempt.id && ["won", "missed", "abandoned"].includes(current.status)
+          && ["ready", "playing"].includes(active.attempt.status)) return current;
+        return mergeCachedTrace(active.attempt, cached?.attempt ?? current);
+      });
       setCredits(active.credits ?? null);
       setCollection(owned.collection ?? []); setRewardTable(owned.rewardTable ?? []);
     } catch (reason) {
@@ -269,16 +286,12 @@ export function ClawGame({ user }: { user: User }) {
   async function recover(showLoading = true) {
     const pendingCompletion = stored<Completion>(COMPLETION_KEY);
     if (pendingCompletion && navigator.onLine) {
-      let active: Payload | null = null;
       try {
-        active = await call("/api/claw/attempts/active");
-        const expectedVersion = active.attempt?.id === pendingCompletion.attemptId
-          ? active.attempt.version : pendingCompletion.body.expectedVersion;
-        const payload = await call(`/api/claw/attempts/${pendingCompletion.attemptId}/complete`, "POST",
-          { ...pendingCompletion.body, expectedVersion });
+        const payload = await completeWithReconciliation(pendingCompletion);
         forget(COMPLETION_KEY);
         if (payload.capture) setLatestCapture(payload.capture);
       } catch {
+        const active = await call("/api/claw/attempts/active").catch(() => null);
         if (active?.attempt?.id === pendingCompletion.attemptId && active.attempt.status === "abandoned") forget(COMPLETION_KEY);
       }
     }
@@ -392,10 +405,11 @@ export function ClawGame({ user }: { user: User }) {
         capturedPlushId: outcome === "won" ? result.capturedPlushId ?? undefined : undefined,
         controlTrace: controls.current,
       };
-      store(COMPLETION_KEY, { attemptId: attempt.id, body } satisfies Completion);
-      const payload = await call(`/api/claw/attempts/${attempt.id}/complete`, "POST", body);
+      const completion = { attemptId: attempt.id, body } satisfies Completion;
+      store(COMPLETION_KEY, completion);
+      const payload = await completeWithReconciliation(completion);
       forget(COMPLETION_KEY);
-      if (payload.attempt) setAttempt(payload.attempt);
+      if (payload.attempt) { version.current = payload.attempt.version; setAttempt(payload.attempt); }
       if (payload.capture) {
         setLatestCapture(payload.capture);
         setCollection((items) => [payload.capture!, ...items.filter(({ instanceId }) => instanceId !== payload.capture!.instanceId)]);
