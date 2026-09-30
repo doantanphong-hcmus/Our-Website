@@ -113,6 +113,9 @@ async function main() {
     await page.getByRole("heading", { name: "Gắp một bé về nhà" }).waitFor();
     assert.equal(await page.locator("html").getAttribute("data-motion"), "reduced");
     await page.getByText("Bộ sưu tập").waitFor();
+    const backgroundMusic = page.locator('audio[src="/friendly-town.mp3"]');
+    assert.equal(await backgroundMusic.count(), 1);
+    assert.equal(await backgroundMusic.getAttribute("loop"), "");
     assert.equal(await page.getByText("Quà có thể nhận").count(), 1);
     assert.equal(await page.getByText(/Lượt này còn \d+ giây/).count(), 1);
     assert.equal(await page.locator(".claw-plush-icon").count(), 1);

@@ -235,6 +235,7 @@ export function ClawGame({ user }: { user: User }) {
   const createKey = useRef(crypto.randomUUID());
   const purchaseKey = useRef(crypto.randomUUID());
   const audio = useRef<AudioContext | null>(null);
+  const music = useRef<HTMLAudioElement>(null);
   const motor = useRef<{ oscillator: OscillatorNode; gain: GainNode; filter: BiquadFilterNode } | null>(null);
   const [joystick, setJoystick] = useState({ x: 0, z: 0 });
   const [feedback, setFeedback] = useState(() => stored<boolean>("our:claw-feedback:v1") ?? true);
@@ -291,6 +292,14 @@ export function ClawGame({ user }: { user: User }) {
     const context = audio.current;
     if (!context || !motor.current) return;
     try { motor.current.gain.gain.setTargetAtTime(.0001, context.currentTime, .06); } catch { /* context closed */ }
+  }
+
+  function backgroundMusic(playing: boolean) {
+    const track = music.current;
+    if (!track) return;
+    track.volume = .14;
+    if (playing && feedbackRef.current) void track.play().catch(() => {});
+    else track.pause();
   }
 
   async function load(showLoading = true) {
@@ -356,7 +365,11 @@ export function ClawGame({ user }: { user: User }) {
     return () => { stopped = true; window.clearTimeout(reconnect); window.removeEventListener("online", online); socket?.close(); };
   }, []);
 
-  useEffect(() => () => { motor.current = null; void audio.current?.close(); }, []);
+  useEffect(() => () => { music.current?.pause(); motor.current = null; void audio.current?.close(); }, []);
+
+  useEffect(() => {
+    backgroundMusic(attempt?.status === "playing");
+  }, [attempt?.status, feedback]);
 
   useEffect(() => {
     if (!loading) store(CACHE_KEY, { attempt, credits, collection, rewardTable } satisfies ClawCache);
@@ -516,12 +529,12 @@ export function ClawGame({ user }: { user: User }) {
 
   async function start() {
     if (!attempt) return;
-    sound("start");
+    sound("start"); backgroundMusic(true);
     setPending(true); setError("");
     try {
       const payload = await call(`/api/claw/attempts/${attempt.id}/start`, "POST", { expectedVersion: attempt.version });
       if (payload.attempt) setAttempt(payload.attempt);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Chưa khởi động được máy."); }
+    } catch (reason) { backgroundMusic(false); setError(reason instanceof Error ? reason.message : "Chưa khởi động được máy."); }
     finally { setPending(false); }
   }
 
@@ -550,6 +563,7 @@ export function ClawGame({ user }: { user: User }) {
   const canPlay = user.role === "girlfriend";
   const remaining = attempt && ["ready", "playing"].includes(attempt.status) ? Math.max(0, attempt.expiresAt - now) : null;
   return <section className="claw-game" aria-labelledby="page-title" onKeyDown={(event) => keyboard(event, true)} onKeyUp={(event) => keyboard(event, false)}>
+    <audio ref={music} src="/friendly-town.mp3" preload="metadata" loop />
     <header className="claw-game__header">
       <div><p className="eyebrow">Máy gắp của Nhi</p><h1 id="page-title">Gắp một bé về nhà</h1></div>
       <div className="claw-status">
@@ -557,7 +571,8 @@ export function ClawGame({ user }: { user: User }) {
           aria-label={`${feedback ? "Tắt" : "Bật"} âm thanh và rung`} onClick={() => {
             const enabled = !feedback; setFeedback(enabled); store("our:claw-feedback:v1", enabled);
             feedbackRef.current = enabled;
-            if (enabled) sound("start", true); else quietMotor();
+            if (enabled) { sound("start", true); backgroundMusic(playing); }
+            else { quietMotor(); backgroundMusic(false); }
           }}>{feedback ? "🔊" : "🔇"}</button>
         <span className="claw-credit" aria-label={`${credits?.balance ?? 0} lượt gắp`}>🕹️ {credits?.balance ?? "…"}</span>
       </div>
