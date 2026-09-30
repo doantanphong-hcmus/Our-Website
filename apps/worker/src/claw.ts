@@ -202,12 +202,17 @@ async function createAttempt(request: Request, env: ClawEnv, auth: Auth) {
   const now = Math.floor(Date.now() / 1000);
   const id = crypto.randomUUID();
   const seed = (crypto.getRandomValues(new Uint32Array(1))[0] & 0x7fffffff) || 1;
-  await env.DB.prepare(`INSERT INTO claw_attempts
-    (id, couple_space_id, player_user_id, idempotency_key, seed, rules_version, expires_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, auth.user.couple_space_id, auth.user.id, key, seed, rules.version,
-      now + rules.attempt.abandonAfterSeconds, now, now).run();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE claw_credit_wallets SET balance = balance - 1, updated_at = ?
+      WHERE couple_space_id = ? AND balance >= 1`).bind(now, auth.user.couple_space_id),
+    env.DB.prepare(`INSERT INTO claw_attempts
+      (id, couple_space_id, player_user_id, idempotency_key, seed, rules_version, expires_at, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`)
+      .bind(id, auth.user.couple_space_id, auth.user.id, key, seed, rules.version,
+        now + rules.attempt.abandonAfterSeconds, now, now),
+  ]);
   const created = await findAttempt(env, auth.user.couple_space_id, id);
+  if (!created) return json({ error: "Em đã hết lượt gắp thú rồi." }, 409);
   return json({ attempt: attempt(created!), credits: await creditState(env, auth.user.couple_space_id) }, 201);
 }
 
@@ -331,12 +336,27 @@ async function buyCredits(request: Request, env: ClawEnv, auth: Auth) {
   const row: PurchaseRow = { id: crypto.randomUUID(), stars_spent: rules.economy.packCost,
     credits_added: rules.economy.attemptsPerPack, label_snapshot: `${rules.economy.attemptsPerPack} lượt gắp thú`,
     created_at: Math.floor(Date.now() / 1000) };
-  await env.DB.prepare(`INSERT INTO claw_credit_purchases
-    (id, couple_space_id, buyer_user_id, idempotency_key, star_transaction_id,
-      stars_spent, credits_added, label_snapshot, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(row.id, auth.user.couple_space_id, auth.user.id, key, crypto.randomUUID(),
-      row.stars_spent, row.credits_added, row.label_snapshot, row.created_at).run();
+  const transactionId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE star_wallets SET balance = balance - ?, updated_at = ?
+      WHERE couple_space_id = ? AND balance >= ?`)
+      .bind(row.stars_spent, row.created_at, auth.user.couple_space_id, row.stars_spent),
+    env.DB.prepare(`INSERT INTO star_transactions
+      (id, couple_space_id, actor_user_id, idempotency_key, kind, delta, balance_after,
+        rule_id, label_snapshot, created_at)
+      SELECT ?, ?, ?, ?, 'redeem', ?, balance, 'claw-credit-pack', ?, ?
+      FROM star_wallets WHERE couple_space_id = ? AND changes() = 1`)
+      .bind(transactionId, auth.user.couple_space_id, auth.user.id, key, -row.stars_spent,
+        row.label_snapshot, row.created_at, auth.user.couple_space_id),
+    env.DB.prepare(`INSERT INTO claw_credit_purchases
+      (id, couple_space_id, buyer_user_id, idempotency_key, star_transaction_id,
+        stars_spent, credits_added, label_snapshot, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(row.id, auth.user.couple_space_id, auth.user.id, key, transactionId,
+        row.stars_spent, row.credits_added, row.label_snapshot, row.created_at),
+    env.DB.prepare(`UPDATE claw_credit_wallets SET balance = balance + ?, updated_at = ?
+      WHERE couple_space_id = ?`).bind(row.credits_added, row.created_at, auth.user.couple_space_id),
+  ]);
   const starWallet = await env.DB.prepare("SELECT balance, updated_at FROM star_wallets WHERE couple_space_id = ?")
     .bind(auth.user.couple_space_id).first<{ balance: number; updated_at: number }>();
   return json({ wallet: { balance: starWallet?.balance ?? 0, updatedAt: starWallet?.updated_at ?? row.created_at },

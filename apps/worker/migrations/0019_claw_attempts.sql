@@ -35,35 +35,41 @@ ON claw_attempts (couple_space_id) WHERE status IN ('ready', 'playing');
 CREATE INDEX claw_attempts_history
 ON claw_attempts (couple_space_id, created_at DESC, id DESC);
 
-CREATE TRIGGER claw_attempt_create_consume_credit
+CREATE TRIGGER claw_attempt_create_validate_state
 BEFORE INSERT ON claw_attempts
 BEGIN
   SELECT CASE WHEN NEW.status <> 'ready' OR NEW.control_trace_json <> '[]'
     OR NEW.started_at IS NOT NULL OR NEW.completed_at IS NOT NULL
     THEN raise(ABORT, 'claw attempt must start ready') END;
+END;
+
+CREATE TRIGGER claw_attempt_create_validate_player
+BEFORE INSERT ON claw_attempts
+BEGIN
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM users WHERE id = NEW.player_user_id
       AND couple_space_id = NEW.couple_space_id AND role = 'girlfriend'
   ) THEN raise(ABORT, 'only girlfriend can play claw game') END;
-  SELECT CASE WHEN coalesce((
-    SELECT balance FROM claw_credit_wallets WHERE couple_space_id = NEW.couple_space_id
-  ), 0) < 1 THEN raise(ABORT, 'no claw credits') END;
-  SELECT CASE WHEN EXISTS (
-    SELECT 1 FROM claw_attempts WHERE couple_space_id = NEW.couple_space_id
-      AND status IN ('ready', 'playing')
-  ) THEN raise(ABORT, 'active claw attempt exists') END;
-  UPDATE claw_credit_wallets SET balance = balance - 1, updated_at = NEW.created_at
-  WHERE couple_space_id = NEW.couple_space_id;
 END;
 
-CREATE TRIGGER claw_attempts_guard_update
+CREATE TRIGGER claw_attempts_guard_identity
 BEFORE UPDATE ON claw_attempts
 BEGIN
   SELECT CASE WHEN NEW.id <> OLD.id OR NEW.couple_space_id <> OLD.couple_space_id
     OR NEW.player_user_id <> OLD.player_user_id OR NEW.idempotency_key <> OLD.idempotency_key
     OR NEW.seed <> OLD.seed OR NEW.rules_version <> OLD.rules_version OR NEW.created_at <> OLD.created_at
     THEN raise(ABORT, 'claw attempt identity is immutable') END;
+END;
+
+CREATE TRIGGER claw_attempts_guard_version
+BEFORE UPDATE ON claw_attempts
+BEGIN
   SELECT CASE WHEN NEW.version <> OLD.version + 1 THEN raise(ABORT, 'claw attempt version must increment') END;
+END;
+
+CREATE TRIGGER claw_attempts_guard_transition
+BEFORE UPDATE ON claw_attempts
+BEGIN
   SELECT CASE WHEN NEW.status <> OLD.status AND NOT (
     (OLD.status = 'ready' AND NEW.status IN ('playing', 'abandoned')) OR
     (OLD.status = 'playing' AND NEW.status IN ('won', 'missed', 'abandoned'))

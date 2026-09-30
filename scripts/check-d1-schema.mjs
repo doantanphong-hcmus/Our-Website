@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -21,6 +21,14 @@ function run(args, expectFailure = false) {
 }
 
 const local = ["DB", "--local", "--persist-to", state, "--config", config];
+
+for (const name of ["0018_claw_credits.sql", "0019_claw_attempts.sql"]) {
+  const sql = await readFile(path.join(root, "apps", "worker", "migrations", name), "utf8");
+  for (const [trigger] of sql.matchAll(/^CREATE TRIGGER[\s\S]*?^END;/gm)) {
+    assert.ok((trigger.match(/;\s*$/gm) ?? []).length <= 2,
+      `${name} trigger bodies must stay single-statement for remote D1 migrations`);
+  }
+}
 
 try {
   run(["d1", "migrations", "apply", ...local]);
@@ -89,9 +97,14 @@ try {
 
   run(["d1", "execute", ...local, "--command", `
     UPDATE star_wallets SET balance=30, updated_at=unixepoch() WHERE couple_space_id='couple-main';
+    UPDATE star_wallets SET balance=balance-20, updated_at=unixepoch() WHERE couple_space_id='couple-main';
+    INSERT INTO star_transactions
+      (id,couple_space_id,actor_user_id,idempotency_key,kind,delta,balance_after,rule_id,label_snapshot)
+    VALUES ('stars-pack-1','couple-main','user-nhi','buy-claw-pack-001','redeem',-20,10,'claw-credit-pack','5 lượt gắp thú');
     INSERT INTO claw_credit_purchases
       (id,couple_space_id,buyer_user_id,idempotency_key,star_transaction_id,stars_spent,credits_added,label_snapshot)
-    VALUES ('pack-1','couple-main','user-nhi','buy-claw-pack-001','stars-pack-1',20,5,'5 lượt gắp thú');`]);
+    VALUES ('pack-1','couple-main','user-nhi','buy-claw-pack-001','stars-pack-1',20,5,'5 lượt gắp thú');
+    UPDATE claw_credit_wallets SET balance=balance+5, updated_at=unixepoch() WHERE couple_space_id='couple-main';`]);
   const clawPurchaseOutput = run([
     "d1", "execute", ...local, "--json", "--command",
     "SELECT (SELECT balance FROM star_wallets) AS stars, (SELECT balance FROM claw_credit_wallets) AS credits",
@@ -101,9 +114,11 @@ try {
   run(["d1", "execute", ...local, "--command", "DELETE FROM claw_credit_purchases WHERE id='pack-1'"], true);
   run(["d1", "execute", ...local, "--command", "UPDATE claw_credit_wallets SET balance=-1 WHERE couple_space_id='couple-main'"], true);
 
-  run(["d1", "execute", ...local, "--command", `INSERT INTO claw_attempts
+  run(["d1", "execute", ...local, "--command", `
+    UPDATE claw_credit_wallets SET balance=balance-1, updated_at=unixepoch() WHERE couple_space_id='couple-main';
+    INSERT INTO claw_attempts
     (id,couple_space_id,player_user_id,idempotency_key,seed,rules_version,expires_at)
-    VALUES ('00000000-0000-4000-8000-000000000201','couple-main','user-nhi','claw-attempt-001',42,1,unixepoch()+300)`]);
+    VALUES ('00000000-0000-4000-8000-000000000201','couple-main','user-nhi','claw-attempt-001',42,1,unixepoch()+300);`]);
   const attemptOutput = run([
     "d1", "execute", ...local, "--json", "--command",
     "SELECT (SELECT balance FROM claw_credit_wallets) AS credits, (SELECT status FROM claw_attempts) AS status",

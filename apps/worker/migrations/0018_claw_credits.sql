@@ -25,32 +25,23 @@ CREATE TABLE claw_credit_purchases (
 CREATE INDEX claw_credit_purchases_history
 ON claw_credit_purchases (couple_space_id, created_at DESC, id DESC);
 
-CREATE TRIGGER claw_credit_purchase_apply
+CREATE TRIGGER claw_credit_purchase_buyer
 BEFORE INSERT ON claw_credit_purchases
 BEGIN
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM users WHERE id = NEW.buyer_user_id
       AND couple_space_id = NEW.couple_space_id AND role = 'girlfriend'
   ) THEN raise(ABORT, 'only girlfriend can buy claw credits') END;
+END;
+
+CREATE TRIGGER claw_credit_purchase_daily_limit
+BEFORE INSERT ON claw_credit_purchases
+BEGIN
   SELECT CASE WHEN (
     SELECT count(*) FROM claw_credit_purchases
     WHERE couple_space_id = NEW.couple_space_id
       AND date(created_at, 'unixepoch', '+7 hours') = date(NEW.created_at, 'unixepoch', '+7 hours')
   ) >= 3 THEN raise(ABORT, 'daily claw pack limit reached') END;
-  SELECT CASE WHEN coalesce((
-    SELECT balance FROM star_wallets WHERE couple_space_id = NEW.couple_space_id
-  ), -1) < NEW.stars_spent THEN raise(ABORT, 'insufficient stars') END;
-
-  UPDATE star_wallets SET balance = balance - NEW.stars_spent, updated_at = NEW.created_at
-  WHERE couple_space_id = NEW.couple_space_id;
-  INSERT INTO star_transactions
-    (id, couple_space_id, actor_user_id, idempotency_key, kind, delta, balance_after,
-      rule_id, label_snapshot, created_at)
-  SELECT NEW.star_transaction_id, NEW.couple_space_id, NEW.buyer_user_id, NEW.idempotency_key,
-    'redeem', -NEW.stars_spent, balance, 'claw-credit-pack', NEW.label_snapshot, NEW.created_at
-  FROM star_wallets WHERE couple_space_id = NEW.couple_space_id;
-  UPDATE claw_credit_wallets SET balance = balance + NEW.credits_added, updated_at = NEW.created_at
-  WHERE couple_space_id = NEW.couple_space_id;
 END;
 
 CREATE TRIGGER claw_credit_purchases_no_update
