@@ -126,6 +126,7 @@ async function main() {
     await page.getByRole("button", { name: "Bắt đầu gắp" }).click();
     const machine = page.locator(".claw-machine__main");
     await machine.waitFor();
+    assert.match(await machine.getAttribute("aria-label"), /18 thú bông, càng bốn chấu/);
     assert.equal(await page.getByLabel("Camera nóc máy gắp với tâm ngắm màu đỏ").count(), 1);
     const machineBounds = await machine.boundingBox();
     assert.ok(machineBounds && machineBounds.width <= 328 && machineBounds.height > machineBounds.width,

@@ -25,6 +25,14 @@ const plushStyle: Record<string, { color: string; ears: "round" | "long" | "smal
   cat: { color: "#e6b765", ears: "small" }, capybara: { color: "#ad7955", ears: "round" },
   dinosaur: { color: "#83b895", ears: "small" }, seal: { color: "#a9c7d9", ears: "round" },
 };
+const plushTypes = ["bear", "rabbit", "cat", "capybara", "dinosaur", "seal"];
+// ponytail: twelve background plushes keep this update visual; make them physical in the physics pass.
+const backgroundPlushes: ClawSnapshot["plushes"] = Array.from({ length: 12 }, (_, index) => ({
+  id: plushTypes[index % plushTypes.length],
+  x: 118 + index % 6 * 43, y: 493 + Math.floor(index / 6) * 39,
+  z: 38 + Math.floor(index / 6) * 100, angle: (index % 5 - 2) * .09,
+  radius: [23, 19, 21, 25, 24, 20][index % 6],
+}));
 
 function PlushIcon({ id }: { id: string }) {
   const style = plushStyle[id] ?? { color: "#c7a6cf", ears: "round" as const };
@@ -143,7 +151,7 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   context.fillStyle = "#120e18"; context.fillRect(0, 555, 88, 85);
   context.strokeStyle = "#f0a3b5"; context.lineWidth = 3; context.strokeRect(5, 560, 78, 72);
   context.fillStyle = "#f7d7e0"; context.font = "700 12px system-ui"; context.fillText("MÁNG QUÀ", 11, 625);
-  for (const plush of [...snapshot.plushes].sort((left, right) => left.z - right.z)) {
+  for (const plush of [...backgroundPlushes, ...snapshot.plushes].sort((left, right) => left.z - right.z)) {
     const depthScale = .84 + (plush.z - 30) / 120 * .18;
     const projected = { ...plush, x: 180 + (plush.x - 180) * depthScale,
       y: plush.y + (plush.z - 90) * .28 };
@@ -159,11 +167,23 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   const clawX = 180 + (x - 180) * clawScale;
   const clawY = y + (z - 90) * .28;
   context.strokeStyle = "#eadff0"; context.lineWidth = 3; context.beginPath(); context.moveTo(clawX, 47); context.lineTo(clawX, clawY); context.stroke();
-  context.fillStyle = "#d4b5df"; context.beginPath(); context.arc(clawX, clawY, 9 * clawScale, 0, Math.PI * 2); context.fill();
   const spread = 20 - close * 10;
-  context.strokeStyle = "#d4b5df"; context.lineWidth = 7; context.lineCap = "round";
-  context.beginPath(); context.moveTo(clawX - 3, clawY + 6); context.quadraticCurveTo(clawX - spread, clawY + 25, clawX - spread + close * 5, clawY + 52); context.stroke();
-  context.beginPath(); context.moveTo(clawX + 3, clawY + 6); context.quadraticCurveTo(clawX + spread, clawY + 25, clawX + spread - close * 5, clawY + 52); context.stroke();
+  // ponytail: the rear pair is visual until the next update adds four-prong collision physics.
+  const prongs = [
+    { side: -1, reach: .48, length: 45, width: 5, color: "#aa8ab7" },
+    { side: 1, reach: .48, length: 45, width: 5, color: "#aa8ab7" },
+    { side: -1, reach: 1, length: 52, width: 7, color: "#d4b5df" },
+    { side: 1, reach: 1, length: 52, width: 7, color: "#d4b5df" },
+  ];
+  context.lineCap = "round";
+  for (const prong of prongs) {
+    context.strokeStyle = prong.color; context.lineWidth = prong.width * clawScale;
+    context.beginPath(); context.moveTo(clawX + prong.side * 3, clawY + 6);
+    context.quadraticCurveTo(clawX + prong.side * spread * prong.reach, clawY + 24,
+      clawX + prong.side * (spread * prong.reach - close * 5 * prong.reach), clawY + prong.length * clawScale);
+    context.stroke();
+  }
+  context.fillStyle = "#d4b5df"; context.beginPath(); context.arc(clawX, clawY, 9 * clawScale, 0, Math.PI * 2); context.fill();
   context.strokeStyle = "rgba(255,255,255,.16)"; context.lineWidth = 2;
   context.beginPath(); context.moveTo(70, 72); context.lineTo(35, 430); context.stroke();
   context.beginPath(); context.moveTo(294, 72); context.lineTo(325, 350); context.stroke();
@@ -188,7 +208,7 @@ function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
 
   const projectX = (x: number) => 10 + Math.max(0, Math.min(1, (x - 90) / 270)) * 140;
   const projectZ = (z: number) => 12 + Math.max(0, Math.min(1, (z - 30) / 120)) * 84;
-  for (const plush of snapshot.plushes) {
+  for (const plush of [...backgroundPlushes, ...snapshot.plushes]) {
     const x = projectX(plush.x);
     const y = projectZ(plush.z);
     const style = plushStyle[plush.id] ?? { color: "#c7a6cf" };
@@ -202,6 +222,12 @@ function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
   context.strokeStyle = "#ff4f64"; context.lineWidth = 1.5;
   context.beginPath(); context.arc(targetX, targetY, 10, 0, Math.PI * 2); context.stroke();
   context.beginPath(); context.moveTo(targetX - 15, targetY); context.lineTo(targetX + 15, targetY); context.moveTo(targetX, targetY - 15); context.lineTo(targetX, targetY + 15); context.stroke();
+  context.strokeStyle = "#d4b5df"; context.lineWidth = 2.5; context.lineCap = "round";
+  for (let index = 0; index < 4; index++) {
+    const angle = Math.PI / 4 + index * Math.PI / 2;
+    context.beginPath(); context.moveTo(targetX + Math.cos(angle) * 13, targetY + Math.sin(angle) * 13);
+    context.lineTo(targetX + Math.cos(angle) * 7, targetY + Math.sin(angle) * 7); context.stroke();
+  }
   context.fillStyle = "#ff4058"; context.beginPath(); context.arc(targetX, targetY, 3.2, 0, Math.PI * 2); context.fill();
 }
 
@@ -581,7 +607,7 @@ export function ClawGame({ user }: { user: User }) {
     {loading ? <p className="claw-message" role="status">Đang bật đèn máy gắp…</p> : null}
     {!loading && playing ? <>
       <div className={`claw-machine claw-machine--${phase}`}>
-        <canvas className="claw-machine__main" ref={canvas} role="img" aria-label="Góc nhìn chính từ bên ngoài máy gắp, với sáu thú bông và máng quà bên trái" />
+        <canvas className="claw-machine__main" ref={canvas} role="img" aria-label="Góc nhìn chính từ bên ngoài máy gắp, với 18 thú bông, càng bốn chấu và máng quà bên trái" />
         <span className="claw-machine__view-label" aria-hidden="true">GÓC NHÌN CHÍNH</span>
         <aside className="claw-camera" aria-label="Camera nóc máy gắp với tâm ngắm màu đỏ">
           <div className="claw-camera__status"><span aria-hidden="true" /> CAM NÓC</div>
