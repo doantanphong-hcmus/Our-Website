@@ -25,14 +25,6 @@ const plushStyle: Record<string, { color: string; ears: "round" | "long" | "smal
   cat: { color: "#e6b765", ears: "small" }, capybara: { color: "#ad7955", ears: "round" },
   dinosaur: { color: "#83b895", ears: "small" }, seal: { color: "#a9c7d9", ears: "round" },
 };
-const plushTypes = ["bear", "rabbit", "cat", "capybara", "dinosaur", "seal"];
-// ponytail: twelve background plushes keep this update visual; make them physical in the physics pass.
-const backgroundPlushes: ClawSnapshot["plushes"] = Array.from({ length: 12 }, (_, index) => ({
-  id: plushTypes[index % plushTypes.length],
-  x: 118 + index % 6 * 43, y: 493 + Math.floor(index / 6) * 39,
-  z: 38 + Math.floor(index / 6) * 100, angle: (index % 5 - 2) * .09,
-  radius: [23, 19, 21, 25, 24, 20][index % 6],
-}));
 
 function PlushIcon({ id }: { id: string }) {
   const style = plushStyle[id] ?? { color: "#c7a6cf", ears: "round" as const };
@@ -151,7 +143,7 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   context.fillStyle = "#120e18"; context.fillRect(0, 555, 88, 85);
   context.strokeStyle = "#f0a3b5"; context.lineWidth = 3; context.strokeRect(5, 560, 78, 72);
   context.fillStyle = "#f7d7e0"; context.font = "700 12px system-ui"; context.fillText("MÁNG QUÀ", 11, 625);
-  for (const plush of [...backgroundPlushes, ...snapshot.plushes].sort((left, right) => left.z - right.z)) {
+  for (const plush of [...snapshot.plushes].sort((left, right) => left.z - right.z)) {
     const depthScale = .84 + (plush.z - 30) / 120 * .18;
     const projected = { ...plush, x: 180 + (plush.x - 180) * depthScale,
       y: plush.y + (plush.z - 90) * .28 };
@@ -168,7 +160,6 @@ function drawMachine(canvas: HTMLCanvasElement, snapshot: ClawSnapshot, reducedM
   const clawY = y + (z - 90) * .28;
   context.strokeStyle = "#eadff0"; context.lineWidth = 3; context.beginPath(); context.moveTo(clawX, 47); context.lineTo(clawX, clawY); context.stroke();
   const spread = 20 - close * 10;
-  // ponytail: the rear pair is visual until the next update adds four-prong collision physics.
   const prongs = [
     { side: -1, reach: .48, length: 45, width: 5, color: "#aa8ab7" },
     { side: 1, reach: .48, length: 45, width: 5, color: "#aa8ab7" },
@@ -208,7 +199,7 @@ function drawTopCamera(canvas: HTMLCanvasElement, snapshot: ClawSnapshot) {
 
   const projectX = (x: number) => 10 + Math.max(0, Math.min(1, (x - 90) / 270)) * 140;
   const projectZ = (z: number) => 12 + Math.max(0, Math.min(1, (z - 30) / 120)) * 84;
-  for (const plush of [...backgroundPlushes, ...snapshot.plushes]) {
+  for (const plush of snapshot.plushes) {
     const x = projectX(plush.x);
     const y = projectZ(plush.z);
     const style = plushStyle[plush.id] ?? { color: "#c7a6cf" };

@@ -31,7 +31,8 @@ function randomFrom(seed: number) {
 }
 
 export class ClawPhysics {
-  readonly engine = Engine.create({ gravity: { x: 0, y: 1, scale: 0.001 } });
+  readonly engine = Engine.create({ positionIterations: 4, velocityIterations: 3, constraintIterations: 2,
+    gravity: { x: 0, y: 1, scale: 0.001 } });
   readonly plushes: Plush[];
   phase: ClawPhase = "aim";
   stepNumber = 0;
@@ -43,7 +44,7 @@ export class ClawPhysics {
   private velocityZ = 0;
   private closeAmount = 0;
   private held: Plush | null = null;
-  private releasedId: string | null = null;
+  private released: Plush | null = null;
   private grip: Matter.Constraint | null = null;
   private gripAlignment = 0;
   private readonly gripStrength: number;
@@ -51,26 +52,29 @@ export class ClawPhysics {
   private readonly leftProng = Bodies.rectangle(CLAW_START_X - 18, 96, 7, 48, { isStatic: true, angle: -0.35, label: "claw-left" });
   private readonly rightProng = Bodies.rectangle(CLAW_START_X + 18, 96, 7, 48, { isStatic: true, angle: 0.35, label: "claw-right" });
 
-  constructor(seed: number, { gripStrength = 1 } = {}) {
+  constructor(seed: number, { gripStrength = 0.72 } = {}) {
     this.gripStrength = gripStrength;
     const random = randomFrom(seed);
     const definitions = [
       { id: "bear", radius: 23, density: 0.0010, grip: 0.78 },
       { id: "rabbit", radius: 19, density: 0.0008, grip: 0.58 },
       { id: "cat", radius: 21, density: 0.0010, grip: 0.68 },
-      { id: "capybara", radius: 25, density: 0.0016, grip: 0.42 },
-      { id: "dinosaur", radius: 24, density: 0.0015, grip: 0.52 },
+      { id: "capybara", radius: 25, density: 0.0016, grip: 0.9 },
+      { id: "dinosaur", radius: 24, density: 0.0015, grip: 0.75 },
       { id: "seal", radius: 20, density: 0.0008, grip: 0.82 },
     ];
-    this.plushes = definitions.map((item, index) => {
-      const column = index % 3;
-      const row = Math.floor(index / 3);
-      const body = Bodies.circle(145 + column * 78 + (random() - 0.5) * 16,
-        535 - row * 52 + (random() - 0.5) * 8, item.radius, {
+    this.plushes = Array.from({ length: 18 }, (_, index) => {
+      const column = index % 6;
+      const depth = Math.floor(index / 6);
+      const item = definitions[(column + depth * 2) % definitions.length];
+      const depthCategory = 2 << depth;
+      const body = Bodies.circle(120 + column * 43 + (random() - 0.5) * 8,
+        535 + (random() - 0.5) * 8, item.radius, {
           density: item.density, friction: 0.72, frictionStatic: 0.9, restitution: 0.08,
-          angle: (random() - 0.5) * 0.45, label: `plush:${item.id}`,
+          angle: (random() - 0.5) * 0.45, label: `plush:${item.id}:${index}`,
+          collisionFilter: { category: depthCategory, mask: 1 | depthCategory },
         });
-      return { id: item.id, body, z: 55 + row * 55 + (random() - .5) * 14, radius: item.radius, grip: item.grip };
+      return { id: item.id, body, z: 42 + depth * 50 + (random() - .5) * 10, radius: item.radius, grip: item.grip };
     });
     const boundaries = [
       Bodies.rectangle(-10, 320, 20, 640, { isStatic: true }),
@@ -80,7 +84,7 @@ export class ClawPhysics {
       Bodies.rectangle(43, 634, 86, 20, { isStatic: true }),
     ];
     Composite.add(this.engine.world, [...boundaries, ...this.plushes.map(({ body }) => body), this.hub, this.leftProng, this.rightProng]);
-    for (let step = 0; step < 150; step++) Engine.update(this.engine, STEP_MS);
+    for (let step = 0; step < 60; step++) Engine.update(this.engine, STEP_MS);
   }
 
   step(input?: Omit<ClawInput, "step">): ClawPhase {
@@ -114,12 +118,12 @@ export class ClawPhysics {
         this.changePhase("release");
       }
     } else if (this.phase === "release") {
-      if (this.grip && this.held) this.releasedId = this.held.id;
+      if (this.grip && this.held) this.released = this.held;
       this.detach();
       this.closeAmount = Math.max(0, this.closeAmount - 0.1);
       if (this.phaseSteps >= 12) this.changePhase("settle");
     } else if (this.phase === "settle" && this.phaseSteps >= 150) {
-      const winner = this.plushes.find(({ id, body, z }) => id === this.releasedId && body.position.x < 84 && z < 60);
+      const winner = this.released && this.released.body.position.x < 84 && this.released.z < 60 ? this.released : null;
       this.changePhase(winner ? "won" : "missed");
       this.held = winner ?? null;
     }
@@ -167,13 +171,19 @@ export class ClawPhysics {
 
   private attachClosest() {
     const gripPoint = { x: this.clawX, y: this.clawY + 30 };
-    const candidates = this.plushes.map((plush) => ({ plush,
-      distance: Math.hypot(plush.body.position.x - gripPoint.x, plush.body.position.y - gripPoint.y, plush.z - this.clawZ) }))
-      .filter(({ plush, distance }) => distance <= plush.radius + 40)
-      .sort((left, right) => left.distance - right.distance);
+    const candidates = this.plushes.map((plush) => {
+      const offsetX = Math.abs(plush.body.position.x - gripPoint.x);
+      const offsetY = Math.abs(plush.body.position.y - gripPoint.y);
+      const offsetZ = Math.abs(plush.z - this.clawZ);
+      const reach = plush.radius + 30;
+      const enclosure = Math.max(0, 1 - offsetX / reach) * Math.max(0, 1 - offsetZ / reach)
+        * Math.max(0, 1 - offsetY / (plush.radius + 45));
+      return { plush, enclosure, distance: Math.hypot(offsetX, offsetY, offsetZ) };
+    }).filter(({ enclosure }) => enclosure > .08)
+      .sort((left, right) => right.enclosure - left.enclosure || left.distance - right.distance);
     if (!candidates.length) return;
     this.held = candidates[0].plush;
-    this.gripAlignment = Math.max(0, 1 - candidates[0].distance / (this.held.radius + 40)) * this.held.grip;
+    this.gripAlignment = Math.sqrt(candidates[0].enclosure) * this.held.grip * Math.min(1, 22 / this.held.radius);
     this.grip = Constraint.create({ bodyA: this.hub, pointA: { x: 0, y: 25 }, bodyB: this.held.body,
       length: this.held.radius * 0.45, stiffness: 0.92, damping: 0.24, label: "claw-grip" });
     Composite.add(this.engine.world, this.grip);

@@ -11,7 +11,8 @@ describe("claw physics spike", () => {
     const game = new ClawPhysics(42);
     const snapshot = game.snapshot();
     expect(snapshot.claw).toEqual({ x: 180, y: 70, z: 90, velocityX: 0, velocityZ: 0, close: 0 });
-    expect(snapshot.plushes).toHaveLength(6);
+    expect(snapshot.plushes).toHaveLength(18);
+    expect(new Set(snapshot.plushes.map(({ id }) => id)).size).toBe(6);
     expect(snapshot.plushes.every(({ z }) => Number.isFinite(z))).toBe(true);
   });
 
@@ -24,6 +25,13 @@ describe("claw physics spike", () => {
     expect(runClawReplay(20260927, aimAt(winningTarget), { gripStrength: 0.15 }).outcome).toBe("missed");
   });
 
+  it("lets precise four-prong aim lift large plushes without guaranteeing them", () => {
+    const game = new ClawPhysics(20260927);
+    const largeTargets = game.snapshot().plushes.filter(({ id }) => id === "capybara" || id === "dinosaur");
+    const results = largeTargets.map(({ x, z }) => runClawReplay(20260927, aimAt(x, z)));
+    expect(new Set(results.map(({ capturedPlushId }) => capturedPlushId))).toEqual(new Set([null, "capybara", "dinosaur"]));
+  });
+
   it("keeps terminal and geometry invariants across 20 deterministic rounds", () => {
     for (let index = 0; index < 20; index++) {
       const seed = 9000 + index;
@@ -33,6 +41,7 @@ describe("claw physics spike", () => {
       expect(["won", "missed"]).toContain(result.outcome);
       expect(result.steps).toBeLessThanOrEqual(900);
       expect(result.capturedPlushId === null).toBe(result.outcome !== "won");
+      expect(result.finalPlushes).toHaveLength(18);
       expect(new Set(result.finalPlushes.map(({ id }) => id)).size).toBe(6);
       expect(result.finalPlushes.every(({ x, y, z, angle }) => [x, y, z, angle].every(Number.isFinite))).toBe(true);
     }
@@ -59,10 +68,10 @@ describe("claw physics spike", () => {
     expect(Math.abs(coasting.velocityX)).toBeLessThan(Math.abs(released.velocityX));
   });
 
-  it("keeps the headless replay cheap enough for a Worker spike", () => {
+  it("keeps a dense headless replay under 175ms per round", () => {
     const started = performance.now();
     for (let index = 0; index < 20; index++) runClawReplay(index + 1, aimAt(150 + index * 5));
     const elapsed = performance.now() - started;
-    expect(elapsed).toBeLessThan(2_500);
+    expect(elapsed).toBeLessThan(3_500);
   });
 });
